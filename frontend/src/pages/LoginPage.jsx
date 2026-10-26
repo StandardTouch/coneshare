@@ -87,7 +87,7 @@ function LoginPage() {
                 type="email"
                 autoComplete="email"
                 required
-                className="relative block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                className="relative block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-primary focus:outline-none focus:ring-primary sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
                 placeholder="you@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -102,7 +102,7 @@ function LoginPage() {
                 type="password"
                 autoComplete="current-password"
                 required
-                className="relative block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                className="relative block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-primary focus:outline-none focus:ring-primary sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -128,7 +128,7 @@ function LoginPage() {
         {showSignupLink && (
           <p className="text-center text-sm text-gray-600 dark:text-gray-400">
             {t('auth.newTo', { brandName })}{' '}
-            <Link className="font-medium text-indigo-600 hover:text-indigo-500" to="/signup">
+            <Link className="font-medium text-primary hover:text-primary/80" to="/signup">
               {t('auth.signUp')}
             </Link>
           </p>

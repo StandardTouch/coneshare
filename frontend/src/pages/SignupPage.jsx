@@ -73,7 +73,7 @@ export function SignupPage() {
                   id="name"
                   type="text"
                   autoComplete="name"
-                  className="relative block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                  className="relative block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-primary focus:outline-none focus:ring-primary sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
                   placeholder={t('auth.name')}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -88,7 +88,7 @@ export function SignupPage() {
                   type="email"
                   autoComplete="email"
                   required
-                  className="relative block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                  className="relative block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-primary focus:outline-none focus:ring-primary sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
                   placeholder="you@company.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -103,7 +103,7 @@ export function SignupPage() {
                   type="password"
                   autoComplete="new-password"
                   required
-                  className="relative block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                  className="relative block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-primary focus:outline-none focus:ring-primary sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
                   placeholder={t('auth.createPasswordPlaceholder')}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -130,7 +130,7 @@ export function SignupPage() {
 
         <p className="text-center text-sm text-gray-600 dark:text-gray-400">
           {t('auth.alreadyHaveAccount')}{' '}
-          <Link className="font-medium text-indigo-600 hover:text-indigo-500" to="/login">
+          <Link className="font-medium text-primary hover:text-primary/80" to="/login">
             {t('auth.signIn')}
           </Link>
         </p>

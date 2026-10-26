@@ -43,7 +43,7 @@ function SidebarContent() {
             className={cn(
               "flex items-center gap-3 rounded-lg py-2 text-gray-500 transition-all hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50",
               (item.href === "/" ? pathname === item.href : pathname.startsWith(item.href)) &&
-                "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-gray-50",
+                "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary",
               isCollapsed ? "justify-center px-0 h-10 w-10" : "px-3"
             )}
           >
