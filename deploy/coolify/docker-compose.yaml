@@ -1,0 +1,207 @@
+x-restart-policy: &restart_policy
+  restart: unless-stopped
+
+x-depends_on-healthy: &depends_on-healthy
+  condition: service_healthy
+
+x-healthcheck-defaults: &healthcheck_defaults
+  interval: 30s
+  timeout: 5s
+  retries: 3
+  start_period: 10s
+
+x-coneshare-defaults: &coneshare_defaults
+  <<: *restart_policy
+  image: ghcr.io/standardtouch/coneshare:allure
+  depends_on:
+    redis:
+      <<: *depends_on-healthy
+    postgres:
+      <<: *depends_on-healthy
+  environment:
+    # Core Django Settings
+    SECRET_KEY: ${SECRET_KEY}
+    DEBUG: ${DEBUG:-False}
+    SITE_DOMAIN: ${SITE_DOMAIN:-https://share.allureclinic.com}
+    DISPLAY_TIME_ZONE: ${DISPLAY_TIME_ZONE:-Asia/Riyadh}
+    
+    # Trusted proxy configuration for Traefik/Coolify
+    # Docker bridge + Coolify internal network
+    TRUSTED_PROXIES: ${TRUSTED_PROXIES:-127.0.0.1,::1,172.16.0.0/12}
+    
+    # Database
+    DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/coneshare}
+    
+    # Redis
+    REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+    
+    # Service Communication
+    INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
+    CORE_API_URL: http://web:8080
+    PORT: "8080"
+    STORAGE_PATH: /data
+    
+    # Malware Scanning (enabled)
+    MALWARE_SCAN_ENABLED: ${MALWARE_SCAN_ENABLED:-true}
+    CLAMAV_HOST: clamav
+    CLAMAV_PORT: "3310"
+    MALWARE_SCAN_TIMEOUT_MS: ${MALWARE_SCAN_TIMEOUT_MS:-10000}
+    MALWARE_SCAN_FAIL_MODE: ${MALWARE_SCAN_FAIL_MODE:-closed}
+    
+    # Security
+    PASSWORD_MIN_LENGTH: ${PASSWORD_MIN_LENGTH:-8}
+    ENABLED_PASSWORD_VALIDATORS: ${ENABLED_PASSWORD_VALIDATORS:-similarity,min_length,common,numeric}
+    
+    # Public signup (disabled for Allure)
+    ENABLE_PUBLIC_SIGNUP: ${ENABLE_PUBLIC_SIGNUP:-False}
+    
+    # Storage
+    STORAGE_TYPE: ${STORAGE_TYPE:-FILESYSTEM}
+    
+    # Email (placeholders - configure as needed)
+    EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
+    EMAIL_HOST: ${EMAIL_HOST}
+    EMAIL_PORT: ${EMAIL_PORT:-587}
+    EMAIL_USE_TLS: ${EMAIL_USE_TLS:-True}
+    EMAIL_HOST_USER: ${EMAIL_HOST_USER}
+    EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
+    DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-noreply@allureclinic.com}
+    SERVER_EMAIL: ${SERVER_EMAIL:-errors@allureclinic.com}
+    ADMINS: ${ADMINS}
+    
+    # Error Monitoring (Sentry disabled for self-hosted)
+    SENTRY_DSN: ""
+    SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
+    SENTRY_RELEASE: ${SENTRY_RELEASE:-allure}
+    SENTRY_SEND_DEFAULT_PII: "false"
+    
+    # Document Preview
+    PDF_PREVIEW_ENGINE: ${PDF_PREVIEW_ENGINE:-server_pages}
+    ENABLE_OFFICE_PREVIEW: ${ENABLE_OFFICE_PREVIEW:-true}
+    ENABLE_VIDEO_PREVIEW: ${ENABLE_VIDEO_PREVIEW:-false}
+    
+    # Gunicorn
+    GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
+    GUNICORN_THREADS: ${GUNICORN_THREADS:-2}
+    
+    # Celery
+    CELERY_WORKER_CONCURRENCY: ${CELERY_WORKER_CONCURRENCY:-4}
+    CELERY_VIDEO_WORKER_CONCURRENCY: ${CELERY_VIDEO_WORKER_CONCURRENCY:-1}
+    
+    # Logging
+    LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    
+    # User/Group IDs
+    PUID: ${PUID:-1000}
+    PGID: ${PGID:-1000}
+  volumes:
+    - coneshare-data:/data
+    - coneshare-logs:/home/coneshare/logs
+    - coneshare-media:/home/coneshare/app/media
+
+services:
+  web:
+    <<: *coneshare_defaults
+    container_name: coneshare-web
+    ulimits:
+      nofile:
+        soft: 4096
+        hard: 4096
+    healthcheck:
+      <<: *healthcheck_defaults
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1/api/v1/_health/"]
+    # Note: Coolify/Traefik routes share.allureclinic.com to internal port 80
+    # No host port publishing needed - Traefik handles SSL and routing
+    expose:
+      - "80"
+
+  celery:
+    <<: *coneshare_defaults
+    container_name: coneshare-celery
+    command: celery -A backend worker --loglevel=info -Q celery --concurrency=${CELERY_WORKER_CONCURRENCY:-4}
+    ulimits:
+      nofile:
+        soft: 4096
+        hard: 4096
+    healthcheck:
+      <<: *healthcheck_defaults
+      test: ["CMD", "gosu", "coneshare", "python3", "-m", "celery", "-A", "backend", "inspect", "ping"]
+
+  video_worker:
+    <<: *coneshare_defaults
+    container_name: coneshare-video
+    command: celery -A backend worker -l INFO -Q video_processing --concurrency=${CELERY_VIDEO_WORKER_CONCURRENCY:-1}
+    ulimits:
+      nofile:
+        soft: 4096
+        hard: 4096
+    healthcheck:
+      <<: *healthcheck_defaults
+      test: ["CMD", "gosu", "coneshare", "python3", "-m", "celery", "-A", "backend", "inspect", "ping"]
+
+  beat:
+    <<: *coneshare_defaults
+    container_name: coneshare-beat
+    command: celery -A backend beat --loglevel=info
+    ulimits:
+      nofile:
+        soft: 4096
+        hard: 4096
+    healthcheck:
+      <<: *healthcheck_defaults
+      test: ["CMD-SHELL", "pgrep -f 'celery.*beat' || exit 1"]
+
+  postgres:
+    <<: *restart_policy
+    container_name: coneshare-postgres
+    image: postgres:14-bullseye
+    healthcheck:
+      <<: *healthcheck_defaults
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+    command:
+      [
+        "postgres",
+        "-c",
+        "max_connections=${POSTGRES_MAX_CONNECTIONS:-100}",
+      ]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-coneshare}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+    volumes:
+      - coneshare-postgres:/var/lib/postgresql/data
+
+  redis:
+    <<: *restart_policy
+    container_name: coneshare-redis
+    image: redis:6.2.14-alpine
+    healthcheck:
+      <<: *healthcheck_defaults
+      test: redis-cli ping
+    volumes:
+      - coneshare-redis:/data
+    ulimits:
+      nofile:
+        soft: 10032
+        hard: 10032
+
+  clamav:
+    <<: *restart_policy
+    container_name: coneshare-clamav
+    image: clamav/clamav:stable-debian
+    expose:
+      - "3310"
+    healthcheck:
+      <<: *healthcheck_defaults
+      test: ["CMD", "/usr/local/bin/clamdcheck.sh"]
+      start_period: 300s
+    volumes:
+      - coneshare-clamav:/var/lib/clamav
+
+volumes:
+  coneshare-postgres:
+  coneshare-redis:
+  coneshare-data:
+  coneshare-logs:
+  coneshare-media:
+  coneshare-clamav:
