@@ -17,7 +17,7 @@ def send_signup_verification_email_task(email: str, verify_url: str, language: s
         html_content = render_to_string('core/signup_verification_email.html', context)
 
         send_mail(
-            subject=_('Verify your Coneshare account'),
+            subject=_('Verify your Allure Clinic account'),
             message=text_content,
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[email],

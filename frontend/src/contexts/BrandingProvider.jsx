@@ -1,16 +1,17 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { authService } from "../services/authService";
 import { isSafeUrl } from "../lib/utils";
+import { BRAND_CONFIG } from "../lib/brandConfig";
 
 const BrandingContext = createContext(null);
 
 export function BrandingProvider({ children }) {
   const [branding, setBranding] = useState({
-    brandName: "Coneshare",
-    brandLogoUrl: "/logo.svg",
-    brandWebsiteUrl: "",
-    termsUrl: "https://www.coneshare.com/terms",
-    privacyPolicyUrl: "https://www.coneshare.com/privacy-policy",
+    brandName: BRAND_CONFIG.name,
+    brandLogoUrl: BRAND_CONFIG.logo.fallback,
+    brandWebsiteUrl: BRAND_CONFIG.links.website,
+    termsUrl: BRAND_CONFIG.links.terms,
+    privacyPolicyUrl: BRAND_CONFIG.links.privacy,
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -22,11 +23,11 @@ export function BrandingProvider({ children }) {
       const privacy = data?.privacy_policy_url;
 
       setBranding({
-        brandName: data?.brand_name || "Coneshare",
-        brandLogoUrl: data?.brand_logo_url || "/logo.svg",
-        brandWebsiteUrl: (websiteUrl && isSafeUrl(websiteUrl)) ? websiteUrl : "",
-        termsUrl: (terms && isSafeUrl(terms)) ? terms : "https://www.coneshare.com/terms",
-        privacyPolicyUrl: (privacy && isSafeUrl(privacy)) ? privacy : "https://www.coneshare.com/privacy-policy",
+        brandName: data?.brand_name || BRAND_CONFIG.name,
+        brandLogoUrl: data?.brand_logo_url || BRAND_CONFIG.logo.fallback,
+        brandWebsiteUrl: (websiteUrl && isSafeUrl(websiteUrl)) ? websiteUrl : BRAND_CONFIG.links.website,
+        termsUrl: (terms && isSafeUrl(terms)) ? terms : BRAND_CONFIG.links.terms,
+        privacyPolicyUrl: (privacy && isSafeUrl(privacy)) ? privacy : BRAND_CONFIG.links.privacy,
       });
     } catch (error) {
       console.error("Failed to fetch public settings/branding:", error);
@@ -41,8 +42,8 @@ export function BrandingProvider({ children }) {
 
   useEffect(() => {
     const faviconElement = document.querySelector("link[rel~='icon']");
-    if (faviconElement) {
-      faviconElement.href = branding.brandLogoUrl || "/logo.svg";
+    if (faviconElement && branding.brandLogoUrl) {
+      faviconElement.href = branding.brandLogoUrl;
     }
   }, [branding.brandLogoUrl]);
 
@@ -63,11 +64,11 @@ export function useBranding() {
   const context = useContext(BrandingContext);
   if (context === null) {
     return {
-      brandName: "Coneshare",
-      brandLogoUrl: "/logo.svg",
-      brandWebsiteUrl: "",
-      termsUrl: "https://www.coneshare.com/terms",
-      privacyPolicyUrl: "https://www.coneshare.com/privacy-policy",
+      brandName: BRAND_CONFIG.name,
+      brandLogoUrl: BRAND_CONFIG.logo.fallback,
+      brandWebsiteUrl: BRAND_CONFIG.links.website,
+      termsUrl: BRAND_CONFIG.links.terms,
+      privacyPolicyUrl: BRAND_CONFIG.links.privacy,
       isLoading: false,
       refetchBranding: async () => {},
     };
