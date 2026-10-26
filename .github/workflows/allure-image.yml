@@ -1,0 +1,53 @@
+name: Build Allure Image
+
+on:
+  push:
+    branches: [ "allure" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-push-allure:
+    name: Build and Push Allure Production Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract short commit SHA
+        id: sha
+        run: echo "short_sha=$(git rev-parse --short=10 HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Build production images
+        run: |
+          echo "Building coneshare-core..."
+          docker build -t coneshare-core:latest -f core/Dockerfile ./core
+          
+          echo "Building coneshare-frontend..."
+          docker build \
+            --build-arg VITE_APP_VERSION=allure \
+            --build-arg VITE_GIT_SHA=${{ steps.sha.outputs.short_sha }} \
+            -t coneshare-frontend:latest -f frontend/Dockerfile ./frontend
+          
+          echo "Building final coneshare image..."
+          docker build -t coneshare:latest -f backend/Dockerfile ./backend
+
+      - name: Tag images for GHCR
+        run: |
+          docker tag coneshare:latest ghcr.io/standardtouch/coneshare:allure
+          docker tag coneshare:latest ghcr.io/standardtouch/coneshare:${{ steps.sha.outputs.short_sha }}
+
+      - name: Push images to GHCR
+        run: |
+          docker push ghcr.io/standardtouch/coneshare:allure
+          docker push ghcr.io/standardtouch/coneshare:${{ steps.sha.outputs.short_sha }}
