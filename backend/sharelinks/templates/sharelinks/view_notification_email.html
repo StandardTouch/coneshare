@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% trans "Coneshare Activity Notification" %}</title>
+    <title>{% trans "Allure Clinic Activity Notification" %}</title>
     <style>
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -124,7 +124,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>{% trans "Coneshare Alert" %}</h1>
+            <h1>{% trans "Allure Clinic Alert" %}</h1>
         </div>
         <div class="content">
             <p class="salutation">{% if owner_name %}{% blocktrans %}Hi {{ owner_name }},{% endblocktrans %}{% else %}{% trans "Hi," %}{% endif %}</p>
@@ -184,8 +184,8 @@
             {% endif %}
         </div>
         <div class="footer">
-            <p>{% trans "Sent by Coneshare Automations." %}</p>
-            <p>&copy; 2026 Coneshare. {% trans "All rights reserved." %}</p>
+            <p>{% trans "Sent by Allure Clinic Automations." %}</p>
+            <p>&copy; {% now "Y" %} Allure Clinic. {% trans "All rights reserved." %}</p>
         </div>
     </div>
 </body>

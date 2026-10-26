@@ -15,7 +15,7 @@ export function GateLayout({
   const { t } = useTranslation();
   const { brandName, brandLogoUrl, brandWebsiteUrl, termsUrl, privacyPolicyUrl } = useBranding();
 
-  const displayBrandName = brandName || 'Coneshare';
+  const displayBrandName = brandName;
   const rawLogoUrl = publicMeta?.resolved_brand_logo_url || brandLogoUrl;
   const resolvedLogoUrl = rawLogoUrl && isSafeUrl(rawLogoUrl) ? rawLogoUrl : null;
 
@@ -111,15 +111,19 @@ export function GateLayout({
           {/* Trust Badges & Footer Links Below Card */}
           <div className="mt-6 text-center space-y-3">
             <div className="flex items-center justify-center gap-2 text-xs text-gray-500 dark:text-zinc-400 font-medium">
-              <a
-                href={brandWebsiteUrl || 'https://www.coneshare.com/about'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-gray-900 dark:hover:text-white transition-colors"
-              >
-                {t('auth.aboutBrand', { brandName: displayBrandName })}
-              </a>
-              <span>•</span>
+              {brandWebsiteUrl && (
+                <>
+                  <a
+                    href={brandWebsiteUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-gray-900 dark:hover:text-white transition-colors"
+                  >
+                    {t('auth.aboutBrand', { brandName: displayBrandName })}
+                  </a>
+                  <span>•</span>
+                </>
+              )}
               <a
                 href={termsUrl}
                 target="_blank"
@@ -137,19 +141,6 @@ export function GateLayout({
               >
                 {t('auth.privacy')}
               </a>
-            </div>
-            <div className="flex items-center justify-center gap-1.5 text-[11px] text-gray-400 dark:text-zinc-500">
-              <span>
-                {t('viewer.poweredBy')}{' '}
-                <a
-                  href="https://github.com/coneshare/coneshare"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-semibold text-gray-700 dark:text-zinc-300 hover:underline"
-                >
-                  Coneshare
-                </a>
-              </span>
             </div>
           </div>
         </div>

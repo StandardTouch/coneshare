@@ -26,7 +26,7 @@ jobs:
 
       - name: Extract short commit SHA
         id: sha
-        run: echo "short_sha=$(git rev-parse --short=10 HEAD)" >> $GITHUB_OUTPUT
+        run: echo "short_sha=$(git rev-parse --short=7 HEAD)" >> $GITHUB_OUTPUT
 
       - name: Build production images
         run: |
@@ -46,6 +46,7 @@ jobs:
         run: |
           docker tag coneshare:latest ghcr.io/standardtouch/coneshare:allure
           docker tag coneshare:latest ghcr.io/standardtouch/coneshare:${{ steps.sha.outputs.short_sha }}
+          echo "Tagged images: allure and ${{ steps.sha.outputs.short_sha }}"
 
       - name: Push images to GHCR
         run: |

@@ -48,19 +48,6 @@ export function DocumentViewerHeader({
           <span className="truncate max-w-[120px] sm:max-w-[200px] text-sm sm:text-base">{brandName}</span>
         </a>
 
-        <div className="hidden md:flex items-center gap-1.5 pl-2 border-l border-gray-200 text-[10px] text-gray-400 select-none">
-          <span>
-            {t('viewer.poweredBy')}{' '}
-            <a
-              href="https://github.com/coneshare/coneshare"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium text-gray-900 hover:text-gray-700 hover:underline transition-colors"
-            >
-              Coneshare
-            </a>
-          </span>
-        </div>
       </div>
 
       {/* Center: Document Title & Security Capsule */}

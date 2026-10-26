@@ -84,15 +84,19 @@ export function SignupVerifyPage() {
         {/* Footer Links */}
         <div className="mt-8 flex flex-col items-center justify-center gap-2 text-xs text-gray-400">
           <div className="flex items-center gap-3">
-            <a
-              href={brandWebsiteUrl || "https://www.coneshare.com/about"}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-gray-600 transition-colors"
-            >
-              {brandWebsiteUrl ? `About ${brandName}` : "About Coneshare"}
-            </a>
-            <span className="text-gray-300">&bull;</span>
+            {brandWebsiteUrl && (
+              <>
+                <a
+                  href={brandWebsiteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-gray-600 transition-colors"
+                >
+                  {`About ${brandName}`}
+                </a>
+                <span className="text-gray-300">&bull;</span>
+              </>
+            )}
             <a
               href={termsUrl}
               target="_blank"
@@ -110,9 +114,6 @@ export function SignupVerifyPage() {
             >
               Privacy Policy
             </a>
-          </div>
-          <div className="text-[11px] text-gray-400/80">
-            Powered by <a href="https://github.com/coneshare/coneshare" target="_blank" rel="noopener noreferrer" className="text-gray-900 hover:text-gray-700 dark:text-gray-100 dark:hover:text-gray-300 font-semibold underline transition-colors">Coneshare</a>
           </div>
         </div>
       </div>

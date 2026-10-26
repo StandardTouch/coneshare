@@ -1,4 +1,4 @@
-{% load i18n %}{% trans "Welcome to Coneshare." %}
+{% load i18n %}{% trans "Welcome to Allure Clinic." %}
 
 {% trans "Please verify your email to activate your account:" %}
 {{ verify_url }}

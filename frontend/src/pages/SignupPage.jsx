@@ -139,15 +139,19 @@ export function SignupPage() {
       {/* Footer Links */}
       <div className="mt-auto pt-8 flex flex-col items-center justify-center gap-2 text-xs text-gray-400">
         <div className="flex items-center gap-3">
-          <a
-            href={brandWebsiteUrl || "https://www.coneshare.com/about"}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-gray-600 transition-colors"
-          >
-            {t('auth.aboutBrand', { brandName: brandName || 'Coneshare' })}
-          </a>
-          <span className="text-gray-300">&bull;</span>
+          {brandWebsiteUrl && (
+            <>
+              <a
+                href={brandWebsiteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-gray-600 transition-colors"
+              >
+                {t('auth.aboutBrand', { brandName })}
+              </a>
+              <span className="text-gray-300">&bull;</span>
+            </>
+          )}
           <a
             href={termsUrl}
             target="_blank"
@@ -167,16 +171,12 @@ export function SignupPage() {
           </a>
         </div>
         <div className="flex items-center gap-1.5 text-[11px] text-gray-400/80">
-          <span>
-            {t('viewer.poweredBy')}{' '}<a href="https://github.com/coneshare/coneshare" target="_blank" rel="noopener noreferrer" className="text-gray-900 hover:text-gray-700 dark:text-gray-100 dark:hover:text-gray-300 font-semibold underline transition-colors">Coneshare</a>
-          </span>
           {APP_DISPLAY_VERSION && (
             <>
-              <span className="text-gray-300 select-none">&bull;</span>
               <span>{`ver-${APP_DISPLAY_VERSION}`}</span>
+              <span className="text-gray-300 select-none">&bull;</span>
             </>
           )}
-          <span className="text-gray-300 select-none">&bull;</span>
           <LanguagePicker />
         </div>
       </div>

@@ -135,17 +135,27 @@ SENTRY_ENVIRONMENT=production
 
 ## Post-Deployment Steps
 
-### 1. Create the First Superuser
+### 1. Database Migrations (Automatic)
 
-After the stack is running, create an admin account:
+Database migrations run automatically on deploy via the `migrate` service in docker-compose. All application services (`web`, `celery`, `video_worker`, `beat`) depend on successful migration completion.
+
+If you need to run migrations manually for troubleshooting, use the Coolify terminal for the web container:
 
 ```bash
-docker exec -it coneshare-web gosu coneshare python manage.py createsuperuser
+gosu coneshare python3 manage.py migrate
+```
+
+### 2. Create the First Superuser
+
+After the stack is running, create an admin account via the Coolify terminal for the web container:
+
+```bash
+gosu coneshare python3 manage.py createsuperuser
 ```
 
 Follow the prompts to set username, email, and password.
 
-### 2. Verify Health
+### 3. Verify Health
 
 Check that all services are healthy:
 
@@ -163,7 +173,7 @@ curl https://share.allureclinic.com/api/v1/_health/
 
 Should return HTTP 200 with status information.
 
-### 3. Login and Configure
+### 4. Login and Configure
 
 1. Navigate to `https://share.allureclinic.com/`
 2. Log in with the superuser account
