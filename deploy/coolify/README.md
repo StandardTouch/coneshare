@@ -219,7 +219,7 @@ Every push to the `allure` branch automatically:
 
 - Add a Coolify API token as a GitHub repository secret named `COOLIFY_TOKEN`
 - The token must have deploy/restart permission for the service
-- Generate it from Coolify: Profile → Security → API Tokens
+- Generate it from Coolify: Keys & Tokens / API Tokens section
 
 **Manual Redeploy:**
 
