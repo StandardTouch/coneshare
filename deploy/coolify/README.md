@@ -207,10 +207,34 @@ The application's nginx and Django middleware correctly handle these headers to:
 
 ## Upgrading
 
-To upgrade to a new commit:
+### Automatic Deployment (Recommended)
 
-1. The GitHub Actions workflow automatically builds and pushes new images on push to the `allure` branch
-2. In Coolify, restart the Docker Compose resource to pull the latest `:allure` tag
+Every push to the `allure` branch automatically:
+
+1. Builds and pushes the `ghcr.io/standardtouch/coneshare:allure` image via GitHub Actions
+2. Triggers a Coolify service restart with fresh image pull (includes automatic migrations)
+3. Waits for the health endpoint to confirm the deployment succeeded
+
+**Setup Requirements:**
+
+- Add a Coolify API token as a GitHub repository secret named `COOLIFY_TOKEN`
+- The token must have deploy/restart permission for the service
+- Generate it from Coolify: Profile → Security → API Tokens
+
+**Manual Redeploy:**
+
+To trigger a redeploy without pushing new code:
+
+1. Go to the GitHub repository → Actions → "Build Allure Image"
+2. Click "Run workflow" → Select branch `allure` → "Run workflow"
+3. The workflow will rebuild and redeploy the current commit
+
+### Manual Upgrade (Without Auto-Deploy)
+
+If the `COOLIFY_TOKEN` secret is not configured:
+
+1. The GitHub Actions workflow still builds and pushes new images on push to the `allure` branch
+2. In Coolify, manually restart the Docker Compose resource to pull the latest `:allure` tag
 3. Check logs for any migration messages or errors
 
 ## Troubleshooting
