@@ -52,3 +52,99 @@ jobs:
         run: |
           docker push ghcr.io/standardtouch/coneshare:allure
           docker push ghcr.io/standardtouch/coneshare:${{ steps.sha.outputs.short_sha }}
+
+  deploy-to-coolify:
+    name: Deploy to Coolify
+    runs-on: ubuntu-latest
+    needs: build-and-push-allure
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/allure'
+    concurrency:
+      group: coolify-deploy-allure
+      cancel-in-progress: false
+
+    steps:
+      - name: Check for Coolify token
+        id: check_token
+        env:
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+        run: |
+          if [ -z "$COOLIFY_TOKEN" ]; then
+            echo "has_token=false" >> $GITHUB_OUTPUT
+            echo "⚠️  COOLIFY_TOKEN secret is not set. Skipping deployment."
+            echo "To enable auto-deploy, add a Coolify API token as a repository secret named COOLIFY_TOKEN."
+          else
+            echo "has_token=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Trigger Coolify restart
+        if: steps.check_token.outputs.has_token == 'true'
+        env:
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+        run: |
+          echo "🚀 Triggering Coolify service restart with fresh image pull..."
+          http_code=$(curl -s -w "%{http_code}" -o /dev/null -X POST \
+            "https://server.allureclinic.com/api/v1/services/cixl82nvwhkz4o66dsvgvdva/restart?latest=true" \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            -H "Content-Type: application/json")
+          
+          echo "HTTP Status: $http_code"
+          
+          if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+            echo "✅ Restart triggered successfully"
+          else
+            echo "❌ Failed to trigger restart (HTTP $http_code)"
+            exit 1
+          fi
+
+      - name: Wait for service restart
+        if: steps.check_token.outputs.has_token == 'true'
+        run: |
+          echo "⏳ Waiting 60 seconds for old containers to stop and new ones to start..."
+          sleep 60
+
+      - name: Verify deployment health
+        if: steps.check_token.outputs.has_token == 'true'
+        timeout-minutes: 10
+        run: |
+          echo "🔍 Verifying deployment with health checks..."
+          required_consecutive_success=3
+          consecutive_success=0
+          max_attempts=60
+          attempt=0
+          
+          while [ $attempt -lt $max_attempts ]; do
+            attempt=$((attempt + 1))
+            echo "Attempt $attempt/$max_attempts: Checking https://share.allureclinic.com/api/v1/_health/"
+            
+            if curl -sf --max-time 10 "https://share.allureclinic.com/api/v1/_health/" > /dev/null 2>&1; then
+              consecutive_success=$((consecutive_success + 1))
+              echo "✓ Health check passed ($consecutive_success/$required_consecutive_success consecutive)"
+              
+              if [ $consecutive_success -ge $required_consecutive_success ]; then
+                echo "✅ Service is stable and healthy!"
+                exit 0
+              fi
+            else
+              if [ $consecutive_success -gt 0 ]; then
+                echo "✗ Health check failed, resetting consecutive count"
+              fi
+              consecutive_success=0
+            fi
+            
+            if [ $attempt -lt $max_attempts ]; then
+              sleep 10
+            fi
+          done
+          
+          echo "❌ Service did not achieve $required_consecutive_success consecutive healthy checks within 10 minutes"
+          exit 1
+
+      - name: Deployment summary
+        if: always() && steps.check_token.outputs.has_token == 'true'
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "🎉 Deployment completed successfully!"
+            echo "Service URL: https://share.allureclinic.com"
+          else
+            echo "⚠️  Deployment encountered issues. Check the logs above."
+          fi
