@@ -18,6 +18,9 @@ const SignupVerifyPage = lazyNamed(() => import('./pages/SignupVerifyPage'), 'Si
 const ShareLinkViewerPage = lazyNamed(() => import('./pages/ShareLinkViewerPage'), 'ShareLinkViewerPage');
 const PublicUploadPage = lazyNamed(() => import('./pages/PublicUploadPage'), 'PublicUploadPage');
 const CloudAuthCallbackPage = lazyNamed(() => import('./pages/CloudAuthCallbackPage'), 'CloudAuthCallbackPage');
+const TermsPage = lazyNamed(() => import('./pages/TermsPage'), 'TermsPage');
+const PrivacyPage = lazyNamed(() => import('./pages/PrivacyPage'), 'PrivacyPage');
+const PublicAppHomePage = lazyNamed(() => import('./pages/PublicAppHomePage'), 'PublicAppHomePage');
 const ErrorPage = lazyNamed(() => import('./pages/ErrorPage'), 'ErrorPage');
 const NotFoundPage = lazyNamed(() => import('./pages/NotFoundPage'), 'NotFoundPage');
 
@@ -70,6 +73,9 @@ function App() {
                 <Route path="/view/:slug" element={<ShareLinkViewerPage />} />
                 <Route path="/upload/:slug" element={<PublicUploadPage />} />
                 <Route path="/auth/:providerName/callback" element={<CloudAuthCallbackPage />} />
+                <Route path="/welcome" element={<PublicAppHomePage />} />
+                <Route path="/terms" element={<TermsPage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/500" element={<ErrorPage />} />
                 <Route element={<MainLayout />}>
                   <Route path="/" element={<HomePage />} />

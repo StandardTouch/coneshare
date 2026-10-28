@@ -33,9 +33,14 @@ export const BRAND_CONFIG = {
   // External links
   links: {
     website: 'https://allureclinic.com',
-    terms: 'https://allureclinic.com/terms',
-    privacy: 'https://allureclinic.com/privacy',
+    /** Same-origin legal pages (see /terms and /privacy routes) */
+    terms: '/terms',
+    privacy: '/privacy',
   },
+
+  /** Shown on Terms & Privacy pages; override in content or Admin contact fields if added later */
+  /** Match Google OAuth "User support email" where possible */
+  contactEmail: 'share@allureclinics.net',
   
   // Page metadata
   meta: {
