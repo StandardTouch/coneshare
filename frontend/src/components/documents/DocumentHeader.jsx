@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useBranding } from '../../contexts/BrandingProvider';
 import { formatDate } from '../../utils/formatters';
 import { Eye, Upload, RefreshCw, Pencil } from 'lucide-react';
 import { Badge } from '../ui/Badge';
@@ -30,11 +31,13 @@ export function DocumentHeader({
   onVersionHistory,
   onDelete,
   onRenameDocument,
+  onRequestSignature,
   isProcessing,
   cloudProviders = [],
   canManage = true,
 }) {
   const { t } = useTranslation();
+  const { esignEnabled } = useBranding();
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(document.name);
 
@@ -240,6 +243,20 @@ export function DocumentHeader({
             <Button className="mr-2" onClick={onCreateLink} disabled={isProcessing}>
               <PlusIcon className="-ml-1 mr-2 h-5 w-5" />
               {t('documents.getLink')}
+            </Button>
+          )}
+          
+          {onRequestSignature && esignEnabled && (
+            <Button
+              variant="outline"
+              className="mr-2"
+              onClick={onRequestSignature}
+              disabled={isProcessing}
+            >
+              <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+              {t('esign.action.requestSignature')}
             </Button>
           )}
 

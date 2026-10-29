@@ -12,6 +12,7 @@ export function BrandingProvider({ children }) {
     brandWebsiteUrl: BRAND_CONFIG.links.website,
     termsUrl: BRAND_CONFIG.links.terms,
     privacyPolicyUrl: BRAND_CONFIG.links.privacy,
+    esignEnabled: false,
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -28,6 +29,7 @@ export function BrandingProvider({ children }) {
         brandWebsiteUrl: (websiteUrl && isSafeUrl(websiteUrl)) ? websiteUrl : BRAND_CONFIG.links.website,
         termsUrl: (terms && isSafeUrl(terms)) ? terms : BRAND_CONFIG.links.terms,
         privacyPolicyUrl: (privacy && isSafeUrl(privacy)) ? privacy : BRAND_CONFIG.links.privacy,
+        esignEnabled: data?.esign_enabled || false,
       });
     } catch (error) {
       console.error("Failed to fetch public settings/branding:", error);
@@ -69,6 +71,7 @@ export function useBranding() {
       brandWebsiteUrl: BRAND_CONFIG.links.website,
       termsUrl: BRAND_CONFIG.links.terms,
       privacyPolicyUrl: BRAND_CONFIG.links.privacy,
+      esignEnabled: false,
       isLoading: false,
       refetchBranding: async () => {},
     };

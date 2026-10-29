@@ -1,0 +1,14 @@
+Signing Complete
+
+Hello {{ name }},
+
+Thank you for signing! All parties have now completed signing:
+
+{{ document_title }}
+
+Completed on: {{ completed_at|date:"F d, Y" }} at {{ completed_at|time:"H:i" }} UTC
+
+A copy of the signed document is available for your records.
+
+---
+This email was sent by {{ site_domain }}

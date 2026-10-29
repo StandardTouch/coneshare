@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signature Request</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background-color: #f4f4f4; padding: 20px; border-radius: 5px;">
+        <h2 style="color: #2c3e50;">Signature Request</h2>
+        
+        <p>Hello {{ signer_name }},</p>
+        
+        <p>{{ requester_name }} has requested your signature on the following document:</p>
+        
+        <div style="background-color: white; padding: 15px; margin: 20px 0; border-left: 4px solid #3498db;">
+            <strong>{{ document_title }}</strong>
+        </div>
+        
+        {% if message %}
+        <div style="background-color: #f9f9f9; padding: 15px; margin: 20px 0; border-radius: 3px;">
+            <p style="margin: 0;"><em>{{ message }}</em></p>
+        </div>
+        {% endif %}
+        
+        <p>Please click the button below to review and sign the document:</p>
+        
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{{ signing_url }}" style="background-color: #3498db; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
+                Review & Sign Document
+            </a>
+        </div>
+        
+        {% if expires_at %}
+        <p style="color: #e74c3c; font-size: 0.9em;">
+            <strong>Note:</strong> This signature request will expire on {{ expires_at|date:"F d, Y" }} at {{ expires_at|time:"H:i" }} UTC.
+        </p>
+        {% endif %}
+        
+        <p style="color: #7f8c8d; font-size: 0.85em; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
+            If you have any questions about this signature request, please contact {{ requester_name }}.
+        </p>
+        
+        <p style="color: #7f8c8d; font-size: 0.85em;">
+            This email was sent by {{ site_domain }}
+        </p>
+    </div>
+</body>
+</html>

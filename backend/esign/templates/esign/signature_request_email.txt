@@ -1,0 +1,24 @@
+Signature Request
+
+Hello {{ signer_name }},
+
+{{ requester_name }} has requested your signature on the following document:
+
+{{ document_title }}
+
+{% if message %}
+Message from {{ requester_name }}:
+{{ message }}
+{% endif %}
+
+Please use the following link to review and sign the document:
+{{ signing_url }}
+
+{% if expires_at %}
+Note: This signature request will expire on {{ expires_at|date:"F d, Y" }} at {{ expires_at|time:"H:i" }} UTC.
+{% endif %}
+
+If you have any questions about this signature request, please contact {{ requester_name }}.
+
+---
+This email was sent by {{ site_domain }}

@@ -1,29 +1,42 @@
 import React from "react";
-import { Bot, File, Home, LayoutGrid, UploadCloud, Trash2 } from "lucide-react";
+import { Bot, File, Home, LayoutGrid, UploadCloud, Trash2, PenLine } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 import { useSidebar } from "./SidebarProvider";
+import { useBranding } from "../../contexts/BrandingProvider";
 
 export const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: Home },
   { href: "/documents", label: "Documents", icon: File },
   { href: "/datarooms", label: "Datarooms", icon: LayoutGrid },
   { href: "/file-requests", label: "File Requests", icon: UploadCloud },
+  { href: "/signatures", label: "Signatures", icon: PenLine, requiresEsign: true },
   { href: "/automations", label: "Automations", icon: Bot },
   { href: "/trash", label: "Trash", icon: Trash2, hasDivider: true },
 ];
 
 export function useNavItems() {
   const { t } = useTranslation();
-  return [
+  const { esignEnabled } = useBranding();
+  
+  const items = [
     { href: "/", label: t('nav.dashboard'), icon: Home },
     { href: "/documents", label: t('nav.documents'), icon: File },
     { href: "/datarooms", label: t('nav.datarooms'), icon: LayoutGrid },
     { href: "/file-requests", label: t('nav.fileRequests'), icon: UploadCloud },
+    { href: "/signatures", label: t('nav.signatures'), icon: PenLine, requiresEsign: true },
     { href: "/automations", label: t('nav.automations'), icon: Bot },
     { href: "/trash", label: t('nav.trash'), icon: Trash2, hasDivider: true },
   ];
+  
+  // Filter items based on esign enabled setting
+  return items.filter(item => {
+    if (item.requiresEsign) {
+      return esignEnabled;
+    }
+    return true;
+  });
 }
 
 function SidebarContent() {

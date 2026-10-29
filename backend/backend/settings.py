@@ -235,6 +235,7 @@ INSTALLED_APPS = [
     'cloudfiles',
     'filerequests',
     'automations',
+    'esign',
 ]
 
 MIDDLEWARE = [
@@ -572,6 +573,10 @@ ENABLE_PUBLIC_SIGNUP = False
 
 # Whether to flatten watermarked PDFs on download.
 FLATTEN_WATERMARKED_DOWNLOADS = False
+
+# E-Signature feature toggle (Phase 1 - internal signers only).
+# E-signature feature is controlled via ESIGN_ENABLED environment variable (default OFF)
+ESIGN_ENABLED = os.environ.get('ESIGN_ENABLED', 'False').lower() in ('true', '1', 'yes')
 
 
 # Path to the TTF/OTF font file to be used for watermarking.

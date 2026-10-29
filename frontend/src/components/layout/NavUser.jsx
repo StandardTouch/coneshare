@@ -1,9 +1,10 @@
-import { ChevronsUpDown, CircleUserRound, KeyRound, LogOut, Shield, Cloud, Lock, Sparkles } from "lucide-react";
+import { ChevronsUpDown, CircleUserRound, KeyRound, LogOut, Shield, Cloud, Lock, Sparkles, Globe } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/Avatar";
 import { Button } from "../ui/Button";
 import { Skeleton } from "../ui/Skeleton";
+import { useEffect } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,10 +19,23 @@ import { useUser } from "../../contexts/UserProvider";
 import { getAvatarInitial } from "../../utils/formatters";
 
 function NavUser() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { isCollapsed } = useSidebar();
   const navigate = useNavigate();
   const { user, handleLogout } = useUser();
+
+  // Set document direction and lang when language changes
+  useEffect(() => {
+    const currentLang = i18n.language;
+    const isRTL = currentLang === 'ar';
+    document.documentElement.dir = isRTL ? 'rtl' : 'ltr';
+    document.documentElement.lang = currentLang;
+  }, [i18n.language]);
+
+  const changeLanguage = (lng) => {
+    i18n.changeLanguage(lng);
+    localStorage.setItem('i18nextLng', lng);
+  };
 
   if (!user) {
     return (
@@ -95,6 +109,15 @@ function NavUser() {
             </DropdownMenuItem>
           </>
         )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => changeLanguage('en')}>
+          <Globe className="mr-2 h-4 w-4" />
+          <span>English</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => changeLanguage('ar')}>
+          <Globe className="mr-2 h-4 w-4" />
+          <span>العربية</span>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" />
