@@ -20,6 +20,10 @@ from reportlab.pdfbase.ttfonts import TTFont
 from PIL import Image
 import pypdf
 
+# Arabic text shaping libraries
+from arabic_reshaper import reshape
+from bidi.algorithm import get_display
+
 from documents.fileserver import fileserver_client
 from documents.models import DocumentVersion
 from .models import SignatureRequest, Signer, SignatureField, SignerAction
@@ -39,6 +43,30 @@ except Exception as e:
 def generate_otp_code() -> str:
     """Generate a 6-digit OTP code."""
     return ''.join([str(secrets.randbelow(10)) for _ in range(6)])
+
+
+def prepare_arabic_text(text: str) -> str:
+    """
+    Prepare Arabic text for PDF rendering with proper shaping and BiDi.
+    
+    Arabic text needs:
+    1. Reshaping (letter joining based on position)
+    2. BiDi algorithm (right-to-left display order)
+    """
+    if not text:
+        return text
+    
+    # Check if text contains Arabic characters
+    arabic_range = range(0x0600, 0x06FF + 1)
+    has_arabic = any(ord(char) in arabic_range for char in text)
+    
+    if has_arabic:
+        # Reshape Arabic letters (handles letter joining)
+        reshaped = reshape(text)
+        # Apply BiDi algorithm for proper RTL display
+        return get_display(reshaped)
+    
+    return text
 
 
 def calculate_document_hash(pdf_bytes: bytes) -> str:
@@ -140,6 +168,9 @@ def create_text_overlay_pdf(
                      '\u08A0' <= char <= '\u08FF' or '\uFB50' <= char <= '\uFDFF' or 
                      '\uFE70' <= char <= '\uFEFF' for char in text)
     
+    # Prepare Arabic text with proper shaping and BiDi
+    display_text = prepare_arabic_text(text) if has_arabic else text
+    
     if has_arabic or is_arabic:
         # Use Amiri for Arabic text
         try:
@@ -155,9 +186,13 @@ def create_text_overlay_pdf(
             logger.warning(f"{font_name} not available, falling back to Helvetica")
             c.setFont('Helvetica', font_size)
     
-    # Draw text (centered in box)
+    # Draw text (centered in box, RTL for Arabic)
     text_y = y + (height / 2)
-    c.drawCentredString(x + width / 2, text_y, text)
+    if has_arabic:
+        # Right-aligned for Arabic
+        c.drawRightString(x + width, text_y, display_text)
+    else:
+        c.drawCentredString(x + width / 2, text_y, display_text)
     
     c.save()
     buffer.seek(0)

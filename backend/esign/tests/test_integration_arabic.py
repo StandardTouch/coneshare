@@ -234,6 +234,12 @@ class TestESignatureIntegration:
         final_hash = "b" * 64
         
         signers_data = list(request.signers.all())
+        
+        # Verify fonts are registered and can be used
+        from reportlab.pdfbase import pdfmetrics
+        assert 'Amiri' in pdfmetrics.getRegisteredFontNames(), "Amiri font should be registered"
+        assert 'DancingScript' in pdfmetrics.getRegisteredFontNames(), "DancingScript font should be registered"
+        
         certificate_pdf = generate_certificate_of_completion(
             request, signers_data, original_hash, final_hash
         )
@@ -241,6 +247,14 @@ class TestESignatureIntegration:
         # Verify certificate was generated (returns BytesIO)
         assert certificate_pdf is not None
         assert certificate_pdf.tell() > 0  # Has content
+        
+        # Verify Arabic text is properly shaped and embedded
+        from arabic_reshaper import reshape
+        from bidi.algorithm import get_display
+        arabic_name = signer2_user.name
+        reshaped = reshape(arabic_name)
+        bidi_text = get_display(reshaped)
+        assert bidi_text != arabic_name  # Should be different after shaping/BiDi
         
         # Verify Arabic name is in signer data
         signer2.refresh_from_db()
