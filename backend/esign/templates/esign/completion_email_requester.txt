@@ -1,0 +1,15 @@
+Signature Completed
+
+Hello {{ name }},
+
+Great news! All signers have completed signing:
+
+{{ document_title }}
+
+Completed on: {{ completed_at|date:"F d, Y" }} at {{ completed_at|time:"H:i" }} UTC
+
+You can now download the signed document and certificate of completion:
+{{ download_url }}
+
+---
+This email was sent by {{ site_domain }}

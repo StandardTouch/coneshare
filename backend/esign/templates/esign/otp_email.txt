@@ -1,0 +1,14 @@
+Verification Code
+
+Hello {{ signer_name }},
+
+Your verification code for signing {{ document_title }} is:
+
+{{ otp_code }}
+
+This code will expire in 10 minutes.
+
+If you did not request this code, please ignore this email.
+
+---
+This email was sent by {{ site_domain }}

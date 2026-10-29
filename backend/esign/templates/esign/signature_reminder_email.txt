@@ -1,0 +1,17 @@
+Reminder: Signature Request
+
+Hello {{ signer_name }},
+
+This is a friendly reminder that {{ requester_name }} is waiting for your signature on:
+
+{{ document_title }}
+
+Please use the following link to complete your signature:
+{{ signing_url }}
+
+{% if expires_at %}
+Expires: {{ expires_at|date:"F d, Y" }} at {{ expires_at|time:"H:i" }} UTC
+{% endif %}
+
+---
+This email was sent by {{ site_domain }}

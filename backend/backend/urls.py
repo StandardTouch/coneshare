@@ -52,5 +52,9 @@ urlpatterns = [
     path('api/v1/admin/datarooms/', include('datarooms.admin_urls')),
 ]
 
+# Conditionally include esign URLs if enabled
+if getattr(settings, 'ENABLE_ESIGNATURE', False):
+    urlpatterns.append(path('api/v1/esign/', include('esign.urls')))
+
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
