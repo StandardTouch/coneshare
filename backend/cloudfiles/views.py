@@ -14,6 +14,7 @@ from documents.serializers import DocumentSerializer
 from documents.services import QuotaExceededError, check_user_quota_on_upload
 from .models import CloudConnection
 from .providers import CloudProviderError, get_cloud_provider
+from .providers.google_drive_picker import get_picker_access_token
 from .serializers import (CloudConnectionSerializer, CloudImportSerializer,
                           OAuthCallbackSerializer)
 from .services import create_document_for_import
@@ -213,10 +214,20 @@ class CloudFileListView(APIView):
     Lists files from a specific cloud connection.
     """
 
-    @extend_schema(responses={200: dict, 404: dict, 500: dict})
+    @extend_schema(responses={200: dict, 404: dict, 400: dict, 500: dict})
     def get(self, request, connection_id, *args, **kwargs):
         try:
             connection = CloudConnection.objects.get(id=connection_id, user=request.user)
+            
+            # In picker mode for Google Drive, list endpoints should not be used
+            if connection.provider == 'google_drive':
+                mode = get_dynamic_setting('GOOGLE_DRIVE_MODE') or 'picker'
+                if mode == 'picker':
+                    return Response(
+                        {"detail": "File listing is not available in Google Drive picker mode. Please use the file picker instead."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
             provider = get_cloud_provider(connection.provider, connection=connection)
 
             path = request.query_params.get('path', '/')
@@ -235,10 +246,20 @@ class CloudFolderListView(APIView):
     Lists only folders from a specific cloud connection.
     """
 
-    @extend_schema(responses={200: dict, 404: dict, 500: dict})
+    @extend_schema(responses={200: dict, 404: dict, 400: dict, 500: dict})
     def get(self, request, connection_id, *args, **kwargs):
         try:
             connection = CloudConnection.objects.get(id=connection_id, user=request.user)
+            
+            # In picker mode for Google Drive, list endpoints should not be used
+            if connection.provider == 'google_drive':
+                mode = get_dynamic_setting('GOOGLE_DRIVE_MODE') or 'picker'
+                if mode == 'picker':
+                    return Response(
+                        {"detail": "Folder listing is not available in Google Drive picker mode. Please use the folder picker instead."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
             provider = get_cloud_provider(connection.provider, connection=connection)
 
             path = request.query_params.get('path', '/')
@@ -250,6 +271,41 @@ class CloudFolderListView(APIView):
             return Response({"detail": "Connection not found."}, status=status.HTTP_404_NOT_FOUND)
         except CloudProviderError as e:
             return Response({"detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@extend_schema(tags=['cloudfiles'])
+class GoogleDrivePickerTokenView(APIView):
+    """
+    Returns a fresh access token and picker credentials for the Google Drive Picker.
+    Only available when GOOGLE_DRIVE_MODE is set to 'picker'.
+    """
+    
+    class PickerTokenResponseSerializer(serializers.Serializer):
+        access_token = serializers.CharField()
+        api_key = serializers.CharField()
+        app_id = serializers.CharField()
+    
+    @extend_schema(responses={200: PickerTokenResponseSerializer, 400: dict, 404: dict, 500: dict})
+    def get(self, request, connection_id, *args, **kwargs):
+        try:
+            connection = CloudConnection.objects.get(id=connection_id, user=request.user)
+            
+            if connection.provider != 'google_drive':
+                return Response(
+                    {"detail": "This endpoint is only available for Google Drive connections."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            token_data = get_picker_access_token(connection)
+            return Response(token_data)
+            
+        except CloudConnection.DoesNotExist:
+            return Response({"detail": "Connection not found."}, status=status.HTTP_404_NOT_FOUND)
+        except CloudProviderError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.exception(f"Failed to get picker token for connection {connection_id}: {e}")
+            return Response({"detail": "Failed to retrieve picker credentials."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @extend_schema(tags=['cloudfiles'])

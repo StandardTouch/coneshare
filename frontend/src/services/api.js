@@ -525,6 +525,9 @@ export const completeNextcloudConnect = ({ code, state }) =>
 export const listCloudFiles = (connectionId, path = '/') =>
   api.get(`/cloud/connections/${connectionId}/list/`, { params: { path } });
 
+export const getGoogleDrivePickerToken = (connectionId) =>
+  api.get(`/cloud/connections/${connectionId}/picker_token/`);
+
 export const importCloudFile = (connectionId, { fileId, fileName, fileSize }) =>
   api.post(`/cloud/connections/${connectionId}/import/`, {
     file_id: fileId,

@@ -24,7 +24,17 @@ logger = logging.getLogger(__name__)
 class GoogleDriveProvider(BaseCloudProvider):
     """Google Drive integration."""
     PROVIDER_NAME = 'google_drive'
-    SCOPES = [
+    
+    # Base scopes for picker mode (non-sensitive, no restricted scopes)
+    PICKER_SCOPES = [
+        'openid',
+        'https://www.googleapis.com/auth/userinfo.email',
+        'https://www.googleapis.com/auth/userinfo.profile',
+        'https://www.googleapis.com/auth/drive.file',
+    ]
+    
+    # Full scopes for browse mode (includes restricted drive.readonly)
+    BROWSE_SCOPES = [
         'openid',
         'https://www.googleapis.com/auth/userinfo.email',
         'https://www.googleapis.com/auth/userinfo.profile',
@@ -38,6 +48,10 @@ class GoogleDriveProvider(BaseCloudProvider):
         self.client_secret = get_dynamic_setting('GOOGLE_DRIVE_CLIENT_SECRET')
         if not self.client_id or not self.client_secret:
             raise CloudProviderError("Google Drive API credentials are not configured in settings.py.")
+        
+        # Determine which scopes to use based on mode
+        self.mode = get_dynamic_setting('GOOGLE_DRIVE_MODE') or 'picker'
+        self.SCOPES = self.PICKER_SCOPES if self.mode == 'picker' else self.BROWSE_SCOPES
 
     def _get_redirect_uri(self):
         return urljoin(settings.SITE_DOMAIN, "auth/google_drive/callback")

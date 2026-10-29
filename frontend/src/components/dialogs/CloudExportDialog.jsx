@@ -7,6 +7,7 @@ import { Folder as FolderIcon, ArrowLeft, Loader2, AlertTriangle } from 'lucide-
 import { toast } from 'sonner';
 import { getCloudConnections, listCloudFolders, exportFileRequestUploads } from '../../services/api';
 import { getLocalizedErrorMessage } from '../../utils/errorTranslator';
+import { useGoogleDrivePicker } from '../cloud/GoogleDrivePicker';
 
 export function CloudExportDialog({ isOpen, onOpenChange, requestId, selectedFileIds, onExportSuccess }) {
   const { t } = useTranslation();
@@ -19,6 +20,7 @@ export function CloudExportDialog({ isOpen, onOpenChange, requestId, selectedFil
   const [error, setError] = useState(null);
   const [currentPath, setCurrentPath] = useState('/');
   const [pathHistory, setPathHistory] = useState([]);
+  const [usePickerMode, setUsePickerMode] = useState(false);
 
   // Fetch connections
   const fetchConnections = useCallback(async () => {
@@ -48,8 +50,17 @@ export function CloudExportDialog({ isOpen, onOpenChange, requestId, selectedFil
       // Sort folders by name
       const sortedFolders = response.data.sort((a, b) => a.name.localeCompare(b.name));
       setFolders(sortedFolders);
+      setUsePickerMode(false);
     } catch (err) {
       console.error('Failed to list folders:', err);
+      
+      // Check if this is Google Drive in picker mode
+      if (err.response?.status === 400 && err.response?.data?.detail?.includes('picker mode')) {
+        setUsePickerMode(true);
+        setLoadingFolders(false);
+        return;
+      }
+      
       setError(getLocalizedErrorMessage(err, 'cloudExport.loadFoldersFailed'));
     } finally {
       setLoadingFolders(false);
@@ -88,14 +99,28 @@ export function CloudExportDialog({ isOpen, onOpenChange, requestId, selectedFil
     fetchFolders(selectedConnection.id, previousPath);
   };
 
-  const handleExport = async () => {
+  const handleFolderPicked = async (folders) => {
+    if (folders.length === 0) {
+      setCurrentPath('root');
+    } else {
+      setCurrentPath(folders[0].id);
+    }
+    await handleExport();
+  };
+  
+  const { openPicker: openFolderPicker, loading: pickerLoading } = useGoogleDrivePicker(
+    selectedConnection, 
+    handleFolderPicked
+  );
+
+  const handleExport = async (pickedFolderId = null) => {
     if (!selectedConnection) return;
     setExporting(true);
     try {
       await exportFileRequestUploads(requestId, {
         connection_id: selectedConnection.id,
         uploaded_file_ids: selectedFileIds,
-        destination_folder_id: currentPath,
+        destination_folder_id: pickedFolderId || currentPath,
       });
       toast.success(t('cloudExport.exportSuccess'));
       if (onExportSuccess) {
@@ -104,10 +129,13 @@ export function CloudExportDialog({ isOpen, onOpenChange, requestId, selectedFil
       onOpenChange(false);
     } catch (err) {
       console.error('Failed to initiate export:', err);
-      // toast is handled by api interceptor
     } finally {
       setExporting(false);
     }
+  };
+  
+  const handlePickerExport = async () => {
+    await openFolderPicker(true);
   };
 
   const breadcrumbs = currentPath.split('/').filter(Boolean);
@@ -174,53 +202,61 @@ export function CloudExportDialog({ isOpen, onOpenChange, requestId, selectedFil
               </span>
             </div>
 
-            <div className="h-[280px] overflow-y-auto rounded-md border">
-              {loadingFolders ? (
-                <div className="flex h-full items-center justify-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-                </div>
-              ) : error ? (
-                <div className="flex h-full flex-col items-center justify-center p-4 text-center">
-                  <AlertTriangle className="mb-2 h-8 w-8 text-destructive" />
-                  <p className="text-sm text-muted-foreground">{error}</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-4"
-                    onClick={() => fetchFolders(selectedConnection?.id, currentPath)}
-                  >
-                    {t('cloudImport.retry')}
-                  </Button>
-                </div>
-              ) : folders.length === 0 ? (
-                <div className="flex h-full items-center justify-center p-4 text-muted-foreground text-sm">
-                  {t('cloudExport.noFolders')}
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t('cloudExport.folderName')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {folders.map((folder) => (
-                      <TableRow key={folder.id}>
-                        <TableCell>
-                          <button
-                            className="flex w-full items-center gap-x-2 text-left hover:underline"
-                            onClick={() => handleFolderClick(folder)}
-                          >
-                            <FolderIcon className="h-5 w-5 text-blue-500 flex-shrink-0" />
-                            <span className="truncate">{folder.name}</span>
-                          </button>
-                        </TableCell>
+            {usePickerMode ? (
+              <div className="flex flex-col items-center justify-center py-12 space-y-4 border rounded-md h-[280px]">
+                <p className="text-sm text-muted-foreground text-center max-w-md px-4">
+                  {t('cloudExport.pickerModeNotice')}
+                </p>
+              </div>
+            ) : (
+              <div className="h-[280px] overflow-y-auto rounded-md border">
+                {loadingFolders ? (
+                  <div className="flex h-full items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+                  </div>
+                ) : error ? (
+                  <div className="flex h-full flex-col items-center justify-center p-4 text-center">
+                    <AlertTriangle className="mb-2 h-8 w-8 text-destructive" />
+                    <p className="text-sm text-muted-foreground">{error}</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-4"
+                      onClick={() => fetchFolders(selectedConnection?.id, currentPath)}
+                    >
+                      {t('cloudImport.retry')}
+                    </Button>
+                  </div>
+                ) : folders.length === 0 ? (
+                  <div className="flex h-full items-center justify-center p-4 text-muted-foreground text-sm">
+                    {t('cloudExport.noFolders')}
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{t('cloudExport.folderName')}</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </div>
+                    </TableHeader>
+                    <TableBody>
+                      {folders.map((folder) => (
+                        <TableRow key={folder.id}>
+                          <TableCell>
+                            <button
+                              className="flex w-full items-center gap-x-2 text-left hover:underline"
+                              onClick={() => handleFolderClick(folder)}
+                            >
+                              <FolderIcon className="h-5 w-5 text-blue-500 flex-shrink-0" />
+                              <span className="truncate">{folder.name}</span>
+                            </button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -237,13 +273,13 @@ export function CloudExportDialog({ isOpen, onOpenChange, requestId, selectedFil
             {t('common.cancel')}
           </Button>
           <Button
-            onClick={handleExport}
-            disabled={!selectedConnection || loadingFolders || exporting || connections.length === 0 || !selectedFileIds || selectedFileIds.length === 0}
+            onClick={usePickerMode ? handlePickerExport : handleExport}
+            disabled={!selectedConnection || loadingFolders || exporting || pickerLoading || connections.length === 0 || !selectedFileIds || selectedFileIds.length === 0}
           >
-            {exporting ? (
+            {exporting || pickerLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {t('automations.replaying')}
+                {pickerLoading ? t('cloudExport.selectingFolder') : t('automations.replaying')}
               </>
             ) : (
               t('cloudExport.exportCount', { count: selectedFileIds?.length || 0 })
