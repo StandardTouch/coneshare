@@ -351,7 +351,7 @@ class PublicSettingsView(APIView):
 
         return Response({
             'enable_public_signup': get_dynamic_setting('ENABLE_PUBLIC_SIGNUP'),
-            'esign_enabled': get_dynamic_setting('ESIGN_ENABLED', default=False),
+            'esign_enabled': get_dynamic_setting('ESIGN_ENABLED'),
             'brand_name': brand_name,
             'brand_logo_url': brand_logo_url,
             'brand_website_url': brand_website_url,

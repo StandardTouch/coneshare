@@ -48,13 +48,10 @@ urlpatterns = [
     path('api/v1/', include('automations.urls')),
     path('api/v1/cloud/', include('cloudfiles.urls')),
     path('api/v1/', include('filerequests.urls')),
+    path('api/v1/esign/', include('esign.urls')),
     path('api/v1/admin/', include('core.admin_urls')),
     path('api/v1/admin/datarooms/', include('datarooms.admin_urls')),
 ]
-
-# Conditionally include esign URLs if enabled
-if settings.ESIGN_ENABLED:
-    urlpatterns.append(path('api/v1/esign/', include('esign.urls')))
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
