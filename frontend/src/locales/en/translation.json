@@ -1176,7 +1176,10 @@
     "exportCount_other": "Export ({{count}})",
     "exportSuccess": "File export initiated successfully.",
     "loadConnectionsFailed": "Failed to load connected storage accounts.",
-    "loadFoldersFailed": "Failed to load folders. Please try again."
+    "loadFoldersFailed": "Failed to load folders. Please try again.",
+    "pickerModeNotice": "Click the export button below to choose a destination folder in Google Drive.",
+    "selectingFolder": "Selecting folder...",
+    "selectFolder": "Select Destination Folder"
   },
   "cloudImport": {
     "title": "Import from {{provider}}",
@@ -1185,7 +1188,17 @@
     "retry": "Retry",
     "back": "Back",
     "import": "Import",
-    "importStarted": "Import started for \"{{name}}\". It will appear in your documents list shortly."
+    "importStarted": "Import started for \"{{name}}\". It will appear in your documents list shortly.",
+    "pickerDescription": "Select a file to import from {{provider}}",
+    "pickerModeNotice": "Click the button below to open the Google Drive file picker and select a file to import.",
+    "openPicker": "Open {{provider}} Picker",
+    "pickerNotReady": "Google Drive Picker is still loading. Please try again in a moment.",
+    "pickerFailed": "Failed to open Google Drive Picker. Please try again.",
+    "reconnectRequired": "Your Google Drive authorization has expired. Please reconnect your account in Settings.",
+    "noConnection": "No cloud connection selected.",
+    "importing": "Importing...",
+    "loading": "Loading...",
+    "selectFile": "Select a File"
   },
   "errors": {
     "googleDriveTokenExpired": "Failed to access Google Drive. Your authorization token may have expired or been revoked. Please reconnect your account.",

@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { listCloudFiles, importCloudFile } from '../../services/api';
 import { formatBytes } from '../../lib/formatters';
 import { getLocalizedErrorMessage } from '../../utils/errorTranslator';
+import { useGoogleDrivePicker } from '../cloud/GoogleDrivePicker';
 
 export function CloudImportDialog({ isOpen, onOpenChange, provider, connection, onImportSuccess, onImport }) {
   const { t } = useTranslation();
@@ -17,6 +18,7 @@ export function CloudImportDialog({ isOpen, onOpenChange, provider, connection, 
   const [importingFileId, setImportingFileId] = useState(null);
   const [currentPath, setCurrentPath] = useState('/');
   const [pathHistory, setPathHistory] = useState([]);
+  const [usePickerMode, setUsePickerMode] = useState(false);
 
   const fetchFiles = useCallback(async (path) => {
     if (!connection) return;
@@ -31,14 +33,55 @@ export function CloudImportDialog({ isOpen, onOpenChange, provider, connection, 
         return a.name.localeCompare(b.name);
       });
       setItems(sortedItems);
+      setUsePickerMode(false);
     } catch (error) {
       console.error(`Failed to list files from ${provider?.display_name}:`, error);
+      
+      // Check if this is Google Drive in picker mode
+      if (error.response?.status === 400 && error.response?.data?.detail?.includes('picker mode')) {
+        setUsePickerMode(true);
+        setLoading(false);
+        return;
+      }
+      
       // Toast is shown by interceptor, but we also show an error in the dialog
       setError(getLocalizedErrorMessage(error, 'cloudImport.failedToLoad'));
     } finally {
       setLoading(false);
     }
-  }, [connection, provider, t]);
+  }, [connection, provider]);
+
+  const handlePickerFilesPicked = async (files) => {
+    if (files.length === 0) return;
+    
+    const file = files[0];
+    setImportingFileId(file.id);
+    
+    try {
+      if (onImport) {
+        await onImport(connection.id, {
+          fileId: file.id,
+          fileName: file.name,
+          fileSize: file.size,
+        });
+      } else {
+        await importCloudFile(connection.id, {
+          fileId: file.id,
+          fileName: file.name,
+          fileSize: file.size,
+        });
+        toast.success(t('cloudImport.importStarted', { name: file.name }));
+      }
+      onImportSuccess();
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Failed to start import:", error);
+    } finally {
+      setImportingFileId(null);
+    }
+  };
+  
+  const { openPicker, loading: pickerLoading } = useGoogleDrivePicker(connection, handlePickerFilesPicked);
 
   useEffect(() => {
     if (isOpen) {
@@ -47,6 +90,7 @@ export function CloudImportDialog({ isOpen, onOpenChange, provider, connection, 
       setPathHistory([]);
       setItems([]);
       setError(null);
+      setUsePickerMode(false);
       fetchFiles('/');
     }
   }, [isOpen, fetchFiles]);
@@ -103,20 +147,47 @@ export function CloudImportDialog({ isOpen, onOpenChange, provider, connection, 
       <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>{t('cloudImport.title', { provider: provider?.display_name || '' })}</DialogTitle>
-          <DialogDescription>{t('cloudImport.browsing', { path: breadcrumbsPath })}</DialogDescription>
+          <DialogDescription>
+            {usePickerMode 
+              ? t('cloudImport.pickerDescription', { provider: provider?.display_name || 'Google Drive' })
+              : t('cloudImport.browsing', { path: breadcrumbsPath })}
+          </DialogDescription>
         </DialogHeader>
-      <div className="mt-4 flex items-center">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleBackClick}
-          disabled={pathHistory.length === 0 || loading}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          {t('cloudImport.back')}
-        </Button>
-      </div>
-      <div className="mt-4 h-[400px] overflow-y-auto rounded-md border">
+      
+      {usePickerMode ? (
+        <div className="flex flex-col items-center justify-center py-12 space-y-4">
+          <p className="text-sm text-muted-foreground text-center max-w-md">
+            {t('cloudImport.pickerModeNotice')}
+          </p>
+          <Button
+            onClick={openPicker}
+            disabled={pickerLoading || importingFileId !== null}
+            size="lg"
+          >
+            {pickerLoading || importingFileId ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {importingFileId ? t('cloudImport.importing') : t('cloudImport.loading')}
+              </>
+            ) : (
+              t('cloudImport.openPicker', { provider: provider?.display_name || 'Google Drive' })
+            )}
+          </Button>
+        </div>
+      ) : (
+        <>
+          <div className="mt-4 flex items-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBackClick}
+              disabled={pathHistory.length === 0 || loading}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              {t('cloudImport.back')}
+            </Button>
+          </div>
+          <div className="mt-4 h-[400px] overflow-y-auto rounded-md border">
         {loading ? (
           <div className="flex h-full items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
@@ -184,6 +255,9 @@ export function CloudImportDialog({ isOpen, onOpenChange, provider, connection, 
           </Table>
         )}
       </div>
+      </>
+      )}
+      
       <div className="mt-6 flex justify-end">
         <Button
           variant="outline"
