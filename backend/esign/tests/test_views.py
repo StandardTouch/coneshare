@@ -4,11 +4,11 @@ from django.utils import timezone
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from rest_framework import status
+from django.conf import settings
 
 from core.models import Organization
 from documents.models import Document, DocumentVersion
 from esign.models import SignatureRequest, Signer, SignatureField, SignatureOTP
-from core.services import set_dynamic_setting
 
 User = get_user_model()
 
@@ -16,14 +16,14 @@ User = get_user_model()
 @pytest.fixture
 def organization(db):
     return Organization.objects.create(
-        name="Test Org",
-        slug="test-org"
+        name="Test Org"
     )
 
 
 @pytest.fixture
 def user(db, organization):
     return User.objects.create_user(
+        username="requester@example.com",
         email="requester@example.com",
         name="Test Requester",
         password="testpass123",
@@ -35,6 +35,7 @@ def user(db, organization):
 @pytest.fixture
 def signer_user(db, organization):
     return User.objects.create_user(
+        username="signer@example.com",
         email="signer@example.com",
         name="Test Signer",
         password="testpass123",
@@ -47,6 +48,7 @@ def signer_user(db, organization):
 def another_user(db, organization):
     """User not involved in the signature request"""
     return User.objects.create_user(
+        username="other@example.com",
         email="other@example.com",
         name="Other User",
         password="testpass123",
@@ -93,11 +95,12 @@ def signer_authenticated_client(api_client, signer_user):
 
 
 @pytest.fixture
-def enable_esign(db):
-    """Enable esign feature via settings"""
-    set_dynamic_setting('ESIGN_ENABLED', True)
+def enable_esign(db, monkeypatch):
+    """Enable esign feature via settings for tests"""
+    # Just set the Django setting directly for tests
+    monkeypatch.setattr(settings, 'ESIGN_ENABLED', True)
     yield
-    set_dynamic_setting('ESIGN_ENABLED', False)
+    monkeypatch.setattr(settings, 'ESIGN_ENABLED', False)
 
 
 @pytest.fixture

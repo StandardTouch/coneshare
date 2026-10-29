@@ -246,7 +246,7 @@ export function DocumentHeader({
             </Button>
           )}
           
-          {onRequestSignature && (
+          {onRequestSignature && esignEnabled && (
             <Button
               variant="outline"
               className="mr-2"
