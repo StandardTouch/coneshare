@@ -1,0 +1,16 @@
+Signature Request Expired
+
+Hello {{ requester_name }},
+
+Your signature request for the following document has expired:
+
+{{ document_title }}
+
+Expired on: {{ expired_at|date:"F d, Y" }} at {{ expired_at|time:"H:i" }} UTC
+
+This request is no longer active. If you still need signatures, you can create a new signature request.
+
+View document: {{ request_url }}
+
+---
+This email was sent by {{ site_domain }}

@@ -1,0 +1,19 @@
+Signature Declined
+
+Hello {{ requester_name }},
+
+{{ signer_name }} has declined to sign the following document:
+
+{{ document_title }}
+
+{% if decline_reason %}
+Reason:
+{{ decline_reason }}
+{% endif %}
+
+This signature request is now marked as declined.
+
+View request details: {{ request_url }}
+
+---
+This email was sent by {{ site_domain }}

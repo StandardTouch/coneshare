@@ -1150,8 +1150,107 @@
       "NEXT_CLOUD_CLIENT_ID": "Client ID for Nextcloud integration.",
       "NEXT_CLOUD_CLIENT_SECRET": "Client Secret for Nextcloud integration.",
       "ENABLE_PUBLIC_SIGNUP": "Enable public signup with email verification.",
-      "FLATTEN_WATERMARKED_DOWNLOADS": "If true, watermarked PDF downloads are flattened (rasterized to JPEGs and recompiled to PDF) to prevent watermark stripping."
+      "FLATTEN_WATERMARKED_DOWNLOADS": "If true, watermarked PDF downloads are flattened (rasterized to JPEGs and recompiled to PDF) to prevent watermark stripping.",
+      "ESIGN_ENABLED": "Enable electronic signature feature. When OFF, all esign UI is hidden and all esign API endpoints return 404/403."
     }
+  },
+  "esign": {
+    "title": "E-Signatures",
+    "tabs": {
+      "sentByMe": "Sent by Me",
+      "awaitingMySignature": "Awaiting My Signature"
+    },
+    "status": {
+      "draft": "Draft",
+      "sent": "Sent",
+      "in_progress": "In Progress",
+      "completed": "Completed",
+      "declined": "Declined",
+      "cancelled": "Cancelled",
+      "expired": "Expired"
+    },
+    "signerStatus": {
+      "pending": "Pending",
+      "sent": "Sent",
+      "viewed": "Viewed",
+      "otp_verified": "OTP Verified",
+      "signed": "Signed",
+      "declined": "Declined"
+    },
+    "fieldType": {
+      "signature": "Signature",
+      "initials": "Initials",
+      "date_signed": "Date Signed",
+      "full_name": "Full Name",
+      "text": "Text"
+    },
+    "request": {
+      "createNew": "Create New Request",
+      "noRequests": "No signature requests found",
+      "document": "Document",
+      "signers": "signer(s)",
+      "signed": "signed",
+      "yourStatus": "Your Status",
+      "created": "Created",
+      "confirmCancel": "Are you sure you want to cancel this signature request?"
+    },
+    "action": {
+      "viewSign": "View & Sign",
+      "viewDocument": "View Document",
+      "sendReminder": "Send Reminder",
+      "cancel": "Cancel",
+      "decline": "Decline",
+      "submit": "Submit Signature",
+      "confirmDecline": "Confirm Decline"
+    },
+    "otp": {
+      "verificationRequired": "Verification Required",
+      "request": "Request Verification Code",
+      "enterCode": "Enter 6-digit code",
+      "verify": "Verify",
+      "resend": "Resend Code",
+      "sent": "Verification code sent to your email",
+      "verified": "Verification successful",
+      "sendFailed": "Failed to send verification code",
+      "verifyFailed": "Invalid verification code"
+    },
+    "readyToSign": "You're verified and ready to sign",
+    "document": {
+      "preview": "Document Preview",
+      "pdfViewerPlaceholder": "PDF Viewer will be displayed here"
+    },
+    "fields": {
+      "toSign": "Fields to Sign",
+      "clickToFill": "Click to fill",
+      "filled": "Filled",
+      "enterValue": "Enter value for this field"
+    },
+    "signature": {
+      "draw": "Draw Your Signature",
+      "canvasPlaceholder": "Canvas for drawing signature (implementation pending)"
+    },
+    "decline": {
+      "title": "Decline to Sign",
+      "reasonPlaceholder": "Please provide a reason for declining (optional)"
+    },
+    "success": {
+      "signed": "Document signed successfully",
+      "declined": "Response recorded",
+      "cancelled": "Signature request cancelled",
+      "reminderSent": "Reminder sent successfully"
+    },
+    "error": {
+      "loadFailed": "Failed to load signing data",
+      "notFound": "Signature request not found",
+      "submitFailed": "Failed to submit signature",
+      "declineFailed": "Failed to record response",
+      "cancelFailed": "Failed to cancel request",
+      "reminderFailed": "Failed to send reminder",
+      "otpRequired": "Please verify your identity with OTP first"
+    }
+  },
+  "nav": {
+    "signatures": "Signatures"
   },
   "uploads": {
     "uploading_one": "Uploading {{count}} file...",

@@ -41,11 +41,8 @@ logger = logging.getLogger(__name__)
 
 def check_esign_enabled():
     """Check if e-signature feature is enabled."""
-    if not getattr(settings, 'ENABLE_ESIGNATURE', False):
-        raise PermissionDenied(_("E-Signature feature is disabled."))
-    
-    if not get_dynamic_setting('ESIGN_ENABLED'):
-        raise PermissionDenied(_("E-Signature feature is not enabled for this organization."))
+    if not get_dynamic_setting('ESIGN_ENABLED', default=False):
+        raise PermissionDenied(_("E-Signature feature is not enabled."))
 
 
 class SignatureRequestViewSet(viewsets.ModelViewSet):
@@ -214,7 +211,9 @@ class SignatureRequestViewSet(viewsets.ModelViewSet):
         signature_request.status = 'cancelled'
         signature_request.save()
         
-        # TODO: Send cancellation emails to pending signers
+        # Send cancellation emails to pending signers
+        from .tasks import send_cancellation_email_task
+        send_cancellation_email_task.delay(signature_request.id)
         
         return Response({'message': _('Signature request cancelled.')})
     
@@ -309,9 +308,11 @@ class SignatureRequestViewSet(viewsets.ModelViewSet):
 
 class SigningViewSet(viewsets.ViewSet):
     """
-    Public viewset for signing workflow (token-based access).
+    ViewSet for signing workflow (authenticated users only - Phase 1).
+    Token in URL identifies which signature request, but user must be logged in
+    and must be the assigned signer.
     """
-    permission_classes = []  # No authentication required; token validated in methods
+    permission_classes = [IsAuthenticated, APIKeyTierPermission]
     
     def retrieve(self, request, token=None):
         """
@@ -321,6 +322,13 @@ class SigningViewSet(viewsets.ViewSet):
         
         signer = get_object_or_404(Signer, token=token)
         signature_request = signer.signature_request
+        
+        # CRITICAL: Verify authenticated user is the assigned signer
+        if request.user != signer.user:
+            return Response(
+                {'detail': _('You are not authorized to sign this request.')},
+                status=status.HTTP_403_FORBIDDEN
+            )
         
         # Check request status
         if signature_request.status not in ['sent', 'in_progress']:
@@ -379,6 +387,13 @@ class SigningViewSet(viewsets.ViewSet):
         
         signer = get_object_or_404(Signer, token=token)
         
+        # CRITICAL: Verify authenticated user is the assigned signer
+        if request.user != signer.user:
+            return Response(
+                {'detail': _('You are not authorized to sign this request.')},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         # Check if already verified
         if signer.otp_verified_at:
             return Response({'message': _('Already verified.')})
@@ -415,6 +430,13 @@ class SigningViewSet(viewsets.ViewSet):
         check_esign_enabled()
         
         signer = get_object_or_404(Signer, token=token)
+        
+        # CRITICAL: Verify authenticated user is the assigned signer
+        if request.user != signer.user:
+            return Response(
+                {'detail': _('You are not authorized to sign this request.')},
+                status=status.HTTP_403_FORBIDDEN
+            )
         
         # Check if already verified
         if signer.otp_verified_at:
@@ -483,6 +505,13 @@ class SigningViewSet(viewsets.ViewSet):
         
         signer = get_object_or_404(Signer, token=token)
         signature_request = signer.signature_request
+        
+        # CRITICAL: Verify authenticated user is the assigned signer
+        if request.user != signer.user:
+            return Response(
+                {'detail': _('You are not authorized to sign this request.')},
+                status=status.HTTP_403_FORBIDDEN
+            )
         
         # Check can sign
         can_sign, reason = signer.can_sign()
@@ -593,6 +622,13 @@ class SigningViewSet(viewsets.ViewSet):
         signer = get_object_or_404(Signer, token=token)
         signature_request = signer.signature_request
         
+        # CRITICAL: Verify authenticated user is the assigned signer
+        if request.user != signer.user:
+            return Response(
+                {'detail': _('You are not authorized to decline this request.')},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         # Check request status
         if signature_request.status not in ['sent', 'in_progress']:
             return Response(
@@ -626,7 +662,9 @@ class SigningViewSet(viewsets.ViewSet):
         signature_request.status = 'declined'
         signature_request.save()
         
-        # TODO: Send notification email to requester
+        # Send notification email to requester
+        from .tasks import send_decline_notification_email_task
+        send_decline_notification_email_task.delay(signature_request.id, signer.id)
         
         return Response({'message': _('Your response has been recorded.')})
 

@@ -315,11 +315,143 @@ def check_expired_requests_task():
     
     count = expired_requests.count()
     
-    # Mark as expired
-    expired_requests.update(status='expired')
+    # Mark as expired and send notifications
+    for request in expired_requests:
+        request.status = 'expired'
+        request.save()
+        send_expiration_notification_email_task.delay(request.id)
     
     logger.info(f"Marked {count} signature requests as expired")
     
-    # TODO: Send notification emails to requesters
-    
     return count
+
+
+@shared_task(bind=True, max_retries=3)
+def send_cancellation_email_task(self, signature_request_id):
+    """
+    Send cancellation notification to pending signers.
+    """
+    try:
+        signature_request = SignatureRequest.objects.select_related(
+            'document', 'created_by'
+        ).prefetch_related('signers__user').get(id=signature_request_id)
+        
+        # Email to each pending signer
+        for signer in signature_request.signers.filter(status__in=['sent', 'viewed', 'otp_verified', 'pending']):
+            activate(signer.user.language or 'en')
+            
+            context = {
+                'signer_name': signer.user.name,
+                'requester_name': signature_request.created_by.name,
+                'document_title': signature_request.title,
+                'site_domain': settings.SITE_DOMAIN
+            }
+            
+            subject = _('Signature Request Cancelled: {title}').format(title=signature_request.title)
+            html_message = render_to_string('esign/cancellation_email.html', context)
+            text_message = render_to_string('esign/cancellation_email.txt', context)
+            
+            send_mail(
+                subject=subject,
+                message=text_message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[signer.user.email],
+                html_message=html_message,
+                fail_silently=False
+            )
+        
+        logger.info(f"Sent cancellation emails for signature request {signature_request_id}")
+        
+    except SignatureRequest.DoesNotExist:
+        logger.error(f"SignatureRequest {signature_request_id} not found")
+    except Exception as exc:
+        logger.error(f"Error sending cancellation emails: {exc}")
+        raise self.retry(exc=exc, countdown=60)
+
+
+@shared_task(bind=True, max_retries=3)
+def send_decline_notification_email_task(self, signature_request_id, signer_id):
+    """
+    Send decline notification to requester.
+    """
+    try:
+        signature_request = SignatureRequest.objects.select_related(
+            'document', 'created_by'
+        ).get(id=signature_request_id)
+        signer = Signer.objects.select_related('user').get(id=signer_id)
+        
+        # Activate requester's language
+        activate(signature_request.created_by.language or 'en')
+        
+        context = {
+            'requester_name': signature_request.created_by.name,
+            'signer_name': signer.user.name,
+            'document_title': signature_request.title,
+            'decline_reason': signer.decline_reason,
+            'request_url': f"{settings.SITE_DOMAIN}/documents/{signature_request.document.id}",
+            'site_domain': settings.SITE_DOMAIN
+        }
+        
+        subject = _('Signature Declined: {title}').format(title=signature_request.title)
+        html_message = render_to_string('esign/decline_notification_email.html', context)
+        text_message = render_to_string('esign/decline_notification_email.txt', context)
+        
+        send_mail(
+            subject=subject,
+            message=text_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[signature_request.created_by.email],
+            html_message=html_message,
+            fail_silently=False
+        )
+        
+        logger.info(f"Sent decline notification for signature request {signature_request_id}")
+        
+    except (SignatureRequest.DoesNotExist, Signer.DoesNotExist) as e:
+        logger.error(f"Object not found: {e}")
+    except Exception as exc:
+        logger.error(f"Error sending decline notification: {exc}")
+        raise self.retry(exc=exc, countdown=60)
+
+
+@shared_task(bind=True, max_retries=3)
+def send_expiration_notification_email_task(self, signature_request_id):
+    """
+    Send expiration notification to requester.
+    """
+    try:
+        signature_request = SignatureRequest.objects.select_related(
+            'document', 'created_by'
+        ).get(id=signature_request_id)
+        
+        # Activate requester's language
+        activate(signature_request.created_by.language or 'en')
+        
+        context = {
+            'requester_name': signature_request.created_by.name,
+            'document_title': signature_request.title,
+            'expired_at': signature_request.expires_at,
+            'request_url': f"{settings.SITE_DOMAIN}/documents/{signature_request.document.id}",
+            'site_domain': settings.SITE_DOMAIN
+        }
+        
+        subject = _('Signature Request Expired: {title}').format(title=signature_request.title)
+        html_message = render_to_string('esign/expiration_notification_email.html', context)
+        text_message = render_to_string('esign/expiration_notification_email.txt', context)
+        
+        send_mail(
+            subject=subject,
+            message=text_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[signature_request.created_by.email],
+            html_message=html_message,
+            fail_silently=False
+        )
+        
+        logger.info(f"Sent expiration notification for signature request {signature_request_id}")
+        
+    except SignatureRequest.DoesNotExist:
+        logger.error(f"SignatureRequest {signature_request_id} not found")
+    except Exception as exc:
+        logger.error(f"Error sending expiration notification: {exc}")
+        raise self.retry(exc=exc, countdown=60)

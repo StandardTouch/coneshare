@@ -50,6 +50,10 @@ const AdminUserDetailPage = lazyNamed(() => import('./pages/AdminUserDetailPage'
 const AdminDataroomsPage = lazyNamed(() => import('./pages/AdminDataroomsPage'), 'AdminDataroomsPage');
 const AdminSecurityAlertsPage = lazyNamed(() => import('./pages/AdminSecurityAlertsPage'), 'AdminSecurityAlertsPage');
 
+// E-signature routes
+const SignatureRequestsPage = lazy(() => import('./pages/SignatureRequestsPage'));
+const SigningPage = lazy(() => import('./pages/SigningPage'));
+
 function RouteLoadingFallback() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -77,6 +81,10 @@ function App() {
                 <Route path="/terms" element={<TermsPage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/500" element={<ErrorPage />} />
+                {/* E-signature signing page (requires authentication) */}
+                <Route element={<MainLayout />}>
+                  <Route path="/sign/:token" element={<SigningPage />} />
+                </Route>
                 <Route element={<MainLayout />}>
                   <Route path="/" element={<HomePage />} />
                   <Route path="/documents" element={<DocumentsPage />} />
@@ -92,6 +100,7 @@ function App() {
                   <Route path="/analytics/links" element={<AllLinksPage />} />
                   <Route path="/analytics/view-sessions" element={<AllViewSessionsPage />} />
                   <Route path="/automations" element={<AutomationsPage />} />
+                  <Route path="/signatures" element={<SignatureRequestsPage />} />
                   <Route path="/settings" element={<UserSettingsPage />} />
                   <Route path="/settings/password" element={<PasswordSettingsPage />} />
                   <Route path="/settings/integrations" element={<IntegrationsSettingsPage />} />

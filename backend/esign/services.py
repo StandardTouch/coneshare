@@ -1,6 +1,7 @@
 import hashlib
 import io
 import logging
+import os
 import secrets
 from datetime import datetime
 from typing import Dict, List
@@ -24,6 +25,15 @@ from documents.models import DocumentVersion
 from .models import SignatureRequest, Signer, SignatureField, SignerAction
 
 logger = logging.getLogger(__name__)
+
+# Register custom fonts for signatures (Arabic + handwriting style)
+FONTS_DIR = os.path.join(os.path.dirname(__file__), 'fonts')
+try:
+    pdfmetrics.registerFont(TTFont('Amiri', os.path.join(FONTS_DIR, 'Amiri-Regular.ttf')))
+    pdfmetrics.registerFont(TTFont('DancingScript', os.path.join(FONTS_DIR, 'DancingScript-Regular.ttf')))
+    logger.info("Custom fonts registered successfully")
+except Exception as e:
+    logger.error(f"Failed to register custom fonts: {e}")
 
 
 def generate_otp_code() -> str:
@@ -105,13 +115,14 @@ def create_text_overlay_pdf(
     y_percent: float,
     width_percent: float,
     height_percent: float,
-    font_name: str = 'Helvetica',
-    font_size: int = 12,
+    font_name: str = 'DancingScript',
+    font_size: int = 14,
     is_arabic: bool = False
 ) -> bytes:
     """
     Create a transparent PDF with text at specified position.
     Coordinates are in percentages.
+    Uses DancingScript for Latin text and Amiri for Arabic text.
     """
     # Convert percentages to points
     x = (x_percent / 100) * page_width
@@ -123,12 +134,26 @@ def create_text_overlay_pdf(
     buffer = io.BytesIO()
     c = pdf_canvas.Canvas(buffer, pagesize=(page_width, page_height))
     
-    # Set font (use a font that supports Arabic if needed)
-    if is_arabic:
-        # For now, use Helvetica; in production, bundle an Arabic-supporting font
-        c.setFont('Helvetica', font_size)
+    # Select appropriate font based on text content
+    # Check if text contains Arabic characters
+    has_arabic = any('\u0600' <= char <= '\u06FF' or '\u0750' <= char <= '\u077F' or 
+                     '\u08A0' <= char <= '\u08FF' or '\uFB50' <= char <= '\uFDFF' or 
+                     '\uFE70' <= char <= '\uFEFF' for char in text)
+    
+    if has_arabic or is_arabic:
+        # Use Amiri for Arabic text
+        try:
+            c.setFont('Amiri', font_size)
+        except:
+            logger.warning("Amiri font not available, falling back to Helvetica")
+            c.setFont('Helvetica', font_size)
     else:
-        c.setFont(font_name, font_size)
+        # Use DancingScript for Latin handwriting style
+        try:
+            c.setFont(font_name if font_name != 'Helvetica' else 'DancingScript', font_size)
+        except:
+            logger.warning(f"{font_name} not available, falling back to Helvetica")
+            c.setFont('Helvetica', font_size)
     
     # Draw text (centered in box)
     text_y = y + (height / 2)
@@ -273,13 +298,34 @@ def generate_certificate_of_completion(
     final_hash: str
 ) -> bytes:
     """
-    Generate certificate of completion as PDF.
+    Generate certificate of completion as PDF with Arabic support.
     """
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)
     story = []
     
     styles = getSampleStyleSheet()
+    
+    # Custom font for Arabic support in certificates
+    try:
+        from reportlab.lib.styles import ParagraphStyle as PS
+        from reportlab.lib.enums import TA_LEFT
+        
+        # Register fonts if not already done
+        try:
+            pdfmetrics.getFont('Amiri')
+        except:
+            pass  # Already registered at module load
+        
+        # Create style with Amiri font for names
+        name_style = PS(
+            'ArabicName',
+            parent=styles['Normal'],
+            fontName='Amiri',
+            fontSize=9
+        )
+    except:
+        name_style = styles['Normal']
     
     # Title style
     title_style = ParagraphStyle(
@@ -303,24 +349,44 @@ def generate_certificate_of_completion(
         styles['Normal']
     ))
     story.append(Spacer(1, 0.1 * inch))
+    
+    # Format completed time in Asia/Riyadh timezone as per requirements
+    import pytz
+    riyadh_tz = pytz.timezone('Asia/Riyadh')
+    completed_riyadh = signature_request.completed_at.astimezone(riyadh_tz)
+    
     story.append(Paragraph(
-        f"<b>Completed:</b> {timezone.localtime(signature_request.completed_at).strftime('%Y-%m-%d %H:%M:%S %Z')}",
+        f"<b>Completed:</b> {completed_riyadh.strftime('%Y-%m-%d %H:%M:%S')} (Asia/Riyadh)",
         styles['Normal']
     ))
     story.append(Spacer(1, 0.3 * inch))
     
-    # Signers table
+    # Signers table - build manually to support Arabic names
     story.append(Paragraph("<b>Signers:</b>", styles['Heading2']))
     story.append(Spacer(1, 0.1 * inch))
     
-    signer_data = [['#', 'Name', 'Email', 'Signed At', 'IP Address', 'Verification']]
+    # Header row
+    signer_data = [['#', 'Name', 'Email', 'Signed At (AST)', 'IP Address', 'OTP Verified']]
+    
+    # Data rows with proper timezone handling
     for idx, signer in enumerate(signers, 1):
-        signed_time = timezone.localtime(signer.signed_at).strftime('%Y-%m-%d %H:%M:%S') if signer.signed_at else '-'
+        if signer.signed_at:
+            signed_riyadh = signer.signed_at.astimezone(riyadh_tz)
+            signed_time = signed_riyadh.strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            signed_time = '-'
+        
         ip = signer.ip_address or '-'
-        verification = 'Email OTP' if signer.otp_verified_at else '-'
+        
+        if signer.otp_verified_at:
+            otp_time_riyadh = signer.otp_verified_at.astimezone(riyadh_tz)
+            verification = otp_time_riyadh.strftime('%H:%M:%S')
+        else:
+            verification = '-'
+        
         signer_data.append([
             str(idx),
-            signer.user.name,
+            signer.user.name,  # ReportLab handles Unicode
             signer.user.email,
             signed_time,
             ip,
@@ -342,6 +408,36 @@ def generate_certificate_of_completion(
     story.append(signer_table)
     story.append(Spacer(1, 0.3 * inch))
     
+    # Event log table
+    story.append(Paragraph("<b>Event Log:</b>", styles['Heading2']))
+    story.append(Spacer(1, 0.1 * inch))
+    
+    event_data = [['Timestamp (AST)', 'Signer', 'Action', 'User Agent']]
+    for signer in signers:
+        for action in signer.actions.all().order_by('timestamp'):
+            action_riyadh = action.timestamp.astimezone(riyadh_tz)
+            event_data.append([
+                action_riyadh.strftime('%Y-%m-%d %H:%M:%S'),
+                signer.user.name,
+                action.get_action_display(),
+                (action.user_agent[:30] + '...') if len(action.user_agent) > 30 else action.user_agent
+            ])
+    
+    event_table = Table(event_data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch, 3*inch])
+    event_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTSIZE', (0, 1), (-1, -1), 7),
+    ]))
+    story.append(event_table)
+    story.append(Spacer(1, 0.3 * inch))
+    
     # Document hashes
     story.append(Paragraph("<b>Document Integrity:</b>", styles['Heading2']))
     story.append(Spacer(1, 0.1 * inch))
@@ -351,12 +447,13 @@ def generate_certificate_of_completion(
     story.append(Spacer(1, 0.3 * inch))
     
     # Footer
+    now_riyadh = datetime.now(riyadh_tz)
     story.append(Paragraph(
-        f"<i>This certificate was generated by Coneshare E-Signature on {datetime.now().strftime('%Y-%m-%d %H:%M:%S %Z')}.</i>",
+        f"<i>This certificate was generated by Coneshare E-Signature on {now_riyadh.strftime('%Y-%m-%d %H:%M:%S')} (Asia/Riyadh).</i>",
         styles['Normal']
     ))
     story.append(Paragraph(
-        f"<i>Audit logs are available to authorized users in the system.</i>",
+        f"<i>All timestamps are in Arabian Standard Time (AST, UTC+3). Audit logs are available to authorized users.</i>",
         styles['Normal']
     ))
     

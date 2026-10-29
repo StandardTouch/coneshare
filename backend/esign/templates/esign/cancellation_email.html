@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signature Request Cancelled</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background-color: #f4f4f4; padding: 20px; border-radius: 5px;">
+        <h2 style="color: #e74c3c;">Signature Request Cancelled</h2>
+        
+        <p>Hello {{ signer_name }},</p>
+        
+        <p>{{ requester_name }} has cancelled the signature request for the following document:</p>
+        
+        <div style="background-color: white; padding: 15px; margin: 20px 0; border-left: 4px solid #e74c3c;">
+            <strong>{{ document_title }}</strong>
+        </div>
+        
+        <p>No action is required from you. This signature request is no longer active.</p>
+        
+        <p style="color: #7f8c8d; font-size: 0.85em; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
+            If you have any questions, please contact {{ requester_name }}.
+        </p>
+        
+        <p style="color: #7f8c8d; font-size: 0.85em;">
+            This email was sent by {{ site_domain }}
+        </p>
+    </div>
+</body>
+</html>

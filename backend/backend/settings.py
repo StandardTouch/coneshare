@@ -575,7 +575,7 @@ ENABLE_PUBLIC_SIGNUP = False
 FLATTEN_WATERMARKED_DOWNLOADS = False
 
 # E-Signature feature toggle (Phase 1 - internal signers only).
-ENABLE_ESIGNATURE = os.environ.get('ENABLE_ESIGNATURE', 'false').lower() in ('true', '1', 't')
+# E-signature feature is controlled via ESIGN_ENABLED in settings_registry (default OFF)
 
 
 # Path to the TTF/OTF font file to be used for watermarking.

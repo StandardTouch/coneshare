@@ -1,0 +1,114 @@
+{
+  "common": {
+    "save": "حفظ التغييرات",
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "loading": "جار التحميل...",
+    "success": "نجح",
+    "pages": "صفحات"
+  },
+  "nav": {
+    "dashboard": "لوحة التحكم",
+    "documents": "المستندات",
+    "datarooms": "غرف البيانات",
+    "fileRequests": "طلبات الملفات",
+    "automations": "الأتمتة",
+    "trash": "سلة المهملات",
+    "signatures": "التوقيعات الإلكترونية"
+  },
+  "esign": {
+    "title": "التوقيعات الإلكترونية",
+    "tabs": {
+      "sentByMe": "أرسلتها",
+      "awaitingMySignature": "بانتظار توقيعي"
+    },
+    "status": {
+      "draft": "مسودة",
+      "sent": "تم الإرسال",
+      "in_progress": "قيد التنفيذ",
+      "completed": "مكتمل",
+      "declined": "مرفوض",
+      "cancelled": "ملغى",
+      "expired": "منتهي الصلاحية"
+    },
+    "signerStatus": {
+      "pending": "معلق",
+      "sent": "تم الإرسال",
+      "viewed": "تم العرض",
+      "otp_verified": "تم التحقق من OTP",
+      "signed": "تم التوقيع",
+      "declined": "مرفوض"
+    },
+    "fieldType": {
+      "signature": "توقيع",
+      "initials": "الأحرف الأولى",
+      "date_signed": "تاريخ التوقيع",
+      "full_name": "الاسم الكامل",
+      "text": "نص"
+    },
+    "request": {
+      "createNew": "إنشاء طلب جديد",
+      "noRequests": "لم يتم العثور على طلبات التوقيع",
+      "document": "المستند",
+      "signers": "الموقعون",
+      "signed": "وقع",
+      "yourStatus": "حالتك",
+      "created": "تم الإنشاء",
+      "confirmCancel": "هل أنت متأكد أنك تريد إلغاء طلب التوقيع هذا؟"
+    },
+    "action": {
+      "viewSign": "عرض والتوقيع",
+      "viewDocument": "عرض المستند",
+      "sendReminder": "إرسال تذكير",
+      "cancel": "إلغاء",
+      "decline": "رفض",
+      "submit": "إرسال التوقيع",
+      "confirmDecline": "تأكيد الرفض"
+    },
+    "otp": {
+      "verificationRequired": "التحقق مطلوب",
+      "request": "طلب رمز التحقق",
+      "enterCode": "أدخل الرمز المكون من 6 أرقام",
+      "verify": "تحقق",
+      "resend": "إعادة إرسال الرمز",
+      "sent": "تم إرسال رمز التحقق إلى بريدك الإلكتروني",
+      "verified": "تم التحقق بنجاح",
+      "sendFailed": "فشل إرسال رمز التحقق",
+      "verifyFailed": "رمز التحقق غير صالح"
+    },
+    "readyToSign": "تم التحقق منك وأنت جاهز للتوقيع",
+    "document": {
+      "preview": "معاينة المستند",
+      "pdfViewerPlaceholder": "سيتم عرض عارض PDF هنا"
+    },
+    "fields": {
+      "toSign": "الحقول للتوقيع",
+      "clickToFill": "انقر للملء",
+      "filled": "تم الملء",
+      "enterValue": "أدخل القيمة لهذا الحقل"
+    },
+    "signature": {
+      "draw": "ارسم توقيعك",
+      "canvasPlaceholder": "لوحة الرسم للتوقيع (التنفيذ معلق)"
+    },
+    "decline": {
+      "title": "رفض التوقيع",
+      "reasonPlaceholder": "يرجى تقديم سبب الرفض (اختياري)"
+    },
+    "success": {
+      "signed": "تم توقيع المستند بنجاح",
+      "declined": "تم تسجيل الرد",
+      "cancelled": "تم إلغاء طلب التوقيع",
+      "reminderSent": "تم إرسال التذكير بنجاح"
+    },
+    "error": {
+      "loadFailed": "فشل تحميل بيانات التوقيع",
+      "notFound": "لم يتم العثور على طلب التوقيع",
+      "submitFailed": "فشل إرسال التوقيع",
+      "declineFailed": "فشل تسجيل الرد",
+      "cancelFailed": "فشل إلغاء الطلب",
+      "reminderFailed": "فشل إرسال التذكير",
+      "otpRequired": "يرجى التحقق من هويتك باستخدام OTP أولاً"
+    }
+  }
+}
