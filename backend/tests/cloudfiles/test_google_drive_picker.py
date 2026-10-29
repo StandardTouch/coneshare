@@ -243,3 +243,90 @@ class TestListEndpointGating:
             )
         
         assert response.status_code == status.HTTP_200_OK
+
+
+@pytest.mark.django_db
+@patch('cloudfiles.providers.google_drive.get_dynamic_setting')
+class TestGoogleDriveUploadPermissions:
+    """Test upload behavior in picker mode with folder permissions."""
+    
+    def test_upload_with_accessible_folder(self, mock_get_setting, google_drive_connection):
+        """Test that upload works when folder is accessible (picker mode)."""
+        def get_setting(key):
+            return {
+                'GOOGLE_DRIVE_MODE': 'picker',
+                'GOOGLE_DRIVE_CLIENT_ID': 'test_client_id',
+                'GOOGLE_DRIVE_CLIENT_SECRET': 'test_secret',
+            }.get(key)
+        mock_get_setting.side_effect = get_setting
+        
+        from cloudfiles.providers.google_drive import GoogleDriveProvider
+        from io import BytesIO
+        
+        provider = GoogleDriveProvider(connection=google_drive_connection)
+        test_file = BytesIO(b"test content")
+        
+        with patch('cloudfiles.providers.google_drive.build') as mock_build:
+            mock_service = MagicMock()
+            mock_files = MagicMock()
+            mock_create = MagicMock()
+            mock_execute = MagicMock(return_value={'id': 'uploaded_file_id'})
+            
+            mock_create.execute = mock_execute
+            mock_files.create.return_value = mock_create
+            mock_service.files.return_value = mock_files
+            mock_build.return_value = mock_service
+            
+            with patch('cloudfiles.providers.google_drive.Credentials') as mock_creds_class:
+                mock_creds = MagicMock()
+                mock_creds.expired = False
+                mock_creds.token = 'test_token'
+                mock_creds_class.return_value = mock_creds
+                
+                file_id = provider.upload_file(test_file, "test.pdf", "folder_id_123")
+        
+        assert file_id == 'uploaded_file_id'
+    
+    def test_upload_folder_permission_error(self, mock_get_setting, google_drive_connection):
+        """Test clear error message when folder is not accessible (403/404)."""
+        def get_setting(key):
+            return {
+                'GOOGLE_DRIVE_MODE': 'picker',
+                'GOOGLE_DRIVE_CLIENT_ID': 'test_client_id',
+                'GOOGLE_DRIVE_CLIENT_SECRET': 'test_secret',
+            }.get(key)
+        mock_get_setting.side_effect = get_setting
+        
+        from cloudfiles.providers.google_drive import GoogleDriveProvider
+        from cloudfiles.providers import CloudProviderError
+        from googleapiclient.errors import HttpError
+        from io import BytesIO
+        
+        provider = GoogleDriveProvider(connection=google_drive_connection)
+        test_file = BytesIO(b"test content")
+        
+        with patch('cloudfiles.providers.google_drive.build') as mock_build:
+            mock_service = MagicMock()
+            mock_files = MagicMock()
+            
+            # Create a proper HttpError
+            http_error = HttpError(
+                resp=MagicMock(status=403),
+                content=b'{"error": {"message": "Insufficient Permission"}}'
+            )
+            mock_files.create.side_effect = http_error
+            mock_service.files.return_value = mock_files
+            mock_build.return_value = mock_service
+            
+            with patch('cloudfiles.providers.google_drive.Credentials') as mock_creds_class:
+                mock_creds = MagicMock()
+                mock_creds.expired = False
+                mock_creds.token = 'test_token'
+                mock_creds_class.return_value = mock_creds
+                
+                with pytest.raises(CloudProviderError) as exc_info:
+                    provider.upload_file(test_file, "test.pdf", "old_folder_id")
+        
+        error_msg = str(exc_info.value)
+        assert "Cannot upload file" in error_msg
+        assert "re-select the destination folder" in error_msg or "reconnect" in error_msg

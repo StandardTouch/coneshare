@@ -278,5 +278,14 @@ class GoogleDriveProvider(BaseCloudProvider):
                 fields='id'
             ).execute()
             return uploaded_file.get('id')
-        except (HttpError, RefreshError) as e:
+        except HttpError as e:
+            # Handle permission errors specifically for folder access
+            if e.resp.status in (403, 404):
+                folder_msg = f" to folder '{folder_id}'" if folder_id and folder_id.lower() != 'root' else ""
+                raise CloudProviderError(
+                    f"Cannot upload file{folder_msg}. The folder may no longer be accessible, "
+                    f"or you may need to reconnect your Google Drive account and re-select the destination folder."
+                )
+            self._handle_provider_error(e, "upload")
+        except RefreshError as e:
             self._handle_provider_error(e, "upload")
