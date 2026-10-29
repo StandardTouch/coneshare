@@ -1,46 +1,29 @@
 {
-  "common": {
-    "save": "حفظ التغييرات",
-    "cancel": "إلغاء",
-    "delete": "حذف",
-    "loading": "جار التحميل...",
-    "success": "نجح",
-    "pages": "صفحات"
-  },
-  "nav": {
-    "dashboard": "لوحة التحكم",
-    "documents": "المستندات",
-    "datarooms": "غرف البيانات",
-    "fileRequests": "طلبات الملفات",
-    "automations": "الأتمتة",
-    "trash": "سلة المهملات",
-    "signatures": "التوقيعات الإلكترونية"
-  },
   "esign": {
     "title": "التوقيعات الإلكترونية",
     "tabs": {
-      "sentByMe": "أرسلتها",
-      "awaitingMySignature": "بانتظار توقيعي"
+      "sentByMe": "المرسلة مني",
+      "awaitingMySignature": "في انتظار توقيعي"
     },
     "status": {
       "draft": "مسودة",
-      "sent": "تم الإرسال",
+      "sent": "مرسلة",
       "in_progress": "قيد التنفيذ",
-      "completed": "مكتمل",
-      "declined": "مرفوض",
-      "cancelled": "ملغى",
-      "expired": "منتهي الصلاحية"
+      "completed": "مكتملة",
+      "declined": "مرفوضة",
+      "cancelled": "ملغاة",
+      "expired": "منتهية الصلاحية"
     },
     "signerStatus": {
-      "pending": "معلق",
-      "sent": "تم الإرسال",
-      "viewed": "تم العرض",
+      "pending": "قيد الانتظار",
+      "sent": "مرسلة",
+      "viewed": "تم الاطلاع",
       "otp_verified": "تم التحقق من OTP",
       "signed": "تم التوقيع",
-      "declined": "مرفوض"
+      "declined": "مرفوضة"
     },
     "fieldType": {
-      "signature": "توقيع",
+      "signature": "التوقيع",
       "initials": "الأحرف الأولى",
       "date_signed": "تاريخ التوقيع",
       "full_name": "الاسم الكامل",
@@ -48,13 +31,13 @@
     },
     "request": {
       "createNew": "إنشاء طلب جديد",
-      "noRequests": "لم يتم العثور على طلبات التوقيع",
+      "noRequests": "لا توجد طلبات توقيع",
       "document": "المستند",
-      "signers": "الموقعون",
-      "signed": "وقع",
+      "signers": "موقع/موقعون",
+      "signed": "تم التوقيع",
       "yourStatus": "حالتك",
       "created": "تم الإنشاء",
-      "confirmCancel": "هل أنت متأكد أنك تريد إلغاء طلب التوقيع هذا؟"
+      "confirmCancel": "هل أنت متأكد من إلغاء طلب التوقيع هذا؟"
     },
     "action": {
       "viewSign": "عرض والتوقيع",
@@ -63,7 +46,39 @@
       "cancel": "إلغاء",
       "decline": "رفض",
       "submit": "إرسال التوقيع",
-      "confirmDecline": "تأكيد الرفض"
+      "confirmDecline": "تأكيد الرفض",
+      "requestSignature": "طلب التوقيع"
+    },
+    "create": {
+      "title": "إنشاء طلب توقيع",
+      "placeFields": "وضع حقول التوقيع",
+      "requestTitle": "عنوان الطلب",
+      "titlePlaceholder": "مثال: عقد عمل",
+      "titleRequired": "العنوان مطلوب",
+      "message": "رسالة للموقعين",
+      "messagePlaceholder": "أضف رسالة للموقعين...",
+      "signers": "الموقعون",
+      "signersRequired": "مطلوب موقع واحد على الأقل",
+      "selectAllSigners": "يرجى اختيار مستخدم لكل موقع",
+      "addSigner": "إضافة موقع",
+      "noSigners": "لم تتم إضافة موقعين بعد",
+      "selectUser": "اختر مستخدم...",
+      "signingOrder": "ترتيب التوقيع",
+      "parallel": "متوازي",
+      "parallelDesc": "يتلقى جميع الموقعين البريد الإلكتروني في نفس الوقت",
+      "sequential": "تسلسلي",
+      "sequentialDesc": "يتم إخطار الموقع التالي بعد إكمال السابق",
+      "expiresIn": "تنتهي في",
+      "selectSigner": "اختر الموقع",
+      "dragInstruction": "اسحب الحقول إلى المستند لوضعها",
+      "pdfPagePlaceholder": "صفحة PDF {{page}}",
+      "fieldsPlaced": "تم وضع {{count}} حقل/حقول",
+      "fields": "حقل/حقول",
+      "noFieldsPlaced": "يرجى وضع حقل واحد على الأقل",
+      "saveAndSend": "حفظ وإرسال",
+      "requestCreated": "تم إنشاء طلب التوقيع",
+      "fieldsSaveFailed": "فشل حفظ الحقول",
+      "createFailed": "فشل إنشاء الطلب"
     },
     "otp": {
       "verificationRequired": "التحقق مطلوب",
@@ -74,22 +89,35 @@
       "sent": "تم إرسال رمز التحقق إلى بريدك الإلكتروني",
       "verified": "تم التحقق بنجاح",
       "sendFailed": "فشل إرسال رمز التحقق",
-      "verifyFailed": "رمز التحقق غير صالح"
+      "verifyFailed": "رمز التحقق غير صحيح"
     },
-    "readyToSign": "تم التحقق منك وأنت جاهز للتوقيع",
+    "readyToSign": "لقد تم التحقق منك وأنت جاهز للتوقيع",
     "document": {
       "preview": "معاينة المستند",
       "pdfViewerPlaceholder": "سيتم عرض عارض PDF هنا"
     },
     "fields": {
-      "toSign": "الحقول للتوقيع",
-      "clickToFill": "انقر للملء",
-      "filled": "تم الملء",
+      "toSign": "الحقول المراد توقيعها",
+      "clickToFill": "انقر للتعبئة",
+      "filled": "تم التعبئة",
       "enterValue": "أدخل القيمة لهذا الحقل"
     },
     "signature": {
-      "draw": "ارسم توقيعك",
-      "canvasPlaceholder": "لوحة الرسم للتوقيع (التنفيذ معلق)"
+      "drawSignature": "ارسم توقيعك",
+      "drawInitials": "ارسم الأحرف الأولى",
+      "typeSignature": "اكتب توقيعك",
+      "typeInitials": "اكتب الأحرف الأولى",
+      "typeName": "أدخل اسمك",
+      "typeText": "أدخل النص",
+      "drawInstruction": "استخدم الماوس أو شاشة اللمس للرسم",
+      "clear": "مسح",
+      "enterYourName": "أدخل اسمك",
+      "enterInitials": "أدخل الأحرف الأولى",
+      "enterFullName": "أدخل اسمك الكامل",
+      "enterText": "أدخل النص",
+      "fontStyle": "نمط الخط",
+      "previewAppears": "ستظهر المعاينة هنا",
+      "arabicDetected": "تم اكتشاف اللغة العربية - استخدام خط Amiri"
     },
     "decline": {
       "title": "رفض التوقيع",
@@ -103,12 +131,21 @@
     },
     "error": {
       "loadFailed": "فشل تحميل بيانات التوقيع",
-      "notFound": "لم يتم العثور على طلب التوقيع",
+      "notFound": "طلب التوقيع غير موجود",
       "submitFailed": "فشل إرسال التوقيع",
       "declineFailed": "فشل تسجيل الرد",
       "cancelFailed": "فشل إلغاء الطلب",
       "reminderFailed": "فشل إرسال التذكير",
       "otpRequired": "يرجى التحقق من هويتك باستخدام OTP أولاً"
     }
+  },
+  "nav": {
+    "signatures": "التوقيعات"
+  },
+  "common": {
+    "day": "يوم",
+    "days": "أيام",
+    "next": "التالي",
+    "page": "صفحة"
   }
 }
