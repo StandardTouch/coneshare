@@ -97,6 +97,9 @@ export function useGoogleDrivePicker(connection, onFilesPicked) {
         if (detail.includes('reconnect') || detail.includes('expired') || detail.includes('revoked')) {
           setError(t('cloudImport.reconnectRequired'));
           toast.error(t('cloudImport.reconnectRequired'));
+        } else if (detail.includes('not configured') || detail.includes('API Key') || detail.includes('App ID')) {
+          setError(detail);
+          toast.error(detail);
         } else {
           setError(detail || t('cloudImport.pickerFailed'));
           toast.error(detail || t('cloudImport.pickerFailed'));
