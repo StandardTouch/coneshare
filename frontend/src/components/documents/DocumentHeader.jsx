@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useBranding } from '../../contexts/BrandingProvider';
 import { formatDate } from '../../utils/formatters';
 import { Eye, Upload, RefreshCw, Pencil } from 'lucide-react';
 import { Badge } from '../ui/Badge';
@@ -36,6 +37,7 @@ export function DocumentHeader({
   canManage = true,
 }) {
   const { t } = useTranslation();
+  const { esignEnabled } = useBranding();
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(document.name);
 
