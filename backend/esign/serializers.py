@@ -4,6 +4,7 @@ from django.utils.translation import gettext as _
 
 from core.models import User
 from core.serializers import UserSerializer
+from documents.models import Document
 from documents.serializers import DocumentSerializer
 from .models import (
     SignatureRequest, Signer, SignatureField,
@@ -24,7 +25,7 @@ class SignatureFieldSerializer(serializers.ModelSerializer):
 class SignerSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     user_id = serializers.PrimaryKeyRelatedField(
-        queryset=None,  # Set in view
+        queryset=User.objects.all(),
         source='user',
         write_only=True
     )
@@ -111,7 +112,7 @@ class SignatureRequestDetailSerializer(serializers.ModelSerializer):
 class SignatureRequestCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating signature requests."""
     document_id = serializers.PrimaryKeyRelatedField(
-        queryset=None,  # Set in view
+        queryset=Document.objects.all(),
         source='document',
         write_only=True
     )

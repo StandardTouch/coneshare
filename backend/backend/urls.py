@@ -53,8 +53,7 @@ urlpatterns = [
 ]
 
 # Conditionally include esign URLs if enabled
-from core.services import get_dynamic_setting
-if get_dynamic_setting('ESIGN_ENABLED', default=False):
+if settings.ESIGN_ENABLED:
     urlpatterns.append(path('api/v1/esign/', include('esign.urls')))
 
 if settings.DEBUG:
