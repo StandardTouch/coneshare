@@ -4,6 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '../components/ui/Button';
 import { toast } from 'sonner';
 import { getSigningData, requestOTP, verifyOTP, submitSignature, declineToSign } from '../services/esign';
+import { SignatureDrawModal } from '../components/esign/SignatureDrawModal';
+import { TypedSignatureModal } from '../components/esign/TypedSignatureModal';
+import { useUser } from '../contexts/UserProvider';
 
 export default function SigningPage() {
   const { token } = useParams();
@@ -65,21 +68,29 @@ export default function SigningPage() {
     }
     setCurrentField(field);
     if (field.field_type === 'signature' || field.field_type === 'initials') {
-      setShowSignatureModal(true);
-    } else {
-      // For text fields, show input dialog
-      const value = prompt(t('esign.field.enterValue'));
-      if (value) {
-        setFieldValues(prev => ({ ...prev, [field.id]: value }));
-      }
+      setShowDrawModal(true);
+    } else if (field.field_type === 'full_name' || field.field_type === 'text') {
+      setShowTypeModal(true);
+    } else if (field.field_type === 'date_signed') {
+      // Auto-fill date
+      const today = new Date().toLocaleDateString();
+      setFieldValues(prev => ({ ...prev, [field.id]: today }));
     }
   };
   
-  const handleSaveSignature = (signatureData) => {
+  const handleSaveDrawnSignature = (signatureData) => {
     if (currentField) {
       setFieldValues(prev => ({ ...prev, [currentField.id]: signatureData }));
     }
-    setShowSignatureModal(false);
+    setShowDrawModal(false);
+    setCurrentField(null);
+  };
+  
+  const handleSaveTypedSignature = (text) => {
+    if (currentField) {
+      setFieldValues(prev => ({ ...prev, [currentField.id]: text }));
+    }
+    setShowTypeModal(false);
     setCurrentField(null);
   };
   
@@ -234,25 +245,22 @@ export default function SigningPage() {
           </div>
         </div>
         
-        {/* Simple Signature Modal */}
-        {showSignatureModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-lg w-full">
-              <h3 className="text-lg font-semibold mb-4">{t('esign.signature.draw')}</h3>
-              <div className="border-2 border-gray-300 rounded h-48 mb-4 bg-white">
-                <p className="text-center pt-20 text-gray-400">{t('esign.signature.canvasPlaceholder')}</p>
-              </div>
-              <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => setShowSignatureModal(false)}>
-                  {t('common.cancel')}
-                </Button>
-                <Button onClick={() => handleSaveSignature('signature-placeholder-data')}>
-                  {t('common.save')}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Draw Signature Modal */}
+        <SignatureDrawModal
+          isOpen={showDrawModal}
+          onOpenChange={setShowDrawModal}
+          onSave={handleSaveDrawnSignature}
+          fieldType={currentField?.field_type}
+        />
+        
+        {/* Type Signature Modal */}
+        <TypedSignatureModal
+          isOpen={showTypeModal}
+          onOpenChange={setShowTypeModal}
+          onSave={handleSaveTypedSignature}
+          fieldType={currentField?.field_type}
+          userName={user?.name}
+        />
         
         {/* Decline Dialog */}
         {showDeclineDialog && (

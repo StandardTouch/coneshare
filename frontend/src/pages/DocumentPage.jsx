@@ -17,6 +17,7 @@ import { DocumentPreviewModal } from '../components/documents/DocumentPreviewMod
 import { ConfirmationDialog } from '../components/dialogs/ConfirmationDialog';
 import { OwnerQnAManager } from '../components/qna/OwnerQnAManager';
 import { CloudImportDialog } from '../components/dialogs/CloudImportDialog';
+import { CreateRequestDialog } from '../components/esign/CreateRequestDialog';
 
 export function DocumentPage() {
   const { t } = useTranslation();
@@ -46,6 +47,8 @@ export function DocumentPage() {
   const [cloudConnections, setCloudConnections] = useState([]);
   const [isCloudImportOpen, setIsCloudImportOpen] = useState(false);
   const [activeCloudImport, setActiveCloudImport] = useState(null);
+  const [isCreateRequestOpen, setIsCreateRequestOpen] = useState(false);
+  const [orgUsers, setOrgUsers] = useState([]);
 
   useEffect(() => {
     const fetchProviders = async () => {
@@ -61,7 +64,27 @@ export function DocumentPage() {
       }
     };
     fetchProviders();
-  }, []);
+    
+    // Fetch organization users for esign
+    const fetchOrgUsers = async () => {
+      try {
+        const response = await fetch('/api/v1/users/', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setOrgUsers(data.results || data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch org users:", error);
+      }
+    };
+    if (user?.settings?.ESIGN_ENABLED) {
+      fetchOrgUsers();
+    }
+  }, [user]);
 
   useEffect(() => {
     const action = searchParams.get('action');
@@ -576,6 +599,15 @@ export function DocumentPage() {
         onImportSuccess={() => {}}
         onImport={handleImportCloudVersion}
       />
+      
+      {user?.settings?.ESIGN_ENABLED && document?.type === 'pdf' && (
+        <CreateRequestDialog
+          isOpen={isCreateRequestOpen}
+          onOpenChange={setIsCreateRequestOpen}
+          document={document}
+          users={orgUsers}
+        />
+      )}
     </div>
   );
 }
