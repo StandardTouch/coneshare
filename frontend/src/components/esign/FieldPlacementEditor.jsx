@@ -14,7 +14,6 @@ const FIELD_TYPES = [
 
 export function FieldPlacementEditor({ documentId, signers, users, onSave, onCancel }) {
   const { t } = useTranslation();
-  const { t } = useTranslation();
   const [pdfUrl, setPdfUrl] = useState(null);
   const [numPages, setNumPages] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
