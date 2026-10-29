@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 def check_esign_enabled():
     """Check if e-signature feature is enabled."""
-    if not get_dynamic_setting('ESIGN_ENABLED', default=False):
+    if not get_dynamic_setting('ESIGN_ENABLED'):
         raise PermissionDenied(_("E-Signature feature is not enabled."))
 
 
