@@ -137,7 +137,7 @@ export default function SigningPage() {
     return <div className="container mx-auto p-4">{t('esign.error.notFound')}</div>;
   }
   
-  const { signature_request, signer, fields, can_sign, can_sign_reason } = signingData;
+  const { signature_request, fields, can_sign, can_sign_reason } = signingData;
   
   return (
     <div className="min-h-screen bg-gray-50 py-8">
