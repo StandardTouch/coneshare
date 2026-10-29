@@ -20,6 +20,11 @@ DEFAULT_SETTINGS = {
     'NEXT_CLOUD_HOST': {'description': 'Host URL for Nextcloud (e.g., https://cloud.example.com).', 'type': 'string'},
     'NEXT_CLOUD_CLIENT_ID': {'description': 'Client ID for Nextcloud integration.', 'type': 'string'},
     'NEXT_CLOUD_CLIENT_SECRET': {'description': 'Client Secret for Nextcloud integration.', 'type': 'string'},
+    'ESIGN_ENABLED': {
+        'default': False,
+        'type': 'boolean',
+        'description': 'Enable electronic signature feature. When OFF, all esign UI is hidden and all esign API endpoints return 404/403.',
+    },
     'ENABLE_PUBLIC_SIGNUP': {'description': 'Enable public signup with email verification.', 'type': 'bool'},
     'FLATTEN_WATERMARKED_DOWNLOADS': {'description': 'If true, watermarked PDF downloads are flattened (rasterized to JPEGs and recompiled to PDF) to prevent watermark stripping.', 'type': 'bool'},
     'ESIGN_ENABLED': {'description': 'Enable electronic signature feature. When OFF, all esign UI is hidden and all esign API endpoints return 404/403.', 'type': 'bool'},
