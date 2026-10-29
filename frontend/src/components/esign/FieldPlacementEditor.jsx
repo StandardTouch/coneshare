@@ -14,6 +14,7 @@ const FIELD_TYPES = [
 
 export function FieldPlacementEditor({ documentId, signers, users, onSave, onCancel }) {
   const { t } = useTranslation();
+  const { t } = useTranslation();
   const [pdfUrl, setPdfUrl] = useState(null);
   const [numPages, setNumPages] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
@@ -151,14 +152,14 @@ export function FieldPlacementEditor({ documentId, signers, users, onSave, onCan
 
         {/* Field Palette */}
         <div className="flex gap-2 flex-wrap">
-          {FIELD_TYPES.map(({ type, icon: Icon, label, color }) => (
+          {FIELD_TYPES.map(({ type, icon: FieldIcon, label, color }) => (
             <div
               key={type}
               draggable
               onDragStart={() => handleDragStart(type)}
               className={`flex items-center gap-2 px-3 py-2 rounded border cursor-move ${color} hover:shadow-md transition-shadow`}
             >
-              <Icon className="h-4 w-4" />
+              <FieldIcon className="h-4 w-4" />
               <span className="text-sm font-medium">{label}</span>
             </div>
           ))}
