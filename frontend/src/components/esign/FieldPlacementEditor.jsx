@@ -20,11 +20,11 @@ export function FieldPlacementEditor({ documentId, signers, users, onSave, onCan
   const [fields, setFields] = useState([]);
   const [draggedField, setDraggedField] = useState(null);
   const [selectedSignerIndex, setSelectedSignerIndex] = useState(0);
-  const canvasRef = useRef(null);
   const containerRef = useRef(null);
 
   useEffect(() => {
     loadDocument();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentId]);
 
   const loadDocument = async () => {
@@ -65,12 +65,6 @@ export function FieldPlacementEditor({ documentId, signers, users, onSave, onCan
 
     setFields([...fields, newField]);
     setDraggedField(null);
-  };
-
-  const handleFieldResize = (fieldId, newWidth, newHeight) => {
-    setFields(fields.map(f => 
-      f.id === fieldId ? { ...f, width: newWidth, height: newHeight } : f
-    ));
   };
 
   const handleFieldMove = (fieldId, newX, newY) => {
@@ -195,7 +189,6 @@ export function FieldPlacementEditor({ documentId, signers, users, onSave, onCan
             {/* Placed Fields */}
             {pageFields.map((field) => {
               const fieldType = FIELD_TYPES.find(ft => ft.type === field.field_type);
-              const Icon = fieldType?.icon;
               const isCurrentSigner = field.signer_id === signers[selectedSignerIndex]?.user_id;
               
               return (
@@ -220,7 +213,7 @@ export function FieldPlacementEditor({ documentId, signers, users, onSave, onCan
                 >
                   <div className="flex items-center justify-between h-full px-2 text-xs">
                     <div className="flex items-center gap-1">
-                      {Icon && <Icon className="h-3 w-3" />}
+                      {fieldType?.icon && <fieldType.icon className="h-3 w-3" />}
                       <span className="font-medium truncate">{fieldType?.label}</span>
                     </div>
                     <button

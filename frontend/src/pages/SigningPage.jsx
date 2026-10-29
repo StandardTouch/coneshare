@@ -12,6 +12,7 @@ export default function SigningPage() {
   const { token } = useParams();
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { user } = useUser();
   
   const [loading, setLoading] = useState(true);
   const [signingData, setSigningData] = useState(null);
@@ -19,13 +20,15 @@ export default function SigningPage() {
   const [otpCode, setOtpCode] = useState('');
   const [otpVerified, setOtpVerified] = useState(false);
   const [fieldValues, setFieldValues] = useState({});
-  const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [showDrawModal, setShowDrawModal] = useState(false);
+  const [showTypeModal, setShowTypeModal] = useState(false);
   const [showDeclineDialog, setShowDeclineDialog] = useState(false);
   const [declineReason, setDeclineReason] = useState('');
   const [currentField, setCurrentField] = useState(null);
-  
+
   useEffect(() => {
     loadSigningData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
   
   const loadSigningData = async () => {
