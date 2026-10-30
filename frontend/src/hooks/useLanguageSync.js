@@ -12,8 +12,13 @@ export function useLanguageSync() {
   const changeLanguage = i18n.changeLanguage;
 
   useEffect(() => {
-    if (user?.language && user.language !== i18n.language) {
-      changeLanguage(user.language);
+    const preferred = user?.language;
+    if (!preferred || preferred === i18n.language) {
+      return;
     }
-  }, [user?.language, i18n.language, changeLanguage]);
+    const supported = i18n.options.supportedLngs?.filter((code) => code !== 'cimode') ?? [];
+    if (supported.includes(preferred)) {
+      changeLanguage(preferred);
+    }
+  }, [user?.language, i18n.language, changeLanguage, i18n.options.supportedLngs]);
 }

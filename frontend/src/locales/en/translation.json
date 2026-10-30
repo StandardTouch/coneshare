@@ -207,7 +207,8 @@
     "usedQuota": "{{size}} used",
     "unlimited": "Unlimited",
     "toggleSidebar": "Toggle sidebar",
-    "pressToToggleSidebar": "Press ] to toggle sidebar"
+    "pressToToggleSidebar": "Press ] to toggle sidebar",
+    "signatures": "Signatures"
   },
   "settings": {
     "title": "User Settings",
@@ -1293,9 +1294,6 @@
       "reminderFailed": "Failed to send reminder",
       "otpRequired": "Please verify your identity with OTP first"
     }
-  },
-  "nav": {
-    "signatures": "Signatures"
   },
   "uploads": {
     "uploading_one": "Uploading {{count}} file...",
