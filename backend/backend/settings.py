@@ -561,6 +561,10 @@ DROPBOX_APP_SECRET = ''
 GOOGLE_DRIVE_CLIENT_ID = ''
 GOOGLE_DRIVE_CLIENT_SECRET = ''
 
+GOOGLE_DRIVE_MODE = os.environ.get('GOOGLE_DRIVE_MODE', 'picker')
+GOOGLE_DRIVE_API_KEY = os.environ.get('GOOGLE_DRIVE_API_KEY', '')
+GOOGLE_DRIVE_APP_ID = os.environ.get('GOOGLE_DRIVE_APP_ID', '')
+
 
 # Nextcloud API Credentials
 # Get these from your Nextcloud Admin Panel.
