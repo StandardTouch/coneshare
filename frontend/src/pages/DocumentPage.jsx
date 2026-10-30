@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useUser } from '../contexts/UserProvider';
+import { useBranding } from '../contexts/BrandingProvider';
 import { toast } from 'sonner';
 import { useBreadcrumb } from '../components/layout/BreadcrumbProvider';
 import { Loader2, AlertTriangle, Shield } from 'lucide-react';
@@ -27,6 +28,7 @@ export function DocumentPage() {
   const userContext = useUser();
   const user = userContext?.user;
   const refreshUser = userContext?.refreshUser;
+  const { esignEnabled } = useBranding();
   const navigate = useNavigate();
   const [document, setDocument] = useState(null);
   const [stats, setStats] = useState(null);
@@ -68,23 +70,23 @@ export function DocumentPage() {
     // Fetch organization users for esign
     const fetchOrgUsers = async () => {
       try {
-        const response = await fetch('/api/v1/users/', {
+        const response = await fetch('/api/v1/esign/requests/organization-users/', {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('access_token')}`
           }
         });
         if (response.ok) {
           const data = await response.json();
-          setOrgUsers(data.results || data);
+          setOrgUsers(data);
         }
       } catch (error) {
         console.error("Failed to fetch org users:", error);
       }
     };
-    if (user?.settings?.ESIGN_ENABLED) {
+    if (esignEnabled) {
       fetchOrgUsers();
     }
-  }, [user]);
+  }, [esignEnabled]);
 
   useEffect(() => {
     const action = searchParams.get('action');
@@ -507,6 +509,7 @@ export function DocumentPage() {
         onVersionHistory={() => navigate(`/documents/${documentId}/versions`)}
         onDelete={handleDelete}
         onRenameDocument={handleRenameDocument}
+        onRequestSignature={document?.type === 'pdf' && canManage ? () => setIsCreateRequestOpen(true) : undefined}
         isProcessing={isProcessing}
         cloudProviders={cloudProviders}
         canManage={canManage}
@@ -600,7 +603,7 @@ export function DocumentPage() {
         onImport={handleImportCloudVersion}
       />
       
-      {user?.settings?.ESIGN_ENABLED && document?.type === 'pdf' && (
+      {esignEnabled && document?.type === 'pdf' && (
         <CreateRequestDialog
           isOpen={isCreateRequestOpen}
           onOpenChange={setIsCreateRequestOpen}

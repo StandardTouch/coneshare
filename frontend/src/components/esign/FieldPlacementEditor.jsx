@@ -151,14 +151,15 @@ export function FieldPlacementEditor({ documentId, signers, users, onSave, onCan
 
         {/* Field Palette */}
         <div className="flex gap-2 flex-wrap">
-          {FIELD_TYPES.map(({ type, icon: FieldIcon, label, color }) => (
+          {/* eslint-disable-next-line no-unused-vars */}
+          {FIELD_TYPES.map(({ type, icon: IconComponent, label, color }) => (
             <div
               key={type}
               draggable
               onDragStart={() => handleDragStart(type)}
               className={`flex items-center gap-2 px-3 py-2 rounded border cursor-move ${color} hover:shadow-md transition-shadow`}
             >
-              <FieldIcon className="h-4 w-4" />
+              <IconComponent className="h-4 w-4" />
               <span className="text-sm font-medium">{label}</span>
             </div>
           ))}

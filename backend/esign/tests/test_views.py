@@ -171,6 +171,21 @@ class TestPermissions:
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data) >= 1
     
+    def test_organization_users_endpoint(self, authenticated_client, enable_esign, signer_user, another_user):
+        """Authenticated users can fetch organization users for esign"""
+        response = authenticated_client.get('/api/v1/esign/requests/organization-users/')
+        assert response.status_code == status.HTTP_200_OK
+        assert isinstance(response.data, list)
+        # Should include at least the signer_user and another_user
+        user_ids = [u['id'] for u in response.data]
+        assert signer_user.id in user_ids
+        assert another_user.id in user_ids
+        # Check structure
+        if len(response.data) > 0:
+            assert 'id' in response.data[0]
+            assert 'name' in response.data[0]
+            assert 'email' in response.data[0]
+    
     def test_only_assigned_signer_can_sign(self, signature_request, signer_authenticated_client, 
                                           another_user, api_client, enable_esign):
         """Only the assigned signer (when authenticated) can access signing endpoints"""
