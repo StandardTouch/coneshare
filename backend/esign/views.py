@@ -305,6 +305,21 @@ class SignatureRequestViewSet(viewsets.ModelViewSet):
             'download_url': response.get('url'),
             'filename': f"certificate_{signature_request.document.name}.pdf"
         })
+    
+    @action(detail=False, methods=['get'], url_path='organization-users')
+    def organization_users(self, request):
+        """
+        Get list of users in the organization for creating signature requests.
+        """
+        check_esign_enabled()
+        
+        from core.models import User
+        users = User.objects.filter(
+            organization=request.user.organization,
+            is_active=True
+        ).values('id', 'name', 'email').order_by('name', 'email')
+        
+        return Response(list(users))
 
 
 class SigningViewSet(viewsets.ViewSet):
