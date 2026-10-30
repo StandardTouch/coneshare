@@ -7,10 +7,8 @@
  */
 
 export const BRAND_CONFIG = {
-  // Brand name (English and Arabic)
   name: 'Allure Clinic',
-  nameArabic: 'ألور',
-  
+
   // Logo paths (relative to /public)
   logo: {
     mark: '/brand/logo.svg',           // Teal mark only
