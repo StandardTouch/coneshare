@@ -56,6 +56,28 @@ class TestShareLinkSerializer:
         assert instance.password is None
         assert serializer.data["has_password"] is False
 
+    def test_allow_print_defaults_true_and_roundtrips(self, document, serializer_context, share_link):
+        create_serializer = ShareLinkSerializer(
+            data={"document": document.id, "name": "Print default link"},
+            context=serializer_context,
+        )
+        assert create_serializer.is_valid(), create_serializer.errors
+        created = create_serializer.save()
+        assert created.allow_print is True
+
+        update_serializer = ShareLinkSerializer(
+            share_link,
+            data={"allow_print": False},
+            partial=True,
+            context=serializer_context,
+        )
+        assert update_serializer.is_valid(), update_serializer.errors
+        updated = update_serializer.save()
+        assert updated.allow_print is False
+
+        read_serializer = ShareLinkSerializer(updated, context=serializer_context)
+        assert read_serializer.data["allow_print"] is False
+
     def test_create_with_enable_watermark_defaults_watermark_text(self, document, serializer_context):
         serializer = ShareLinkSerializer(
             data={"document": document.id, "name": "", "enable_watermark": True},
