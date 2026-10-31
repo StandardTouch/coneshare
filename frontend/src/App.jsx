@@ -5,6 +5,7 @@ import './App.css';
 import MainLayout from './components/layout/MainLayout';
 import RequireAuth from './components/auth/RequireAuth';
 import { UploadProvider } from './contexts/UploadProvider';
+import { UserProvider } from './contexts/UserProvider';
 import { BrandingProvider } from './contexts/BrandingProvider';
 import { TooltipProvider } from './components/ui/Tooltip';
 
@@ -69,6 +70,7 @@ function App() {
       <Toaster richColors />
       <TooltipProvider>
         <BrandingProvider>
+          <UserProvider>
           <UploadProvider>
             <Suspense fallback={<RouteLoadingFallback />}>
               <Routes>
@@ -118,6 +120,7 @@ function App() {
               </Routes>
             </Suspense>
           </UploadProvider>
+          </UserProvider>
       </BrandingProvider>
       </TooltipProvider>
     </>

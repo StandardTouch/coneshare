@@ -4,7 +4,7 @@ import { jwtDecode } from "jwt-decode";
 import { getUser } from "../services/api";
 import { authService } from "../services/authService";
 
-const UserContext = createContext(null);
+export const UserContext = createContext(null);
 
 export function UserProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -20,58 +20,51 @@ export function UserProvider({ children }) {
   const refreshUser = useCallback(async (updatedUserData = null) => {
     if (updatedUserData) {
       setUser(updatedUserData);
-      return;
+      return updatedUserData;
     }
+
     const token = localStorage.getItem("access_token");
-    if (token) {
-      try {
-        const decoded = jwtDecode(token);
-        const response = await getUser(decoded.user_id);
-        setUser(response.data);
-      } catch (error) {
-        console.error("Failed to refresh user:", error);
-        if (error.response?.status === 401) {
-          handleLogout();
-        }
+    if (!token) {
+      setUser(null);
+      setIsLoading(false);
+      return null;
+    }
+
+    setIsLoading(true);
+    try {
+      const decoded = jwtDecode(token);
+      const response = await getUser(decoded.user_id);
+      setUser(response.data);
+      return response.data;
+    } catch (error) {
+      console.error("Failed to refresh user:", error);
+      setUser(null);
+      if (error.response?.status === 401) {
+        await handleLogout();
       }
+      return null;
+    } finally {
+      setIsLoading(false);
     }
   }, [handleLogout]);
 
   useEffect(() => {
-    let isMounted = true;
-    const fetchUser = async () => {
-      const token = localStorage.getItem("access_token");
-      if (token) {
-        try {
-          const decoded = jwtDecode(token);
-          const response = await getUser(decoded.user_id);
-          if (isMounted) {
-            setUser(response.data);
-          }
-        } catch (error) {
-          console.error("Failed to fetch user:", error);
-          if (isMounted && error.response?.status === 401) {
-            handleLogout();
-          }
-        }
-      }
-      if (isMounted) {
-        setIsLoading(false);
-      }
-    };
-    fetchUser();
-    return () => { isMounted = false; };
-  }, [handleLogout]);
+    refreshUser();
+  }, [refreshUser]);
 
   const value = { user, isLoading, handleLogout, refreshUser };
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }
 
+const defaultUserContext = {
+  user: null,
+  isLoading: false,
+  handleLogout: async () => {},
+  refreshUser: async () => null,
+};
+
 export function useUser() {
   const context = useContext(UserContext);
-  if (context === undefined) {
-    throw new Error("useUser must be used within a UserProvider");
-  }
-  return context;
+  return context ?? defaultUserContext;
 }

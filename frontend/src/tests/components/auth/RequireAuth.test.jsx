@@ -1,23 +1,27 @@
-import { render, screen } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import RequireAuth from "../../../components/auth/RequireAuth";
 import { UserContext } from "../../../contexts/UserProvider";
 
-const mockNavigate = vi.fn();
-vi.mock("react-router", async () => {
-  const actual = await vi.importActual("react-router");
-  return {
-    ...actual,
-    useNavigate: () => mockNavigate,
-  };
-});
+const mockRefreshUser = vi.fn();
 
 describe("RequireAuth", () => {
-  const renderWithUser = (user, isLoading = false, initialPath = "/") => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.clear();
+    mockRefreshUser.mockResolvedValue(null);
+  });
+
+  const renderWithUser = (
+    user,
+    isLoading = false,
+    initialPath = "/",
+    refreshUser = mockRefreshUser
+  ) => {
     return render(
       <MemoryRouter initialEntries={[initialPath]}>
-        <UserContext.Provider value={{ user, isLoading }}>
+        <UserContext.Provider value={{ user, isLoading, refreshUser }}>
           <Routes>
             <Route path="/login" element={<div>Login Page</div>} />
             <Route
@@ -25,6 +29,14 @@ describe("RequireAuth", () => {
               element={
                 <RequireAuth>
                   <div>Protected Content</div>
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/sign/:token"
+              element={
+                <RequireAuth>
+                  <div>Signing Page</div>
                 </RequireAuth>
               }
             />
@@ -49,10 +61,19 @@ describe("RequireAuth", () => {
     expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
   });
 
-  it("redirects to login when user is null and not loading", () => {
+  it("redirects to login when user is null, not loading, and no token", () => {
     renderWithUser(null, false);
     expect(screen.getByText("Login Page")).toBeInTheDocument();
     expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
+  });
+
+  it("attempts refresh when a token exists but user is null", async () => {
+    localStorage.setItem("access_token", "fake-token");
+    renderWithUser(null, false);
+
+    await waitFor(() => {
+      expect(mockRefreshUser).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("renders children when user is authenticated", () => {
@@ -65,7 +86,9 @@ describe("RequireAuth", () => {
     const mockUser = { id: 1, email: "test@example.com", role: "user" };
     render(
       <MemoryRouter initialEntries={["/admin"]}>
-        <UserContext.Provider value={{ user: mockUser, isLoading: false }}>
+        <UserContext.Provider
+          value={{ user: mockUser, isLoading: false, refreshUser: mockRefreshUser }}
+        >
           <Routes>
             <Route path="/" element={<div>Home Page</div>} />
             <Route
@@ -88,7 +111,13 @@ describe("RequireAuth", () => {
     const mockAdminUser = { id: 1, email: "admin@example.com", role: "admin" };
     render(
       <MemoryRouter initialEntries={["/admin"]}>
-        <UserContext.Provider value={{ user: mockAdminUser, isLoading: false }}>
+        <UserContext.Provider
+          value={{
+            user: mockAdminUser,
+            isLoading: false,
+            refreshUser: mockRefreshUser,
+          }}
+        >
           <Routes>
             <Route path="/" element={<div>Home Page</div>} />
             <Route
