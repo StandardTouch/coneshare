@@ -8,6 +8,7 @@ const UserContext = createContext(null);
 
 export function UserProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
   const handleLogout = useCallback(async () => {
@@ -54,12 +55,15 @@ export function UserProvider({ children }) {
           }
         }
       }
+      if (isMounted) {
+        setIsLoading(false);
+      }
     };
     fetchUser();
     return () => { isMounted = false; };
   }, [handleLogout]);
 
-  const value = { user, handleLogout, refreshUser };
+  const value = { user, isLoading, handleLogout, refreshUser };
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }

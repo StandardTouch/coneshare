@@ -3,6 +3,7 @@ import { Route, Routes } from 'react-router';
 import { Toaster } from 'sonner';
 import './App.css';
 import MainLayout from './components/layout/MainLayout';
+import RequireAuth from './components/auth/RequireAuth';
 import { UploadProvider } from './contexts/UploadProvider';
 import { BrandingProvider } from './contexts/BrandingProvider';
 import { TooltipProvider } from './components/ui/Tooltip';
@@ -82,10 +83,10 @@ function App() {
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/500" element={<ErrorPage />} />
                 {/* E-signature signing page (requires authentication) */}
-                <Route element={<MainLayout />}>
+                <Route element={<RequireAuth><MainLayout /></RequireAuth>}>
                   <Route path="/sign/:token" element={<SigningPage />} />
                 </Route>
-                <Route element={<MainLayout />}>
+                <Route element={<RequireAuth><MainLayout /></RequireAuth>}>
                   <Route path="/" element={<HomePage />} />
                   <Route path="/documents" element={<DocumentsPage />} />
                   <Route path="/documents/folders/:folderId" element={<DocumentsPage />} />
@@ -105,13 +106,13 @@ function App() {
                   <Route path="/settings/password" element={<PasswordSettingsPage />} />
                   <Route path="/settings/integrations" element={<IntegrationsSettingsPage />} />
                   <Route path="/settings/api-keys" element={<ApiKeysSettingsPage />} />
-                  <Route path="/admin/settings" element={<AdminSettingsPage />} />
-                  <Route path="/admin/branding" element={<AdminBrandingPage />} />
-                  <Route path="/admin/users" element={<AdminUsersPage />} />
-                  <Route path="/admin/users/:userId" element={<AdminUserDetailPage />} />
-                  <Route path="/admin/datarooms" element={<AdminDataroomsPage />} />
-                  <Route path="/admin/login-activity" element={<AdminLoginActivityPage />} />
-                  <Route path="/admin/security-alerts" element={<AdminSecurityAlertsPage />} />
+                  <Route path="/admin/settings" element={<RequireAuth adminOnly><AdminSettingsPage /></RequireAuth>} />
+                  <Route path="/admin/branding" element={<RequireAuth adminOnly><AdminBrandingPage /></RequireAuth>} />
+                  <Route path="/admin/users" element={<RequireAuth adminOnly><AdminUsersPage /></RequireAuth>} />
+                  <Route path="/admin/users/:userId" element={<RequireAuth adminOnly><AdminUserDetailPage /></RequireAuth>} />
+                  <Route path="/admin/datarooms" element={<RequireAuth adminOnly><AdminDataroomsPage /></RequireAuth>} />
+                  <Route path="/admin/login-activity" element={<RequireAuth adminOnly><AdminLoginActivityPage /></RequireAuth>} />
+                  <Route path="/admin/security-alerts" element={<RequireAuth adminOnly><AdminSecurityAlertsPage /></RequireAuth>} />
                   <Route path="*" element={<NotFoundPage />} />
                 </Route>
               </Routes>
