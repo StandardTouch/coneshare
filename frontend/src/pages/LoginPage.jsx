@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useNavigate, useLocation } from 'react-router'
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { authService } from '../services/authService'
 import { APP_DISPLAY_VERSION } from '../lib/constants'
@@ -10,6 +11,7 @@ import { LanguagePicker } from '../components/common/LanguagePicker'
 
 function LoginPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { t } = useTranslation()
   const { brandName, brandLogoUrl, brandWebsiteUrl, termsUrl, privacyPolicyUrl } = useBranding()
   const [email, setEmail] = useState('')
@@ -17,6 +19,13 @@ function LoginPage() {
   const [error, setError] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [showSignupLink, setShowSignupLink] = useState(false)
+
+  useEffect(() => {
+    if (location.state?.invitePasswordSet) {
+      toast.success(t('auth.passwordSetSignInPrompt'))
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location, navigate, t])
 
   useEffect(() => {
     let mounted = true

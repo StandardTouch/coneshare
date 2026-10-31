@@ -15,6 +15,7 @@ const lazyNamed = (importer, name) =>
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const SignupPage = lazyNamed(() => import('./pages/SignupPage'), 'SignupPage');
 const SignupVerifyPage = lazyNamed(() => import('./pages/SignupVerifyPage'), 'SignupVerifyPage');
+const SetPasswordPage = lazyNamed(() => import('./pages/SetPasswordPage'), 'SetPasswordPage');
 const ShareLinkViewerPage = lazyNamed(() => import('./pages/ShareLinkViewerPage'), 'ShareLinkViewerPage');
 const PublicUploadPage = lazyNamed(() => import('./pages/PublicUploadPage'), 'PublicUploadPage');
 const CloudAuthCallbackPage = lazyNamed(() => import('./pages/CloudAuthCallbackPage'), 'CloudAuthCallbackPage');
@@ -74,6 +75,7 @@ function App() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignupPage />} />
                 <Route path="/signup/verify" element={<SignupVerifyPage />} />
+                <Route path="/set-password/:uid/:token" element={<SetPasswordPage />} />
                 <Route path="/view/:slug" element={<ShareLinkViewerPage />} />
                 <Route path="/upload/:slug" element={<PublicUploadPage />} />
                 <Route path="/auth/:providerName/callback" element={<CloudAuthCallbackPage />} />
