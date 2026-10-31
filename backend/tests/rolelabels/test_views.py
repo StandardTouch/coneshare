@@ -1,8 +1,12 @@
 import pytest
+from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from rest_framework import status
+
 from core.models import AppConfiguration, Organization
 from rolelabels.models import RoleLabel, UserRoleLabel
+
+User = get_user_model()
 
 pytestmark = pytest.mark.django_db
 
@@ -135,3 +139,66 @@ class TestAdminUserRoleLabel:
         user.refresh_from_db()
         assert user.role == 'admin'
         assert not UserRoleLabel.objects.filter(user=user).exists()
+
+
+class TestAdminUserCreateRoleLabel:
+    def _create_payload(self, **overrides):
+        payload = {
+            'email': 'newuser@example.com',
+            'name': 'New User',
+            'role': 'member',
+            'password': 'ValidPassword123!',
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_create_member_with_role_label(self, admin_api_client, custom_role):
+        payload = self._create_payload(
+            email='labeled@example.com',
+            role='member',
+            role_label_id=custom_role.id,
+        )
+        response = admin_api_client.post('/api/v1/admin/users/', payload, format='json')
+        assert response.status_code == status.HTTP_201_CREATED
+        user = User.objects.get(email='labeled@example.com')
+        assert user.role == 'member'
+        assignment = UserRoleLabel.objects.get(user=user)
+        assert assignment.role_label_id == custom_role.id
+        assert response.data['role_label']['id'] == custom_role.id
+
+    def test_create_admin_without_label(self, admin_api_client):
+        payload = self._create_payload(email='newadmin@example.com', role='admin')
+        response = admin_api_client.post('/api/v1/admin/users/', payload, format='json')
+        assert response.status_code == status.HTTP_201_CREATED
+        user = User.objects.get(email='newadmin@example.com')
+        assert user.role == 'admin'
+        assert not UserRoleLabel.objects.filter(user=user).exists()
+
+    def test_create_member_without_label(self, admin_api_client):
+        payload = self._create_payload(email='plainmember@example.com', role='member')
+        response = admin_api_client.post('/api/v1/admin/users/', payload, format='json')
+        assert response.status_code == status.HTTP_201_CREATED
+        user = User.objects.get(email='plainmember@example.com')
+        assert user.role == 'member'
+        assert not UserRoleLabel.objects.filter(user=user).exists()
+
+    def test_create_toggle_off_ignores_role_label_id(self, admin_api_client, custom_role):
+        _set_role_labels_enabled(False)
+        payload = self._create_payload(
+            email='toggleoff@example.com',
+            role_label_id=custom_role.id,
+        )
+        response = admin_api_client.post('/api/v1/admin/users/', payload, format='json')
+        assert response.status_code == status.HTTP_201_CREATED
+        user = User.objects.get(email='toggleoff@example.com')
+        assert not UserRoleLabel.objects.filter(user=user).exists()
+
+    def test_create_rejects_foreign_org_role_label(self, admin_api_client, other_org):
+        foreign = RoleLabel.objects.create(organization=other_org, name='Foreign')
+        payload = self._create_payload(
+            email='foreignlabel@example.com',
+            role_label_id=foreign.id,
+        )
+        response = admin_api_client.post('/api/v1/admin/users/', payload, format='json')
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'role_label_id' in response.data

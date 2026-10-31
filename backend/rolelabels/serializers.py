@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from rest_framework import serializers
 
 from .models import RoleLabel
@@ -47,16 +48,30 @@ class RoleLabelAdminUserMixin:
     """Adds role_label read/write fields to AdminUserSerializer."""
 
     @staticmethod
-    def apply_role_label_changes(user, validated_data):
-        if not role_labels_enabled():
-            return user
+    def extract_role_label_side_effects(validated_data):
+        """Remove mixin-internal keys before User.create_user / model update kwargs."""
         role_label_id = validated_data.pop('_role_label_id', serializers.empty)
         clear_label = validated_data.pop('_clear_role_label', False)
+        return role_label_id, clear_label
+
+    @staticmethod
+    def apply_role_label_side_effects(user, role_label_id, clear_label=False):
+        if not role_labels_enabled():
+            return user
         if clear_label:
             clear_user_role_label(user)
         elif role_label_id is not serializers.empty and role_label_id:
             set_user_role_label(user, role_label_id)
         return user
+
+    @staticmethod
+    def apply_role_label_changes(user, validated_data):
+        role_label_id, clear_label = RoleLabelAdminUserMixin.extract_role_label_side_effects(
+            validated_data
+        )
+        return RoleLabelAdminUserMixin.apply_role_label_side_effects(
+            user, role_label_id, clear_label
+        )
 
     def get_fields(self):
         fields = super().get_fields()
@@ -107,5 +122,8 @@ class RoleLabelAdminUserMixin:
         return attrs
 
     def create(self, validated_data):
-        user = super().create(validated_data)
-        return self.apply_role_label_changes(user, validated_data)
+        role_label_id, clear_label = self.extract_role_label_side_effects(validated_data)
+        with transaction.atomic():
+            user = super().create(validated_data)
+            self.apply_role_label_side_effects(user, role_label_id, clear_label)
+        return user

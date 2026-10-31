@@ -201,8 +201,11 @@ class AdminUserSerializer(RoleLabelAdminUserMixin, UserSerializer):
         """
         validated_data.pop('email', None)
         validated_data.pop('password', None)
+        role_label_id, clear_label = RoleLabelAdminUserMixin.extract_role_label_side_effects(
+            validated_data
+        )
         user = super(UserSerializer, self).update(instance, validated_data)
-        RoleLabelAdminUserMixin.apply_role_label_changes(user, validated_data)
+        RoleLabelAdminUserMixin.apply_role_label_side_effects(user, role_label_id, clear_label)
         return user
 
 
