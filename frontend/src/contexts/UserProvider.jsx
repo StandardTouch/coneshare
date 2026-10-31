@@ -1,4 +1,11 @@
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import { getUser } from "../services/api";
@@ -9,6 +16,7 @@ export const UserContext = createContext(null);
 export function UserProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const initialLoadDoneRef = useRef(false);
   const navigate = useNavigate();
 
   const handleLogout = useCallback(async () => {
@@ -17,36 +25,54 @@ export function UserProvider({ children }) {
     navigate("/login");
   }, [navigate]);
 
-  const refreshUser = useCallback(async (updatedUserData = null) => {
-    if (updatedUserData) {
-      setUser(updatedUserData);
-      return updatedUserData;
-    }
-
-    const token = localStorage.getItem("access_token");
-    if (!token) {
-      setUser(null);
+  const finishInitialLoad = useCallback(() => {
+    if (!initialLoadDoneRef.current) {
+      initialLoadDoneRef.current = true;
       setIsLoading(false);
-      return null;
     }
+  }, []);
 
-    setIsLoading(true);
-    try {
-      const decoded = jwtDecode(token);
-      const response = await getUser(decoded.user_id);
-      setUser(response.data);
-      return response.data;
-    } catch (error) {
-      console.error("Failed to refresh user:", error);
-      setUser(null);
-      if (error.response?.status === 401) {
-        await handleLogout();
+  const refreshUser = useCallback(
+    async (updatedUserData = null) => {
+      if (updatedUserData) {
+        setUser(updatedUserData);
+        finishInitialLoad();
+        return updatedUserData;
       }
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [handleLogout]);
+
+      const token = localStorage.getItem("access_token");
+      const isInitialLoad = !initialLoadDoneRef.current;
+
+      if (!token) {
+        setUser(null);
+        finishInitialLoad();
+        return null;
+      }
+
+      if (isInitialLoad) {
+        setIsLoading(true);
+      }
+
+      try {
+        const decoded = jwtDecode(token);
+        const response = await getUser(decoded.user_id);
+        setUser(response.data);
+        return response.data;
+      } catch (error) {
+        console.error("Failed to refresh user:", error);
+        if (error.response?.status === 401) {
+          await handleLogout();
+          return null;
+        }
+        // Transient errors must not clear an established session.
+        setUser((current) => current);
+        return null;
+      } finally {
+        finishInitialLoad();
+      }
+    },
+    [handleLogout, finishInitialLoad]
+  );
 
   useEffect(() => {
     refreshUser();

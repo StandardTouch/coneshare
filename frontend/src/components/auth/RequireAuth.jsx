@@ -40,8 +40,9 @@ function RequireAuth({ children, adminOnly = false }) {
   }, [user, isLoading, hasAccessToken, tokenRefreshAttempted, refreshUser]);
 
   const awaitingTokenRefresh = hasAccessToken && !user && !tokenRefreshAttempted;
+  const showAuthSpinner = !user && (isLoading || awaitingTokenRefresh);
 
-  if (isLoading || awaitingTokenRefresh) {
+  if (showAuthSpinner) {
     return <AuthLoadingSpinner />;
   }
 

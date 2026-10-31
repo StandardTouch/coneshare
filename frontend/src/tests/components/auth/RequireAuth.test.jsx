@@ -82,6 +82,13 @@ describe("RequireAuth", () => {
     expect(screen.getByText("Protected Content")).toBeInTheDocument();
   });
 
+  it("does not show spinner when user exists even if isLoading is true", () => {
+    const mockUser = { id: 1, email: "test@example.com", role: "user" };
+    renderWithUser(mockUser, true);
+    expect(screen.getByText("Protected Content")).toBeInTheDocument();
+    expect(document.querySelector(".animate-spin")).not.toBeInTheDocument();
+  });
+
   it("redirects non-admin users when adminOnly is true", () => {
     const mockUser = { id: 1, email: "test@example.com", role: "user" };
     render(
