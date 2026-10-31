@@ -739,6 +739,10 @@ export const updateAdminUser = (id, data) => api.patch(`/admin/users/${id}/`, da
 export const deleteAdminUser = (id) => api.delete(`/admin/users/${id}/`);
 export const recalculateAdminUserQuota = (id) => api.post(`/admin/users/${id}/recalculate-quota/`);
 export const resetAdminUserPassword = (id, data) => api.post(`/admin/users/${id}/reset-password/`, data);
+export const getAdminRoleLabels = () => api.get('/admin/role-labels/');
+export const createAdminRoleLabel = (data) => api.post('/admin/role-labels/', data);
+export const updateAdminRoleLabel = (id, data) => api.patch(`/admin/role-labels/${id}/`, data);
+export const deleteAdminRoleLabel = (id) => api.delete(`/admin/role-labels/${id}/`);
 export const getAdminLoginActivities = (page = 1) => api.get(`/admin/login-activities/?page=${page}`);
 export const getAdminSecurityThreatEvents = ({ page = 1, status = '', severity = '', eventType = '' } = {}) => {
   const params = { page };

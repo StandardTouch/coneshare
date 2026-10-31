@@ -14,6 +14,7 @@ import { Progress } from '../components/ui/Progress';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/Table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/Tooltip';
 import { formatBytes } from '../lib/formatters';
+import { displayRoleName } from '../lib/adminRoleLabels';
 
 export function AdminUserDetailPage() {
   const { t } = useTranslation();
@@ -170,7 +171,7 @@ export function AdminUserDetailPage() {
               {user.is_active ? t('common.active') : t('common.inactive')}
             </span>
             <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 capitalize">
-              {user.role === 'admin' ? t('admin.roleAdmin') : user.role === 'member' ? t('admin.roleMember') : user.role}
+              {displayRoleName(user, t)}
             </span>
           </div>
 

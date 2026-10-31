@@ -12,6 +12,7 @@ from drf_spectacular.utils import extend_schema_field
 
 from core.models import APIKey, AppConfiguration, LoginActivity, Organization, UserGroup
 from core.services import blacklist_all_user_tokens, get_dynamic_setting
+from rolelabels.serializers import RoleLabelAdminUserMixin
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -145,7 +146,7 @@ class UserSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
-class AdminUserSerializer(UserSerializer):
+class AdminUserSerializer(RoleLabelAdminUserMixin, UserSerializer):
     """Serializer for admin management of organization users."""
     password = serializers.CharField(write_only=True, required=False)
 
@@ -200,7 +201,9 @@ class AdminUserSerializer(UserSerializer):
         """
         validated_data.pop('email', None)
         validated_data.pop('password', None)
-        return super(UserSerializer, self).update(instance, validated_data)
+        user = super(UserSerializer, self).update(instance, validated_data)
+        RoleLabelAdminUserMixin.apply_role_label_changes(user, validated_data)
+        return user
 
 
 

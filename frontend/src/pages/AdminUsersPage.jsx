@@ -30,15 +30,18 @@ import { Progress } from '../components/ui/Progress';
 import { Pagination } from '../components/ui/Pagination';
 import { formatBytes } from '../lib/formatters';
 import { cn } from '../lib/utils';
+import { useBranding } from '../contexts/BrandingProvider';
+import { RoleSelect } from '../components/admin/RoleSelect';
+import { buildRolePayload, displayRoleName, roleSelectionFromUser } from '../lib/adminRoleLabels';
 
-function AddUserForm({ onAddUser, onCancel }) {
+function AddUserForm({ onAddUser, onCancel, roleLabelsEnabled, customRoles }) {
   const { t } = useTranslation();
   const [formData, setFormData] = useState({
     username: '',
     email: '',
     name: '',
     password: '',
-    role: 'member',
+    roleSelection: 'member',
     custom_file_size_quota_mb: '',
   });
   const [isSaving, setIsSaving] = useState(false);
@@ -52,9 +55,11 @@ function AddUserForm({ onAddUser, onCancel }) {
     e.preventDefault();
     setIsSaving(true);
     try {
+      const { roleSelection, ...rest } = formData;
       const payload = {
-        ...formData,
+        ...rest,
         custom_file_size_quota_mb: formData.custom_file_size_quota_mb === '' ? null : parseInt(formData.custom_file_size_quota_mb, 10),
+        ...(roleLabelsEnabled ? buildRolePayload(roleSelection) : { role: roleSelection === 'admin' ? 'admin' : 'member' }),
       };
       await onAddUser(payload);
     } finally {
@@ -132,16 +137,25 @@ function AddUserForm({ onAddUser, onCancel }) {
             <label htmlFor="role" className="mb-1 block text-sm font-medium">
               {t('admin.role')}
             </label>
-            <Select
-              id="role"
-              name="role"
-              value={formData.role}
-              onChange={handleChange}
-              disabled={isSaving}
-            >
-              <option value="member">{t('admin.roleMember')}</option>
-              <option value="admin">{t('admin.roleAdmin')}</option>
-            </Select>
+            {roleLabelsEnabled ? (
+              <RoleSelect
+                value={formData.roleSelection}
+                onChange={handleChange}
+                customRoles={customRoles}
+                disabled={isSaving}
+              />
+            ) : (
+              <Select
+                id="role"
+                name="roleSelection"
+                value={formData.roleSelection}
+                onChange={handleChange}
+                disabled={isSaving}
+              >
+                <option value="member">{t('admin.roleMember')}</option>
+                <option value="admin">{t('admin.roleAdmin')}</option>
+              </Select>
+            )}
           </div>
           <div>
             <label htmlFor="custom_file_size_quota_mb" className="mb-1 block text-sm font-medium">
@@ -239,6 +253,8 @@ function UserStorageUsage({ user }) {
 
 export function AdminUsersPage() {
   const { t } = useTranslation();
+  const { roleLabelsEnabled } = useBranding();
+  const [customRoles, setCustomRoles] = useState([]);
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddingUser, setIsAddingUser] = useState(false);
@@ -264,6 +280,27 @@ export function AdminUsersPage() {
     totalStorageBytes: 0,
     dataroomUsers: 0,
   });
+
+  useEffect(() => {
+    if (!roleLabelsEnabled) {
+      setCustomRoles([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.getAdminRoleLabels();
+        if (!cancelled) {
+          setCustomRoles(res.data.custom_roles || []);
+        }
+      } catch {
+        // interceptor
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [roleLabelsEnabled]);
 
   // Debounce search input
   useEffect(() => {
@@ -442,7 +479,7 @@ export function AdminUsersPage() {
     setEditingUserId(user.id);
     setEditedUserData({
       name: user.name,
-      role: user.role,
+      roleSelection: roleSelectionFromUser(user),
       is_active: user.is_active,
       custom_file_size_quota_mb: user.custom_file_size_quota_mb !== null ? String(user.custom_file_size_quota_mb) : '',
     });
@@ -465,9 +502,13 @@ export function AdminUsersPage() {
           : typeof rawQuota === 'string'
           ? (isNaN(parseInt(rawQuota, 10)) ? null : parseInt(rawQuota, 10))
           : rawQuota;
+      const { roleSelection, ...restEdit } = editedUserData;
       const payload = {
-        ...editedUserData,
+        ...restEdit,
         custom_file_size_quota_mb: normalizedQuota,
+        ...(roleLabelsEnabled
+          ? buildRolePayload(roleSelection)
+          : { role: roleSelection === 'admin' ? 'admin' : 'member' }),
       };
       await handleUpdateUser(userId, payload);
       setEditingUserId(null);
@@ -651,6 +692,8 @@ export function AdminUsersPage() {
         <AddUserForm
           onAddUser={handleAddUser}
           onCancel={() => setIsAddingUser(false)}
+          roleLabelsEnabled={roleLabelsEnabled}
+          customRoles={customRoles}
         />
       )}
 
@@ -714,16 +757,26 @@ export function AdminUsersPage() {
                         {user.email}
                       </td>
                       <td className="p-4 text-muted-foreground w-28">
-                        <Select
-                          name="role"
-                          value={editedUserData.role}
-                          onChange={handleEditDataChange}
-                          disabled={savingUserId === user.id}
-                          className="w-full"
-                        >
-                          <option value="member">{t('admin.roleMember')}</option>
-                          <option value="admin">{t('admin.roleAdmin')}</option>
-                        </Select>
+                        {roleLabelsEnabled ? (
+                          <RoleSelect
+                            value={editedUserData.roleSelection}
+                            onChange={handleEditDataChange}
+                            customRoles={customRoles}
+                            disabled={savingUserId === user.id}
+                            className="w-full"
+                          />
+                        ) : (
+                          <Select
+                            name="roleSelection"
+                            value={editedUserData.roleSelection}
+                            onChange={handleEditDataChange}
+                            disabled={savingUserId === user.id}
+                            className="w-full"
+                          >
+                            <option value="member">{t('admin.roleMember')}</option>
+                            <option value="admin">{t('admin.roleAdmin')}</option>
+                          </Select>
+                        )}
                       </td>
                       <td className="p-4 text-muted-foreground w-24">
                         <Select
@@ -795,7 +848,7 @@ export function AdminUsersPage() {
                         </Link>
                       </td>
                       <td className="p-4 text-muted-foreground capitalize w-28 whitespace-nowrap">
-                        {user.role === 'admin' ? t('admin.roleAdmin') : user.role === 'member' ? t('admin.roleMember') : user.role}
+                        {displayRoleName(user, t)}
                       </td>
                       <td className="p-4 w-24 whitespace-nowrap">
                         <span

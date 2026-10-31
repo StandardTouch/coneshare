@@ -48,6 +48,7 @@ const AdminLoginActivityPage = lazyNamed(() => import('./pages/AdminLoginActivit
 const AdminUsersPage = lazyNamed(() => import('./pages/AdminUsersPage'), 'AdminUsersPage');
 const AdminUserDetailPage = lazyNamed(() => import('./pages/AdminUserDetailPage'), 'AdminUserDetailPage');
 const AdminDataroomsPage = lazyNamed(() => import('./pages/AdminDataroomsPage'), 'AdminDataroomsPage');
+const AdminRolesPage = lazyNamed(() => import('./pages/AdminRolesPage'), 'AdminRolesPage');
 const AdminSecurityAlertsPage = lazyNamed(() => import('./pages/AdminSecurityAlertsPage'), 'AdminSecurityAlertsPage');
 
 // E-signature routes
@@ -108,6 +109,7 @@ function App() {
                   <Route path="/admin/settings" element={<AdminSettingsPage />} />
                   <Route path="/admin/branding" element={<AdminBrandingPage />} />
                   <Route path="/admin/users" element={<AdminUsersPage />} />
+                  <Route path="/admin/roles" element={<AdminRolesPage />} />
                   <Route path="/admin/users/:userId" element={<AdminUserDetailPage />} />
                   <Route path="/admin/datarooms" element={<AdminDataroomsPage />} />
                   <Route path="/admin/login-activity" element={<AdminLoginActivityPage />} />

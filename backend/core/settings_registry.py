@@ -23,6 +23,7 @@ DEFAULT_SETTINGS = {
     'ENABLE_PUBLIC_SIGNUP': {'description': 'Enable public signup with email verification.', 'type': 'bool'},
     'FLATTEN_WATERMARKED_DOWNLOADS': {'description': 'If true, watermarked PDF downloads are flattened (rasterized to JPEGs and recompiled to PDF) to prevent watermark stripping.', 'type': 'bool'},
     'ESIGN_ENABLED': {'description': 'Enable electronic signature feature. When OFF, all esign UI is hidden and all esign API endpoints return 404/403.', 'type': 'bool'},
+    'ROLE_LABELS_ENABLED': {'description': 'Enable custom display role labels in the admin panel. When OFF, role label UI and API endpoints are hidden.', 'type': 'bool'},
 }
 
 VALID_BOOL_TRUE_VALUES = {'true', '1', 'yes', 'on', 't'}
