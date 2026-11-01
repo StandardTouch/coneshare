@@ -28,6 +28,7 @@ export function ViewerToolbar({
 
   // Actions
   allowDownload,
+  allowPrint = true,
   downloadUrl,
   downloadFileName,
   downloadDocumentId: _downloadDocumentId = null,
@@ -305,15 +306,17 @@ export function ViewerToolbar({
             </Button>
           )}
 
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={onPrint} 
-            title={t('viewer.printDocument')}
-            className="hidden h-8 w-8 hover:bg-gray-100 dark:hover:bg-gray-800 md:inline-flex"
-          >
-            <Printer className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-          </Button>
+          {allowPrint && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={onPrint} 
+              title={t('viewer.printDocument')}
+              className="hidden h-8 w-8 hover:bg-gray-100 dark:hover:bg-gray-800 md:inline-flex"
+            >
+              <Printer className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+            </Button>
+          )}
 
           <Button 
             variant="ghost" 
