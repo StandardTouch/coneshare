@@ -49,6 +49,7 @@ urlpatterns = [
     path('api/v1/cloud/', include('cloudfiles.urls')),
     path('api/v1/', include('filerequests.urls')),
     path('api/v1/esign/', include('esign.urls')),
+    path('api/v1/onboarding/', include('onboarding.urls')),
     path('api/v1/admin/', include('core.admin_urls')),
     path('api/v1/admin/datarooms/', include('datarooms.admin_urls')),
 ]

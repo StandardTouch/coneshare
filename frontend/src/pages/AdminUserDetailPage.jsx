@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ExternalLink, HardDrive, Link as LinkIcon, FolderOpen, Calendar, Mail, ShieldAlert, RefreshCw, Key } from 'lucide-react';
+import { ExternalLink, HardDrive, Link as LinkIcon, FolderOpen, Calendar, Mail, ShieldAlert, RefreshCw, Key, Send } from 'lucide-react';
 import { toast } from 'sonner';
 
 import * as api from '../services/api';
@@ -24,6 +24,20 @@ export function AdminUserDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false);
+  const [inviteEmailEnabled, setInviteEmailEnabled] = useState(false);
+  const [isResendingInvite, setIsResendingInvite] = useState(false);
+
+  const handleResendInvite = async () => {
+    setIsResendingInvite(true);
+    try {
+      await api.resendAdminUserInvite(userId);
+      toast.success(t('admin.resendInviteSuccess'));
+    } catch (_error) {
+      toast.error(t('admin.resendInviteFailed'));
+    } finally {
+      setIsResendingInvite(false);
+    }
+  };
 
   const handleRecalculateQuota = async () => {
     setIsRecalculating(true);
@@ -44,14 +58,18 @@ export function AdminUserDetailPage() {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const [userRes, linksRes, dataroomsRes] = await Promise.all([
+        const [userRes, linksRes, dataroomsRes, settingsRes] = await Promise.all([
           api.getAdminUserDetails(userId),
           api.getAdminUserShareLinks(userId),
           api.getAdminUserDatarooms(userId),
+          api.getAdminSettings(),
         ]);
         setUser(userRes.data);
         setLinks(linksRes.data.results || []);
         setDatarooms(dataroomsRes.data.results || []);
+        const settingsList = Array.isArray(settingsRes.data) ? settingsRes.data : [];
+        const inviteRow = settingsList.find((item) => item.key === 'USER_INVITE_EMAIL_ENABLED');
+        setInviteEmailEnabled(Boolean(inviteRow?.value));
       } catch (error) {
         // error handled by interceptor
       } finally {
@@ -174,6 +192,18 @@ export function AdminUserDetailPage() {
             </span>
           </div>
 
+          {inviteEmailEnabled ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResendInvite}
+              disabled={isResendingInvite}
+              className="flex items-center gap-1.5"
+            >
+              <Send className="h-4 w-4 text-muted-foreground" />
+              {t('admin.resendInvite')}
+            </Button>
+          ) : null}
           <Button
             variant="outline"
             size="sm"
@@ -181,7 +211,7 @@ export function AdminUserDetailPage() {
             className="flex items-center gap-1.5"
           >
             <Key className="h-4 w-4 text-muted-foreground" />
-            {t('admin.resetPassword', 'Reset Password')}
+            {t('admin.resetPassword')}
           </Button>
         </div>
       </div>
