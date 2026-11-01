@@ -51,6 +51,7 @@ const AdminLoginActivityPage = lazyNamed(() => import('./pages/AdminLoginActivit
 const AdminUsersPage = lazyNamed(() => import('./pages/AdminUsersPage'), 'AdminUsersPage');
 const AdminUserDetailPage = lazyNamed(() => import('./pages/AdminUserDetailPage'), 'AdminUserDetailPage');
 const AdminDataroomsPage = lazyNamed(() => import('./pages/AdminDataroomsPage'), 'AdminDataroomsPage');
+const AdminRolesPage = lazyNamed(() => import('./pages/AdminRolesPage'), 'AdminRolesPage');
 const AdminSecurityAlertsPage = lazyNamed(() => import('./pages/AdminSecurityAlertsPage'), 'AdminSecurityAlertsPage');
 
 // E-signature routes
@@ -113,6 +114,7 @@ function App() {
                   <Route path="/admin/settings" element={<RequireAuth adminOnly><AdminSettingsPage /></RequireAuth>} />
                   <Route path="/admin/branding" element={<RequireAuth adminOnly><AdminBrandingPage /></RequireAuth>} />
                   <Route path="/admin/users" element={<RequireAuth adminOnly><AdminUsersPage /></RequireAuth>} />
+                  <Route path="/admin/roles" element={<RequireAuth adminOnly><AdminRolesPage /></RequireAuth>} />
                   <Route path="/admin/users/:userId" element={<RequireAuth adminOnly><AdminUserDetailPage /></RequireAuth>} />
                   <Route path="/admin/datarooms" element={<RequireAuth adminOnly><AdminDataroomsPage /></RequireAuth>} />
                   <Route path="/admin/login-activity" element={<RequireAuth adminOnly><AdminLoginActivityPage /></RequireAuth>} />

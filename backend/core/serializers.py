@@ -12,6 +12,7 @@ from drf_spectacular.utils import extend_schema_field
 
 from core.models import APIKey, AppConfiguration, LoginActivity, Organization, UserGroup
 from core.services import blacklist_all_user_tokens, get_dynamic_setting
+from rolelabels.serializers import RoleLabelAdminUserMixin
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -145,7 +146,7 @@ class UserSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
-class AdminUserSerializer(UserSerializer):
+class AdminUserSerializer(RoleLabelAdminUserMixin, UserSerializer):
     """Serializer for admin management of organization users."""
     password = serializers.CharField(write_only=True, required=False, allow_blank=True)
     send_invite = serializers.BooleanField(write_only=True, required=False, default=False)
@@ -208,16 +209,26 @@ class AdminUserSerializer(UserSerializer):
         return super().validate(attrs)
 
     def create(self, validated_data):
+        role_label_id, clear_label = RoleLabelAdminUserMixin.extract_role_label_side_effects(
+            validated_data
+        )
         send_invite = validated_data.pop('send_invite', False)
-        if send_invite:
-            from onboarding.services import create_user_with_invite
+        request = self.context.get('request')
 
-            request = self.context.get('request')
-            return create_user_with_invite(validated_data, request)
-        password = validated_data.pop('password', None)
-        if password:
-            validated_data['password'] = password
-        return super().create(validated_data)
+        with transaction.atomic():
+            if send_invite:
+                from onboarding.services import create_user_with_invite
+
+                user = create_user_with_invite(validated_data, request)
+            else:
+                password = validated_data.pop('password', None)
+                if password:
+                    validated_data['password'] = password
+                user = super(RoleLabelAdminUserMixin, self).create(validated_data)
+            RoleLabelAdminUserMixin.apply_role_label_side_effects(
+                user, role_label_id, clear_label
+            )
+        return user
 
     def update(self, instance, validated_data):
         """
@@ -226,7 +237,12 @@ class AdminUserSerializer(UserSerializer):
         validated_data.pop('email', None)
         validated_data.pop('password', None)
         validated_data.pop('send_invite', None)
-        return super(UserSerializer, self).update(instance, validated_data)
+        role_label_id, clear_label = RoleLabelAdminUserMixin.extract_role_label_side_effects(
+            validated_data
+        )
+        user = super(UserSerializer, self).update(instance, validated_data)
+        RoleLabelAdminUserMixin.apply_role_label_side_effects(user, role_label_id, clear_label)
+        return user
 
 
 

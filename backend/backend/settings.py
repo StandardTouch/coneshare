@@ -237,6 +237,7 @@ INSTALLED_APPS = [
     'automations',
     'esign',
     'onboarding.apps.OnboardingConfig',
+    'rolelabels',
 ]
 
 MIDDLEWARE = [
@@ -585,6 +586,9 @@ FLATTEN_WATERMARKED_DOWNLOADS = False
 # E-Signature feature toggle (Phase 1 - internal signers only).
 # E-signature feature is controlled via ESIGN_ENABLED environment variable (default OFF)
 ESIGN_ENABLED = os.environ.get('ESIGN_ENABLED', 'False').lower() in ('true', '1', 'yes')
+
+# Custom display role labels in admin (default OFF).
+ROLE_LABELS_ENABLED = os.environ.get('ROLE_LABELS_ENABLED', 'False').lower() in ('true', '1', 'yes')
 
 # Admin user invite email (set password via link).
 USER_INVITE_EMAIL_ENABLED = False

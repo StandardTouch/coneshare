@@ -1067,6 +1067,21 @@
     "role": "Role",
     "roleMember": "Member",
     "roleAdmin": "Admin",
+    "roles": {
+      "nav": "Roles",
+      "title": "Roles",
+      "subtitle": "Custom roles are display labels only; permissions follow the Member role.",
+      "addRole": "Add role",
+      "name": "Name",
+      "description": "Description",
+      "users": "Users",
+      "systemRole": "System",
+      "createSuccess": "Role created.",
+      "updateSuccess": "Role updated.",
+      "deleteSuccess": "Role deleted.",
+      "deleteTitle": "Delete role?",
+      "deleteDescription": "This cannot be undone. Roles assigned to users must be reassigned first."
+    },
     "storageQuota": "Storage Quota (MB)",
     "recalculateQuota": "Recalculate Usage",
     "recalculateQuotaTip": "Recalculate and synchronize the user's storage usage from all active documents in the database if the displayed quota is inaccurate.",
@@ -1172,7 +1187,8 @@
       "NEXT_CLOUD_CLIENT_SECRET": "Client Secret for Nextcloud integration.",
       "ENABLE_PUBLIC_SIGNUP": "Enable public signup with email verification.",
       "FLATTEN_WATERMARKED_DOWNLOADS": "If true, watermarked PDF downloads are flattened (rasterized to JPEGs and recompiled to PDF) to prevent watermark stripping.",
-      "ESIGN_ENABLED": "Enable electronic signature feature. When OFF, all esign UI is hidden and all esign API endpoints return 404/403."
+      "ESIGN_ENABLED": "Enable electronic signature feature. When OFF, all esign UI is hidden and all esign API endpoints return 404/403.",
+      "ROLE_LABELS_ENABLED": "Enable custom display role labels in the admin panel. When OFF, role label UI and API endpoints are hidden."
     }
   },
   "esign": {
