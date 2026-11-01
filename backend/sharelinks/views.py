@@ -59,6 +59,10 @@ from .serializers import (DataroomVisitSerializer, PageViewRecordSerializer,
                           ShareLinkEmailSerializer, ShareLinkPasswordSerializer,
                           ShareLinkTemplateSerializer, ShareLinkSerializer,
                           ViewerSerializer, ViewSessionSerializer)
+from .link_preview_policy import (
+    effective_preview_mode_for_link,
+    may_expose_client_pdf_preview_url,
+)
 from .tasks import send_view_notification_email_task
 
 logger = logging.getLogger(__name__)
@@ -969,12 +973,8 @@ class ShareLinkViewDataView(APIView):
                 )
 
             renderer = get_renderer(primary_version)
-            preview_mode = renderer.get_preview_mode(primary_version)
+            engine_preview_mode = renderer.get_preview_mode(primary_version)
             render_status = renderer.enqueue_render_task(primary_version)
-
-            preview_status = preview_status_for_render_status(render_status)
-            if preview_mode in {'client_pdf', 'markdown'}:
-                preview_status = 'ready'
 
             # Determine the correct settings to use (link vs. item-specific)
             allow_download = link.allow_download
@@ -983,6 +983,15 @@ class ShareLinkViewDataView(APIView):
             if dataroom_setting:
                 allow_download = dataroom_setting.allow_download
                 enable_watermark = dataroom_setting.enable_watermark
+
+            preview_mode = effective_preview_mode_for_link(
+                engine_preview_mode,
+                allow_print=link.allow_print,
+            )
+
+            preview_status = preview_status_for_render_status(render_status)
+            if preview_mode in {'client_pdf', 'markdown'}:
+                preview_status = 'ready'
 
             # Forcefully disable video downloading if watermarking is enabled
             if document.type == 'video' and enable_watermark:
@@ -1032,7 +1041,10 @@ class ShareLinkViewDataView(APIView):
 
             # Generate a signed PDF URL for PDF.js/client-side preview.
             pdf_preview_url = None
-            if preview_mode == 'client_pdf':
+            if may_expose_client_pdf_preview_url(
+                engine_preview_mode,
+                allow_print=link.allow_print,
+            ):
                 try:
                     pdf_preview_url = fileserver_client.generate_preview_url(
                         primary_version.original_storage_key, is_internal=False
@@ -1097,6 +1109,7 @@ class ShareLinkViewDataView(APIView):
                 "link_settings": {
                     "id": link.id,
                     "allow_download": allow_download,
+                    "allow_print": link.allow_print,
                     "enable_qna": link.qna_enabled,
                     "enable_watermark": enable_watermark,
                     "watermark_text": link.watermark_text,
@@ -1306,6 +1319,7 @@ class ShareLinkViewDataView(APIView):
                 'link_settings': {
                     'id': link.id,
                     'allow_download': link.allow_download,
+                    'allow_print': link.allow_print,
                     'enable_qna': link.qna_enabled,
                     'enable_watermark': link.enable_watermark,
                     'watermark_text': link.watermark_text,

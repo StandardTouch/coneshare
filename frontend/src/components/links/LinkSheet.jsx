@@ -36,6 +36,7 @@ export function LinkSheet({
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [isPasswordEnabled, setIsPasswordEnabled] = useState(false);
   const [allowDownload, setAllowDownload] = useState(true);
+  const [allowPrint, setAllowPrint] = useState(true);
   const [enableQna, setEnableQna] = useState(true);
   const [enableWatermark, setEnableWatermark] = useState(false);
   const [watermarkText, setWatermarkText] = useState('');
@@ -55,6 +56,7 @@ export function LinkSheet({
         setRequiresEmail(currentLink.requires_email || false);
         setRequiresEmailVerification(currentLink.requires_email_verification || false);
         setAllowDownload(currentLink.allow_download);
+        setAllowPrint(currentLink.allow_print !== false);
         setEnableQna(currentLink.enable_qna !== false);
         setIsPasswordEnabled(currentLink.has_password || currentLink.is_password_protected || false);
         setPassword(currentLink.password || '');
@@ -80,6 +82,7 @@ export function LinkSheet({
         setRequiresEmail(false);
         setRequiresEmailVerification(false);
         setAllowDownload(true);
+        setAllowPrint(true);
         setEnableQna(true);
         setIsPasswordEnabled(false);
         setPassword('');
@@ -108,6 +111,7 @@ export function LinkSheet({
       requires_email_verification: requiresEmail && requiresEmailVerification,
       receive_email_notification: receiveEmailNotification,
       allow_download: allowDownload,
+      allow_print: allowPrint,
       enable_watermark: isWatermarkable && enableWatermark,
       watermark_text: isWatermarkable && enableWatermark ? watermarkText : '',
       expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
@@ -298,6 +302,20 @@ export function LinkSheet({
               checked={allowDownload}
               onCheckedChange={setAllowDownload}
               disabled={document?.download_only}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <Label htmlFor="allow-print" className="flex flex-col space-y-1">
+              <span>{t('linkSheet.allowPrint')}</span>
+              <span className="text-sm font-normal text-muted-foreground">
+                {t('linkSheet.allowPrintSubtitle')}
+              </span>
+            </Label>
+            <Switch
+              id="allow-print"
+              checked={allowPrint}
+              onCheckedChange={setAllowPrint}
             />
           </div>
 

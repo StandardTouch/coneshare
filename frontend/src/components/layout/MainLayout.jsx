@@ -4,7 +4,6 @@ import Sidebar from "./Sidebar";
 import { BreadcrumbProvider } from "./BreadcrumbProvider";
 import { SidebarProvider, useSidebar } from "./SidebarProvider";
 import { cn } from "../../lib/utils";
-import { UserProvider } from "../../contexts/UserProvider";
 import { UploadProgressIndicator } from "../documents/UploadProgressIndicator";
 import { useLanguageSync } from "../../hooks/useLanguageSync";
 
@@ -35,11 +34,9 @@ function Layout() {
 function MainLayout() {
   return (
     <SidebarProvider>
-      <UserProvider>
-        <BreadcrumbProvider>
-          <Layout />
-        </BreadcrumbProvider>
-      </UserProvider>
+      <BreadcrumbProvider>
+        <Layout />
+      </BreadcrumbProvider>
     </SidebarProvider>
   );
 }

@@ -641,6 +641,35 @@ class TestShareLinkViewDataView:
         expected_url = f"http://test.coneshare.com/api/v1/links/{share_link.slug}/page/1/"
         assert data['pages'][0]['url'] == expected_url
         assert data['link_settings']['allow_download'] == share_link.allow_download
+        assert data['link_settings']['allow_print'] is True
+
+    @override_settings(SITE_DOMAIN="http://test.coneshare.com", PDF_PREVIEW_ENGINE='pdfjs')
+    @patch('documents.renderers.pdf.core_services.get_dynamic_setting', return_value=100)
+    @patch('documents.models.get_dynamic_setting', return_value=100)
+    @patch('documents.fileserver.fileserver_client.generate_preview_url')
+    def test_get_share_link_data_withholds_raw_pdf_when_print_disabled(
+        self, mock_fs_preview_url, _mock_models_dynamic, _mock_pdf_dynamic, public_client, share_link, document_with_pages,
+    ):
+        document = document_with_pages
+        document.type = 'pdf'
+        document.save()
+        version = document.versions.get(is_primary=True)
+        version.type = 'pdf'
+        version.render_status = 'ready'
+        version.original_storage_key = 'path/to/original.pdf'
+        version.save()
+
+        share_link.allow_print = False
+        share_link.save()
+
+        response = public_client.get(f'/api/v1/links/{share_link.slug}/view-data/')
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data['preview_mode'] == 'server_pages'
+        assert data['pdf_preview_url'] is None
+        assert data['link_settings']['allow_print'] is False
+        mock_fs_preview_url.assert_not_called()
 
     @override_settings(SITE_DOMAIN="http://test.coneshare.com")
     def test_get_share_link_data_markdown_document(self, public_client, user):
