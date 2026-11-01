@@ -42,7 +42,7 @@ export const createSignatureRequest = async (data) => {
  */
 export const updateSignatureFields = async (requestId, fields) => {
   // fields: [{ signer_id, field_type, page_number, x, y, width, height, label?, required? }]
-  const response = await api.patch(`/esign/requests/${requestId}/update_fields/`, {
+  const response = await api.post(`/esign/requests/${requestId}/update_fields/`, {
     fields
   });
   return response.data;

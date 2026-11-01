@@ -32,6 +32,8 @@
     "retry": "重试",
     "moving": "移动中...",
     "creating": "创建中...",
+    "day": "天",
+    "days": "天",
     "copy": "复制",
     "copyFailed": "复制到剪贴板失败",
     "show": "显示",

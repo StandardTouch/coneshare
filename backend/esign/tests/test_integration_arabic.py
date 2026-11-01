@@ -246,7 +246,7 @@ class TestESignatureIntegration:
         
         # Verify certificate was generated (returns BytesIO)
         assert certificate_pdf is not None
-        assert certificate_pdf.tell() > 0  # Has content
+        assert len(certificate_pdf) > 0
         
         # Verify Arabic text is properly shaped and embedded
         from arabic_reshaper import reshape
@@ -262,7 +262,7 @@ class TestESignatureIntegration:
         
         # Step 9: Verify document hash would be calculated
         # (In real workflow, this would create a new document version)
-        assert request.document_hash is None or len(request.document_hash) == 64  # SHA256 hex
+        assert not request.original_document_hash or len(request.original_document_hash) == 64
 
         # Verify sequential workflow was enforced
         assert signer1.signed_at < signer2.signed_at

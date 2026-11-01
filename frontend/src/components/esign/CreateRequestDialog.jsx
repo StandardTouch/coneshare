@@ -7,7 +7,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Label } from '../ui/Label';
 import { toast } from 'sonner';
-import { createSignatureRequest, updateSignatureFields } from '../../services/esign';
+import { createSignatureRequest, getSignatureRequest, updateSignatureFields } from '../../services/esign';
 import { FieldPlacementEditor } from './FieldPlacementEditor';
 
 export function CreateRequestDialog({ isOpen, onOpenChange, document, users }) {
@@ -46,7 +46,7 @@ export function CreateRequestDialog({ isOpen, onOpenChange, document, users }) {
 
   const handleSignerChange = (index, userId) => {
     const updated = [...signers];
-    updated[index] = { ...updated[index], user_id: parseInt(userId) };
+    updated[index] = { ...updated[index], user_id: userId };
     setSigners(updated);
   };
 
@@ -83,7 +83,16 @@ export function CreateRequestDialog({ isOpen, onOpenChange, document, users }) {
         };
 
         const request = await createSignatureRequest(data);
-        setRequestId(request.id);
+        const requestId = request.id;
+        setRequestId(requestId);
+        const detail = await getSignatureRequest(requestId);
+        setSigners(
+          detail.signers.map((s) => ({
+            id: s.id,
+            user_id: s.user?.id ?? s.user_id,
+            signing_order: s.signing_order,
+          }))
+        );
         setStep(2);
       } catch (error) {
         toast.error(t('esign.error.createFailed'));
