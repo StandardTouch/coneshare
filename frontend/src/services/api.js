@@ -459,6 +459,15 @@ export const getUser = (id) => api.get(`/users/${id}/`);
 
 export const setPassword = (data) => api.post('/users/set-password/', data);
 
+export const validateInviteToken = ({ uid, token }) =>
+  api.get('/onboarding/invite/validate/', { params: { uid, token } });
+
+export const completeInviteSetPassword = (data) =>
+  api.post('/onboarding/invite/set-password/', data);
+
+export const resendAdminUserInvite = (id) =>
+  api.post(`/admin/users/${id}/resend-invite/`);
+
 export const updateUser = (id, data) => {
   const config = {};
   if (data instanceof FormData) {

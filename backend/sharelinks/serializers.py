@@ -443,7 +443,7 @@ class ShareLinkSerializer(serializers.ModelSerializer):
         model = ShareLink
         fields = [
             'id', 'document', 'dataroom', 'document_name', 'document_type', 'dataroom_name', 'dataroom_settings', 'created_by', 'created_by_user', 'name', 'slug', 'url', 'expires_at',
-            'has_password', 'password', 'requires_email', 'requires_email_verification', 'allow_download', 'enable_qna',
+            'has_password', 'password', 'requires_email', 'requires_email_verification', 'allow_download', 'allow_print', 'enable_qna',
             'enable_watermark', 'watermark_text', 'receive_email_notification', 'is_active', 'created_at', 'updated_at',
             'view_count', 'recent_view_sessions', 'last_viewed_at', 'require_nda', 'nda_text', 'nda_version', 'has_accepted_current_nda'
         ]
@@ -540,7 +540,7 @@ class ShareLinkTemplateSerializer(serializers.ModelSerializer):
         model = ShareLinkTemplate
         fields = [
             'id', 'organization', 'name', 'is_default', 'expires_in_days',
-            'requires_password', 'requires_email', 'requires_email_verification', 'allow_download',
+            'requires_password', 'requires_email', 'requires_email_verification', 'allow_download', 'allow_print',
             'enable_watermark', 'watermark_text', 'receive_email_notification', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'organization', 'created_at', 'updated_at']

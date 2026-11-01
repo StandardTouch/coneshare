@@ -39,6 +39,7 @@ const VideoViewer = lazy(() => import('../documents/VideoViewer').then(m => ({ d
 const SpreadsheetViewer = lazy(() => import('../documents/SpreadsheetViewer').then(m => ({ default: m.SpreadsheetViewer })));
 const MarkdownViewer = lazy(() => import('../documents/MarkdownViewer').then(m => ({ default: m.MarkdownViewer })));
 import { printPdf, printImages } from '../../lib/print';
+import { usePrintProtection, PrintDisabledNotice } from '../../hooks/usePrintProtection';
 import {
   hasRenderablePages,
   isPreviewPending,
@@ -321,6 +322,13 @@ export function DataroomViewer({ data, slug, viewId, publicMeta }) {
       setTotalPages(documentViewData.num_pages || (documentViewData.pages?.length || 1));
     }
   }, [documentViewData]);
+
+  const linkAllowsPrint = (
+    documentViewData?.link_settings?.allow_print
+    ?? scopeData?.link_settings?.allow_print
+    ?? data?.link_settings?.allow_print
+  ) !== false;
+  usePrintProtection(!linkAllowsPrint);
 
   const handleDocumentLoad = useCallback(({ numPages }) => {
     setTotalPages(numPages);
@@ -879,6 +887,7 @@ export function DataroomViewer({ data, slug, viewId, publicMeta }) {
 
   const handlePrint = () => {
     if (!documentViewData) return;
+    if (documentViewData.link_settings?.allow_print === false) return;
 
     if (documentViewData.preview_mode === 'client_pdf') {
       printPdf(documentViewData.pdf_preview_url);
@@ -948,6 +957,7 @@ export function DataroomViewer({ data, slug, viewId, publicMeta }) {
   const PREVIEWABLE_TYPES = ['image', 'pdf', 'document', 'video', 'spreadsheet', 'markdown'];
   const isPreviewable = documentViewData && PREVIEWABLE_TYPES.includes(documentViewData.type);
   const canDownload = Boolean(documentViewData?.link_settings?.allow_download);
+  const allowPrint = documentViewData?.link_settings?.allow_print !== false;
   const isVideo = documentViewData && documentViewData.type === 'video';
   const isVideoReady = isVideo && documentViewData.preview_status === 'ready';
   const isSpreadsheet = documentViewData && documentViewData.preview_mode === 'spreadsheet';
@@ -1165,10 +1175,12 @@ export function DataroomViewer({ data, slug, viewId, publicMeta }) {
                     />
                   </div>
                 ) : (
-                  <div className="relative flex-1 flex flex-col h-full overflow-hidden">
+                  <div className="relative flex-1 flex flex-col h-full overflow-hidden" data-viewer-content>
+                    <PrintDisabledNotice message={!allowPrint ? t('viewer.printDisabledNotice') : null} />
                     {documentViewData.preview_mode !== 'video' && (
                       <ViewerToolbar
                         allowDownload={canDownload}
+                        allowPrint={allowPrint}
                         downloadUrl={docDownloadUrl}
                         downloadFileName={documentViewData.name}
                         downloadDocumentId={selectedDocumentId}

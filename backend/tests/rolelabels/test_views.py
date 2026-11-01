@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
@@ -9,6 +11,17 @@ from rolelabels.models import RoleLabel, UserRoleLabel
 User = get_user_model()
 
 pytestmark = pytest.mark.django_db
+
+
+def _set_user_invite_enabled(enabled: bool):
+    AppConfiguration.objects.update_or_create(
+        key='USER_INVITE_EMAIL_ENABLED',
+        defaults={
+            'value': 'true' if enabled else 'false',
+            'description': 'User invite email toggle',
+        },
+    )
+    cache.delete('app_config:USER_INVITE_EMAIL_ENABLED')
 
 
 def _set_role_labels_enabled(enabled: bool):
@@ -202,3 +215,61 @@ class TestAdminUserCreateRoleLabel:
         response = admin_api_client.post('/api/v1/admin/users/', payload, format='json')
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert 'role_label_id' in response.data
+
+
+class TestAdminUserCreateInviteRoleLabel:
+    @staticmethod
+    def _enable_invite():
+        _set_user_invite_enabled(True)
+
+    @staticmethod
+    def _disable_invite():
+        _set_user_invite_enabled(False)
+
+    def setup_method(self):
+        self._enable_invite()
+
+    def teardown_method(self):
+        self._disable_invite()
+
+    @staticmethod
+    def _invite_payload(**overrides):
+        payload = {
+            'email': 'invited-label@example.com',
+            'name': 'Invited Label User',
+            'role': 'member',
+            'send_invite': True,
+        }
+        payload.update(overrides)
+        return payload
+
+    @patch('django.db.transaction.on_commit', side_effect=lambda func: func())
+    @patch('onboarding.services.send_user_invite_email_task.delay')
+    def test_create_with_invite_and_role_label(self, mock_delay, _on_commit, admin_api_client, custom_role):
+        response = admin_api_client.post(
+            '/api/v1/admin/users/',
+            self._invite_payload(role_label_id=custom_role.id),
+            format='json',
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+        user = User.objects.get(email='invited-label@example.com')
+        assert user.role == 'member'
+        assert user.has_usable_password() is False
+        assignment = UserRoleLabel.objects.get(user=user)
+        assert assignment.role_label_id == custom_role.id
+        assert response.data['role_label']['id'] == custom_role.id
+        mock_delay.assert_called_once()
+
+    @patch('django.db.transaction.on_commit', side_effect=lambda func: func())
+    @patch('onboarding.services.send_user_invite_email_task.delay')
+    def test_create_with_invite_without_role_label(self, mock_delay, _on_commit, admin_api_client):
+        response = admin_api_client.post(
+            '/api/v1/admin/users/',
+            self._invite_payload(email='invited-plain@example.com'),
+            format='json',
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+        user = User.objects.get(email='invited-plain@example.com')
+        assert user.role == 'member'
+        assert not UserRoleLabel.objects.filter(user=user).exists()
+        mock_delay.assert_called_once()

@@ -148,4 +148,9 @@ describe('ViewerToolbar', () => {
     renderComponent({ allowDownload: false });
     expect(screen.queryByTitle('Download file')).not.toBeInTheDocument();
   });
+
+  it('hides print button when allowPrint is false', () => {
+    renderComponent({ allowPrint: false });
+    expect(screen.queryByTitle('Print document')).not.toBeInTheDocument();
+  });
 });

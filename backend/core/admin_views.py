@@ -14,6 +14,7 @@ from rest_framework import permissions, status, viewsets, serializers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from drf_spectacular.utils import extend_schema, extend_schema_field, inline_serializer
@@ -166,6 +167,11 @@ class AdminUserViewSet(viewsets.ModelViewSet):
     serializer_class = AdminUserSerializer
     permission_classes = [IsAuthenticated, IsAdmin, APIKeyTierPermission]
     pagination_class = AdminPagination
+
+    def get_throttles(self):
+        if getattr(self, 'action', None) == 'resend_invite':
+            self.throttle_scope = 'invite_resend'
+        return super().get_throttles()
 
     def get_serializer_class(self):
         if self.action == 'retrieve':
@@ -413,6 +419,46 @@ class AdminUserViewSet(viewsets.ModelViewSet):
         recalculate_user_document_size(user)
         serializer = AdminUserDetailSerializer(user, context=self.get_serializer_context())
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        responses={
+            status.HTTP_200_OK: inline_serializer(
+                name='AdminUserResendInviteResponse',
+                fields={'message': serializers.CharField()},
+            ),
+            status.HTTP_400_BAD_REQUEST: dict,
+            status.HTTP_429_TOO_MANY_REQUESTS: dict,
+        },
+        description='Resend a user invite email with a new 72-hour set-password link.',
+    )
+    @action(
+        detail=True,
+        methods=['post'],
+        url_path='resend-invite',
+        throttle_classes=[ScopedRateThrottle],
+    )
+    def resend_invite(self, request, pk=None):
+        from onboarding.services import invite_feature_enabled, resend_user_invite
+
+        if not invite_feature_enabled():
+            return Response(
+                {'detail': _('User invite email is not enabled.')},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = self.get_object()
+        ok, reason = resend_user_invite(user, request)
+        if reason == 'rate_limited':
+            return Response(
+                {'detail': _('Please wait before resending another invite.')},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+        if not ok:
+            return Response(
+                {'detail': _('User invite email is not enabled.')},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({'message': _('Invite email sent.')}, status=status.HTTP_200_OK)
 
     @extend_schema(
         request=AdminResetPasswordSerializer,

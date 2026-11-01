@@ -148,11 +148,12 @@ class UserSerializer(serializers.ModelSerializer):
 
 class AdminUserSerializer(RoleLabelAdminUserMixin, UserSerializer):
     """Serializer for admin management of organization users."""
-    password = serializers.CharField(write_only=True, required=False)
+    password = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    send_invite = serializers.BooleanField(write_only=True, required=False, default=False)
 
     class Meta(UserSerializer.Meta):
         fields = [
-            'id', 'email', 'name', 'role', 'organization', 'password',
+            'id', 'email', 'name', 'role', 'organization', 'password', 'send_invite',
             'avatar', 'avatar_url', 'language', 'date_joined', 'updated_at',
             'total_document_size', 'file_size_quota_mb', 'custom_file_size_quota_mb', 'max_files_per_upload',
             'is_superuser', 'is_active'
@@ -184,6 +185,8 @@ class AdminUserSerializer(RoleLabelAdminUserMixin, UserSerializer):
         return value
 
     def validate_password(self, value):
+        if not value:
+            return value
         try:
             password_validation.validate_password(value, self.instance)
         except ValidationError as e:
@@ -191,9 +194,41 @@ class AdminUserSerializer(RoleLabelAdminUserMixin, UserSerializer):
         return value
 
     def validate(self, attrs):
-        if self.instance is None and not attrs.get('password'):
-            raise serializers.ValidationError({'password': ['This field is required.']})
+        if self.instance is None:
+            send_invite = attrs.get('send_invite', False)
+            if send_invite:
+                if not get_dynamic_setting('USER_INVITE_EMAIL_ENABLED'):
+                    raise serializers.ValidationError({
+                        'send_invite': ['User invite email is not enabled.']
+                    })
+                attrs.pop('password', None)
+            elif not attrs.get('password'):
+                raise serializers.ValidationError({'password': ['This field is required.']})
+        else:
+            attrs.pop('send_invite', None)
         return super().validate(attrs)
+
+    def create(self, validated_data):
+        role_label_id, clear_label = RoleLabelAdminUserMixin.extract_role_label_side_effects(
+            validated_data
+        )
+        send_invite = validated_data.pop('send_invite', False)
+        request = self.context.get('request')
+
+        with transaction.atomic():
+            if send_invite:
+                from onboarding.services import create_user_with_invite
+
+                user = create_user_with_invite(validated_data, request)
+            else:
+                password = validated_data.pop('password', None)
+                if password:
+                    validated_data['password'] = password
+                user = super(RoleLabelAdminUserMixin, self).create(validated_data)
+            RoleLabelAdminUserMixin.apply_role_label_side_effects(
+                user, role_label_id, clear_label
+            )
+        return user
 
     def update(self, instance, validated_data):
         """
@@ -201,6 +236,7 @@ class AdminUserSerializer(RoleLabelAdminUserMixin, UserSerializer):
         """
         validated_data.pop('email', None)
         validated_data.pop('password', None)
+        validated_data.pop('send_invite', None)
         role_label_id, clear_label = RoleLabelAdminUserMixin.extract_role_label_side_effects(
             validated_data
         )

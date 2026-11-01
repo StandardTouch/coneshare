@@ -37,6 +37,7 @@ import { useBranding } from '../contexts/BrandingProvider';
 import { LanguagePicker } from '../components/common/LanguagePicker';
 import { useTranslation } from 'react-i18next';
 import { getLocalizedErrorMessage } from '../utils/errorTranslator';
+import { usePrintProtection, PrintDisabledNotice } from '../hooks/usePrintProtection';
 
 const PREVIEW_POLL_INTERVAL_MS = 3000;
 
@@ -124,6 +125,10 @@ export function ShareLinkViewerPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+
+  const shouldProtectPrint = viewData?.link_settings?.allow_print === false
+    && publicMeta?.target_type !== 'dataroom';
+  usePrintProtection(shouldProtectPrint);
 
   // Synchronize totalPages with viewData when it loads
   useEffect(() => {
@@ -405,6 +410,7 @@ export function ShareLinkViewerPage() {
 
   const handlePrint = () => {
     if (!viewData) return;
+    if (viewData.link_settings?.allow_print === false) return;
 
     if (viewData.preview_mode === 'client_pdf') {
       printPdf(viewData.pdf_preview_url);
@@ -546,6 +552,7 @@ export function ShareLinkViewerPage() {
   const PREVIEWABLE_TYPES = ['image', 'pdf', 'document', 'video', 'spreadsheet', 'markdown'];
   const isPreviewable = viewData && PREVIEWABLE_TYPES.includes(viewData.type);
   const canDownload = Boolean(viewData?.link_settings?.allow_download);
+  const allowPrint = viewData?.link_settings?.allow_print !== false;
   const isQnaEnabled = viewData?.link_settings?.enable_qna !== false;
   const isVideo = viewData && viewData.type === 'video';
   const isVideoReady = isVideo && viewData.preview_status === 'ready';
@@ -724,10 +731,12 @@ export function ShareLinkViewerPage() {
         hasViewSession={Boolean(viewId)}
       />
       {viewData && (
-        <div className="relative flex-1 min-h-0 w-full overflow-hidden">
+        <div className="relative flex-1 min-h-0 w-full overflow-hidden" data-viewer-content>
+          <PrintDisabledNotice message={!allowPrint ? t('viewer.printDisabledNotice') : null} />
           {viewData.preview_mode !== 'video' && (
             <ViewerToolbar
               allowDownload={Boolean(viewData.link_settings?.allow_download)}
+              allowPrint={allowPrint}
               downloadUrl={downloadUrl}
               downloadFileName={viewData.name}
               downloadDocumentId={dataroomDocumentIdFromUrl || null}

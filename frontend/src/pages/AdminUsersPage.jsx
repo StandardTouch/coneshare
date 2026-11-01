@@ -34,8 +34,15 @@ import { useBranding } from '../contexts/BrandingProvider';
 import { RoleSelect } from '../components/admin/RoleSelect';
 import { buildRolePayload, displayRoleName, roleSelectionFromUser } from '../lib/adminRoleLabels';
 
-function AddUserForm({ onAddUser, onCancel, roleLabelsEnabled, customRoles }) {
+function AddUserForm({
+  onAddUser,
+  onCancel,
+  roleLabelsEnabled,
+  customRoles,
+  inviteEmailEnabled,
+}) {
   const { t } = useTranslation();
+  const [credentialMode, setCredentialMode] = useState('password');
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -56,12 +63,19 @@ function AddUserForm({ onAddUser, onCancel, roleLabelsEnabled, customRoles }) {
     setIsSaving(true);
     try {
       const { roleSelection, ...rest } = formData;
+      const sendInvite = inviteEmailEnabled && credentialMode === 'invite';
       const payload = {
         ...rest,
         custom_file_size_quota_mb: formData.custom_file_size_quota_mb === '' ? null : parseInt(formData.custom_file_size_quota_mb, 10),
-        ...(roleLabelsEnabled ? buildRolePayload(roleSelection) : { role: roleSelection === 'admin' ? 'admin' : 'member' }),
+        send_invite: sendInvite,
+        ...(roleLabelsEnabled
+          ? buildRolePayload(roleSelection)
+          : { role: roleSelection === 'admin' ? 'admin' : 'member' }),
       };
-      await onAddUser(payload);
+      if (sendInvite) {
+        delete payload.password;
+      }
+      await onAddUser(payload, { sendInvite });
     } finally {
       setIsSaving(false);
     }
@@ -115,6 +129,36 @@ function AddUserForm({ onAddUser, onCancel, roleLabelsEnabled, customRoles }) {
               required
             />
           </div>
+          {inviteEmailEnabled ? (
+            <div className="md:col-span-2">
+              <span className="mb-2 block text-sm font-medium">{t('admin.credentialMode')}</span>
+              <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="credentialMode"
+                    value="password"
+                    checked={credentialMode === 'password'}
+                    onChange={() => setCredentialMode('password')}
+                    disabled={isSaving}
+                  />
+                  {t('admin.credentialModePassword')}
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="credentialMode"
+                    value="invite"
+                    checked={credentialMode === 'invite'}
+                    onChange={() => setCredentialMode('invite')}
+                    disabled={isSaving}
+                  />
+                  {t('admin.credentialModeInvite')}
+                </label>
+              </div>
+            </div>
+          ) : null}
+          {(!inviteEmailEnabled || credentialMode === 'password') && (
           <div>
             <label
               htmlFor="password"
@@ -129,10 +173,11 @@ function AddUserForm({ onAddUser, onCancel, roleLabelsEnabled, customRoles }) {
               value={formData.password}
               onChange={handleChange}
               disabled={isSaving}
-              required
+              required={!inviteEmailEnabled || credentialMode === 'password'}
               minLength={3}
             />
           </div>
+          )}
           <div>
             <label htmlFor="role" className="mb-1 block text-sm font-medium">
               {t('admin.role')}
@@ -280,6 +325,27 @@ export function AdminUsersPage() {
     totalStorageBytes: 0,
     dataroomUsers: 0,
   });
+  const [inviteEmailEnabled, setInviteEmailEnabled] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadInviteSetting = async () => {
+      try {
+        const response = await api.getAdminSettings();
+        const list = Array.isArray(response.data) ? response.data : [];
+        const row = list.find((item) => item.key === 'USER_INVITE_EMAIL_ENABLED');
+        if (mounted) {
+          setInviteEmailEnabled(Boolean(row?.value));
+        }
+      } catch (_err) {
+        if (mounted) setInviteEmailEnabled(false);
+      }
+    };
+    loadInviteSetting();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!roleLabelsEnabled) {
@@ -408,10 +474,14 @@ export function AdminUsersPage() {
     return response.data;
   };
 
-  const handleAddUser = async (userData) => {
+  const handleAddUser = async (userData, options = {}) => {
     try {
       const response = await api.createAdminUser(userData);
-      toast.success(t('admin.userCreatedSuccess', { name: response.data.name }));
+      if (options.sendInvite) {
+        toast.success(t('admin.inviteEmailQueued'));
+      } else {
+        toast.success(t('admin.userCreatedSuccess', { name: response.data.name }));
+      }
       setIsAddingUser(false);
       setRefreshKey((k) => k + 1);
     } catch (error) {
@@ -694,6 +764,7 @@ export function AdminUsersPage() {
           onCancel={() => setIsAddingUser(false)}
           roleLabelsEnabled={roleLabelsEnabled}
           customRoles={customRoles}
+          inviteEmailEnabled={inviteEmailEnabled}
         />
       )}
 

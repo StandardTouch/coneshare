@@ -2,11 +2,24 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import LoginPage from "../../pages/LoginPage";
+import { UserProvider } from "../../contexts/UserProvider";
 import { authService } from "../../services/authService";
+import { getUser } from "../../services/api";
 import "../../i18n";
 
-// Mock the authService
+vi.mock("jwt-decode", () => ({
+  jwtDecode: vi.fn(() => ({ user_id: 1 })),
+}));
+
 vi.mock("../../services/authService");
+
+vi.mock("../../services/api", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    getUser: vi.fn(),
+  };
+});
 
 // Mock useNavigate from react-router
 const mockedNavigate = vi.fn();
@@ -20,18 +33,21 @@ vi.mock("react-router", async () => {
 
 describe("LoginPage", () => {
   beforeEach(() => {
-    // Reset mocks before each test
     vi.resetAllMocks();
+    localStorage.clear();
     authService.getPublicSettings.mockResolvedValue({ enable_public_signup: false });
+    getUser.mockResolvedValue({ data: { id: 1, email: "test@example.com" } });
   });
 
   const renderComponent = () => {
     return render(
       <MemoryRouter initialEntries={["/login"]}>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/" element={<div>Homepage</div>} />
-        </Routes>
+        <UserProvider>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/" element={<div>Homepage</div>} />
+          </Routes>
+        </UserProvider>
       </MemoryRouter>
     );
   };
@@ -47,7 +63,9 @@ describe("LoginPage", () => {
   });
 
   it("calls authService.login and navigates to home on successful login", async () => {
-    authService.login.mockResolvedValue({});
+    authService.login.mockImplementation(async () => {
+      localStorage.setItem("access_token", "token");
+    });
     renderComponent();
 
     fireEvent.change(screen.getByLabelText(/Email address/i), {
@@ -66,7 +84,7 @@ describe("LoginPage", () => {
     });
 
     await waitFor(() => {
-      expect(mockedNavigate).toHaveBeenCalledWith("/");
+      expect(mockedNavigate).toHaveBeenCalledWith("/", { replace: true });
     });
   });
 
@@ -115,7 +133,7 @@ describe("LoginPage", () => {
     const loginPromise = new Promise((resolve) => {
       resolveLogin = resolve;
     });
-    authService.login.mockReturnValue(loginPromise);
+    authService.login.mockImplementation(() => loginPromise);
 
     renderComponent();
 
@@ -137,6 +155,7 @@ describe("LoginPage", () => {
 
     // Resolve the promise to finish the login process
     resolveLogin({});
+    localStorage.setItem("access_token", "token");
 
     // Wait for the UI to update after login completes
     await waitFor(() => {

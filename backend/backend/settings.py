@@ -236,6 +236,7 @@ INSTALLED_APPS = [
     'filerequests',
     'automations',
     'esign',
+    'onboarding.apps.OnboardingConfig',
     'rolelabels',
 ]
 
@@ -293,6 +294,9 @@ REST_FRAMEWORK = {
         'signup': '5/min',
         'health_check': '1000/min',
         'document_copy': '5/min',
+        'invite_validate': '30/min',
+        'invite_set_password': '5/min',
+        'invite_resend': '5/min',
     }
 }
 
@@ -585,6 +589,9 @@ ESIGN_ENABLED = os.environ.get('ESIGN_ENABLED', 'False').lower() in ('true', '1'
 
 # Custom display role labels in admin (default OFF).
 ROLE_LABELS_ENABLED = os.environ.get('ROLE_LABELS_ENABLED', 'False').lower() in ('true', '1', 'yes')
+
+# Admin user invite email (set password via link).
+USER_INVITE_EMAIL_ENABLED = False
 
 
 # Path to the TTF/OTF font file to be used for watermarking.

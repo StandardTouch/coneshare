@@ -28,6 +28,16 @@ def ensure_mo_catalogs_compiled():
 
 
 @pytest.fixture(autouse=True)
+def disable_redis_cache(settings):
+    """Use in-memory cache during pytest runs when Redis is unavailable."""
+    settings.CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        }
+    }
+
+
+@pytest.fixture(autouse=True)
 def disable_drf_rate_limiting(settings):
     """Disable DRF throttling during pytest runs to prevent 429 Too Many Requests in large test suites."""
     rf_settings = settings.REST_FRAMEWORK.copy()
