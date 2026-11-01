@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useNavigate, useLocation } from 'react-router'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { authService } from '../services/authService'
+import { useUser } from '../contexts/UserProvider'
+import { getSafeRedirectTarget } from '../utils/authRedirect'
 import { APP_DISPLAY_VERSION } from '../lib/constants'
 import { Button } from '../components/ui/Button'
 import { useBranding } from '../contexts/BrandingProvider'
@@ -10,6 +12,8 @@ import { LanguagePicker } from '../components/common/LanguagePicker'
 
 function LoginPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const { refreshUser } = useUser()
   const { t } = useTranslation()
   const { brandName, brandLogoUrl, brandWebsiteUrl, termsUrl, privacyPolicyUrl } = useBranding()
   const [email, setEmail] = useState('')
@@ -47,8 +51,8 @@ function LoginPage() {
 
     try {
       await authService.login(email, password)
-      // Redirect to homepage on successful login
-      navigate('/')
+      await refreshUser()
+      navigate(getSafeRedirectTarget(location.state?.from), { replace: true })
     } catch (err) {
       setError('auth.invalidCredentials')
     } finally {
