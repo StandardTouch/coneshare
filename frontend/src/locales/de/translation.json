@@ -32,6 +32,8 @@
     "retry": "Wiederholen",
     "moving": "Wird verschoben...",
     "creating": "Wird erstellt...",
+    "day": "Tag",
+    "days": "Tage",
     "copy": "Kopieren",
     "copyFailed": "Kopieren in die Zwischenablage fehlgeschlagen",
     "show": "Anzeigen",

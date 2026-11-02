@@ -32,6 +32,8 @@
     "retry": "Retry",
     "moving": "Moving...",
     "creating": "Creating...",
+    "day": "day",
+    "days": "days",
     "copy": "Copy",
     "copyFailed": "Failed to copy to clipboard",
     "show": "Show",

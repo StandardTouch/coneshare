@@ -12,6 +12,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied, ValidationError as DRFValidationError
 
+from core.models import User
 from core.permissions import APIKeyTierPermission
 from core.services import get_dynamic_setting
 from documents.models import Document, DocumentVersion
@@ -330,11 +331,12 @@ class SigningViewSet(viewsets.ViewSet):
     """
     permission_classes = [IsAuthenticated, APIKeyTierPermission]
     
-    def retrieve(self, request, token=None):
+    def retrieve(self, request, pk=None):
         """
         Get signing page data by token.
         """
         check_esign_enabled()
+        token = pk
         
         signer = get_object_or_404(Signer, token=token)
         signature_request = signer.signature_request
@@ -395,11 +397,12 @@ class SigningViewSet(viewsets.ViewSet):
         return Response(data)
     
     @action(detail=True, methods=['post'])
-    def request_otp(self, request, token=None):
+    def request_otp(self, request, pk=None):
         """
         Request OTP for signing.
         """
         check_esign_enabled()
+        token = pk
         
         signer = get_object_or_404(Signer, token=token)
         
@@ -439,11 +442,12 @@ class SigningViewSet(viewsets.ViewSet):
         })
     
     @action(detail=True, methods=['post'])
-    def verify_otp(self, request, token=None):
+    def verify_otp(self, request, pk=None):
         """
         Verify OTP for signing.
         """
         check_esign_enabled()
+        token = pk
         
         signer = get_object_or_404(Signer, token=token)
         
@@ -513,11 +517,12 @@ class SigningViewSet(viewsets.ViewSet):
         return Response({'message': _('Verified successfully.'), 'verified': True})
     
     @action(detail=True, methods=['post'])
-    def submit(self, request, token=None):
+    def submit(self, request, pk=None):
         """
         Submit signature.
         """
         check_esign_enabled()
+        token = pk
         
         signer = get_object_or_404(Signer, token=token)
         signature_request = signer.signature_request
@@ -629,11 +634,12 @@ class SigningViewSet(viewsets.ViewSet):
                 })
     
     @action(detail=True, methods=['post'])
-    def decline(self, request, token=None):
+    def decline(self, request, pk=None):
         """
         Decline to sign.
         """
         check_esign_enabled()
+        token = pk
         
         signer = get_object_or_404(Signer, token=token)
         signature_request = signer.signature_request

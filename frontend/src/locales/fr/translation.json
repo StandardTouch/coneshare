@@ -32,6 +32,8 @@
     "retry": "Réessayer",
     "moving": "Déplacement...",
     "creating": "Création...",
+    "day": "jour",
+    "days": "jours",
     "copy": "Copier",
     "copyFailed": "Échec de la copie dans le presse-papiers",
     "show": "Afficher",

@@ -53,7 +53,7 @@ export function FieldPlacementEditor({ documentId, signers, users, onSave, onCan
     const signer = signers[selectedSignerIndex];
     const newField = {
       id: `temp-${Date.now()}`,
-      signer_id: signer.user_id,
+      signer_id: signer.id,
       field_type: draggedField,
       page_number: currentPage,
       x: Math.max(0, Math.min(x, 90)),
@@ -190,7 +190,7 @@ export function FieldPlacementEditor({ documentId, signers, users, onSave, onCan
             {/* Placed Fields */}
             {pageFields.map((field) => {
               const fieldType = FIELD_TYPES.find(ft => ft.type === field.field_type);
-              const isCurrentSigner = field.signer_id === signers[selectedSignerIndex]?.user_id;
+              const isCurrentSigner = field.signer_id === signers[selectedSignerIndex]?.id;
               
               return (
                 <div
@@ -245,7 +245,7 @@ export function FieldPlacementEditor({ documentId, signers, users, onSave, onCan
           {t('esign.create.fieldsPlaced', { count: fields.length })}
         </div>
         {signers.map((signer, idx) => {
-          const signerFields = fields.filter(f => f.signer_id === signer.user_id);
+          const signerFields = fields.filter(f => f.signer_id === signer.id);
           return (
             <div key={idx} className="text-xs text-gray-500">
               {getUserName(signer.user_id)}: {signerFields.length} {t('esign.create.fields')}

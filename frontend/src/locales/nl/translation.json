@@ -32,6 +32,8 @@
     "retry": "Opnieuw proberen",
     "moving": "Verplaatsen...",
     "creating": "Aanmaken...",
+    "day": "dag",
+    "days": "dagen",
     "copy": "Kopiëren",
     "copyFailed": "Kopiëren naar klembord mislukt",
     "show": "Tonen",

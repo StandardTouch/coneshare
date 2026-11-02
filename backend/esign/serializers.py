@@ -117,13 +117,23 @@ class SignatureRequestCreateSerializer(serializers.ModelSerializer):
         write_only=True
     )
     signers = SignerSerializer(many=True, write_only=True)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get('request')
+        if request and getattr(request.user, 'organization_id', None):
+            self.fields['signers'].child.fields['user_id'].queryset = User.objects.filter(
+                organization=request.user.organization,
+                is_active=True,
+            )
     
     class Meta:
         model = SignatureRequest
         fields = [
-            'document_id', 'title', 'message', 'signing_order',
+            'id', 'document_id', 'title', 'message', 'signing_order',
             'expires_at', 'signers'
         ]
+        read_only_fields = ['id']
     
     def validate_signers(self, value):
         if not value or len(value) < 1:
@@ -133,6 +143,17 @@ class SignatureRequestCreateSerializer(serializers.ModelSerializer):
         user_ids = [s['user'].id for s in value]
         if len(user_ids) != len(set(user_ids)):
             raise serializers.ValidationError(_("Duplicate signers are not allowed."))
+
+        request = self.context.get('request')
+        if request and getattr(request.user, 'organization_id', None):
+            for signer_data in value:
+                signer_user = signer_data['user']
+                if signer_user.organization_id != request.user.organization_id:
+                    raise serializers.ValidationError(
+                        _("All signers must belong to your organization.")
+                    )
+                if not signer_user.is_active:
+                    raise serializers.ValidationError(_("All signers must be active users."))
         
         # Validate signing order
         if self.initial_data.get('signing_order'):

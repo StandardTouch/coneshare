@@ -1,3 +1,4 @@
+import io
 import pytest
 from datetime import timedelta
 from django.utils import timezone
@@ -5,6 +6,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from rest_framework import status
 from django.conf import settings
+from reportlab.pdfgen import canvas as pdf_canvas
 
 from core.models import Organization
 from documents.models import Document, DocumentVersion
@@ -45,6 +47,66 @@ def signer_user(db, organization):
 
 
 @pytest.fixture
+def second_signer_user(db, organization):
+    return User.objects.create_user(
+        username="signer2@example.com",
+        email="signer2@example.com",
+        name="Second Signer",
+        password="testpass123",
+        organization=organization,
+        is_active=True,
+    )
+
+
+@pytest.fixture
+def other_organization(db):
+    return Organization.objects.create(name="Other Org")
+
+
+@pytest.fixture
+def outsider_user(db, other_organization):
+    return User.objects.create_user(
+        username="outsider@example.com",
+        email="outsider@example.com",
+        name="Outsider",
+        password="testpass123",
+        organization=other_organization,
+        is_active=True,
+    )
+
+
+@pytest.fixture
+def mock_esign_pdf_pipeline(monkeypatch):
+    buffer = io.BytesIO()
+    pdf = pdf_canvas.Canvas(buffer, pagesize=(612, 792))
+    pdf.drawString(100, 700, "Test document")
+    pdf.showPage()
+    pdf.save()
+    pdf_bytes = buffer.getvalue()
+
+    def fake_download(_version):
+        return pdf_bytes
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+    class FakeClient:
+        def put(self, *_args, **_kwargs):
+            return FakeResponse()
+
+        def close(self):
+            return None
+
+    monkeypatch.setattr("esign.services.download_document_pdf", fake_download)
+    monkeypatch.setattr("httpx.Client", FakeClient)
+    monkeypatch.setattr(
+        "esign.services.fileserver_client.generate_upload_url",
+        lambda **_kwargs: {"url": "/test-upload"},
+    )
+
+
+@pytest.fixture
 def another_user(db, organization):
     """User not involved in the signature request"""
     return User.objects.create_user(
@@ -62,17 +124,21 @@ def document(db, organization, user):
     doc = Document.objects.create(
         name="Test Document.pdf",
         organization=organization,
-        owner=user,
-        num_pages=3
+        created_by=user,
+        type="pdf",
+        content_type="application/pdf",
+        num_pages=3,
+        status="ready",
     )
     DocumentVersion.objects.create(
         document=doc,
         version_number=1,
         storage_key="test-storage-key",
+        original_storage_key="test-storage-key",
         content_type="application/pdf",
         type="pdf",
         file_size=1024,
-        is_primary=True
+        is_primary=True,
     )
     return doc
 
@@ -354,6 +420,7 @@ class TestSigningFlow:
         """Test sequential signing workflow"""
         # Create request with 2 signers in sequential order
         signer1_user = User.objects.create_user(
+            username="signer1@example.com",
             email="signer1@example.com",
             name="Signer One",
             password="test123",
@@ -361,6 +428,7 @@ class TestSigningFlow:
             is_active=True
         )
         signer2_user = User.objects.create_user(
+            username="signer2@example.com",
             email="signer2@example.com",
             name="Signer Two",
             password="test123",
@@ -557,3 +625,151 @@ class TestAuditTrail:
         # IP and user agent should be recorded
         signed_action = signer.actions.filter(action='signed').first()
         assert signed_action.ip_address is not None
+
+
+def _sign_with_otp(client, signer, field_id, value="Signed"):
+    client.post(f"/api/v1/esign/sign/{signer.token}/request_otp/")
+    otp = SignatureOTP.objects.get(signer=signer)
+    client.post(
+        f"/api/v1/esign/sign/{signer.token}/verify_otp/",
+        {"code": otp.code},
+    )
+    return client.post(
+        f"/api/v1/esign/sign/{signer.token}/submit/",
+        {"fields": [{"field_id": field_id, "value": value}]},
+        format="json",
+    )
+
+
+@pytest.mark.django_db
+class TestUlidSignerIntegrationFlow:
+    def test_full_flow_with_ulid_signers_and_pdf_completion(
+        self,
+        authenticated_client,
+        api_client,
+        enable_esign,
+        mock_esign_pdf_pipeline,
+        user,
+        signer_user,
+        second_signer_user,
+        document,
+    ):
+        assert isinstance(signer_user.id, str)
+        assert isinstance(second_signer_user.id, str)
+
+        expires_at = (timezone.now() + timedelta(days=7)).isoformat()
+        create_response = authenticated_client.post(
+            "/api/v1/esign/requests/",
+            {
+                "document_id": document.id,
+                "title": "ULID Signers Agreement",
+                "message": "Please sign",
+                "signing_order": False,
+                "expires_at": expires_at,
+                "signers": [
+                    {"user_id": signer_user.id, "signing_order": 1},
+                    {"user_id": second_signer_user.id, "signing_order": 1},
+                ],
+            },
+            format="json",
+        )
+        assert create_response.status_code == status.HTTP_201_CREATED, create_response.data
+        request_id = create_response.data["id"]
+
+        detail = authenticated_client.get(f"/api/v1/esign/requests/{request_id}/")
+        signers_by_user = {s["user"]["id"]: s for s in detail.data["signers"]}
+        signer_one = signers_by_user[signer_user.id]
+        signer_two = signers_by_user[second_signer_user.id]
+
+        fields_response = authenticated_client.post(
+            f"/api/v1/esign/requests/{request_id}/update_fields/",
+            {
+                "fields": [
+                    {
+                        "signer_id": signer_one["id"],
+                        "field_type": "signature",
+                        "page_number": 1,
+                        "x": 10.0,
+                        "y": 20.0,
+                        "width": 30.0,
+                        "height": 8.0,
+                        "required": True,
+                    },
+                    {
+                        "signer_id": signer_two["id"],
+                        "field_type": "signature",
+                        "page_number": 1,
+                        "x": 50.0,
+                        "y": 20.0,
+                        "width": 30.0,
+                        "height": 8.0,
+                        "required": True,
+                    },
+                ]
+            },
+            format="json",
+        )
+        assert fields_response.status_code == status.HTTP_200_OK, fields_response.data
+
+        signature_request = SignatureRequest.objects.get(id=request_id)
+        signer_one_model = signature_request.signers.get(user=signer_user)
+        signer_two_model = signature_request.signers.get(user=second_signer_user)
+        assert signer_one_model.fields.first().signer_id == signer_one_model.id
+        assert signer_two_model.fields.first().signer_id == signer_two_model.id
+
+        assert authenticated_client.post(
+            f"/api/v1/esign/requests/{request_id}/send/"
+        ).status_code == status.HTTP_200_OK
+
+        api_client.force_authenticate(user=signer_user)
+        submit_one = _sign_with_otp(
+            api_client, signer_one_model, signer_one_model.fields.first().id, "Signer One"
+        )
+        assert submit_one.status_code == status.HTTP_200_OK
+
+        api_client.force_authenticate(user=second_signer_user)
+        submit_two = _sign_with_otp(
+            api_client, signer_two_model, signer_two_model.fields.first().id, "Signer Two"
+        )
+        assert submit_two.status_code == status.HTTP_200_OK
+        assert submit_two.data["status"] == "completed"
+
+        signature_request.refresh_from_db()
+        assert signature_request.status == "completed"
+        assert signature_request.signed_document_version is not None
+        assert signature_request.certificate_storage_key.endswith("certificate.pdf")
+        assert DocumentVersion.objects.filter(document=document).count() >= 2
+
+        from esign.services import generate_certificate_of_completion
+        from pypdf import PdfReader
+
+        cert_bytes = generate_certificate_of_completion(
+            signature_request,
+            list(signature_request.signers.order_by("signing_order")),
+            signature_request.original_document_hash or "a" * 64,
+            signature_request.metadata.get("signed_document_hash", "b" * 64),
+        )
+        assert len(PdfReader(io.BytesIO(cert_bytes)).pages) >= 1
+
+    def test_create_rejects_signer_outside_organization(
+        self,
+        authenticated_client,
+        enable_esign,
+        document,
+        outsider_user,
+    ):
+        expires_at = (timezone.now() + timedelta(days=7)).isoformat()
+        response = authenticated_client.post(
+            "/api/v1/esign/requests/",
+            {
+                "document_id": document.id,
+                "title": "Invalid signer",
+                "message": "",
+                "signing_order": False,
+                "expires_at": expires_at,
+                "signers": [{"user_id": outsider_user.id, "signing_order": 1}],
+            },
+            format="json",
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert SignatureRequest.objects.filter(title="Invalid signer").count() == 0
