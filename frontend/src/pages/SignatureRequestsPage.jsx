@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '../components/ui/Button';
 import { toast } from 'sonner';
 import { listSignatureRequests, cancelSignatureRequest, sendReminder } from '../services/esign';
-import { STATUS_COLORS } from '../services/esign';
+import { STATUS_COLORS, SIGNER_STATUS_COLORS } from '../services/esign';
 
 export default function SignatureRequestsPage() {
   const { t } = useTranslation();
@@ -122,11 +122,16 @@ export default function SignatureRequestsPage() {
                   )}
                   
                   {activeTab === 'awaiting' && request.signer_status && (
-                    <div className="text-sm">
-                      <span className="text-gray-500">{t('esign.request.yourStatus')}:</span>
-                      <span className={`ml-2 px-2 py-1 rounded text-xs ${STATUS_COLORS[request.signer_status]}`}>
-                        {t(`esign.signerStatus.${request.signer_status}`)}
-                      </span>
+                    <div className="text-sm space-y-1">
+                      <div>
+                        <span className="text-gray-500">{t('esign.request.yourStatus')}:</span>
+                        <span className={`ml-2 px-2 py-1 rounded text-xs ${SIGNER_STATUS_COLORS[request.signer_status] || STATUS_COLORS[request.status]}`}>
+                          {t(`esign.signerStatus.${request.signer_status}`)}
+                        </span>
+                      </div>
+                      {request.can_sign === false && request.can_sign_reason && (
+                        <p className="text-xs text-amber-700">{request.can_sign_reason}</p>
+                      )}
                     </div>
                   )}
                   
@@ -139,6 +144,7 @@ export default function SignatureRequestsPage() {
                   {activeTab === 'awaiting' && request.signer_token && (
                     <Button
                       size="sm"
+                      variant={request.can_sign === false ? 'outline' : 'default'}
                       onClick={() => navigate(`/sign/${request.signer_token}`)}
                     >
                       {t('esign.action.viewSign')}

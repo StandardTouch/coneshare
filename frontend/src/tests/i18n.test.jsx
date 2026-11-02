@@ -36,7 +36,10 @@ describe('Frontend i18n System', () => {
   it('loads English translations by default', () => {
     const testI18n = createTestI18n();
     expect(testI18n.t('common.save')).toBe('Save Changes');
+    expect(testI18n.t('common.page')).toBe('Page');
     expect(testI18n.t('common.edit')).toBe('Edit');
+    expect(testI18n.t('esign.fields.clickToFill')).toBe('Click to fill');
+    expect(testI18n.t('esign.fields.filled')).toBe('Filled');
     expect(testI18n.t('viewer.preview')).toBe('Preview');
     expect(testI18n.t('nav.dashboard')).toBe('Dashboard');
     expect(testI18n.t('dashboard.title')).toBe('Dashboard');
