@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/Dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 
@@ -37,6 +44,11 @@ export function TypedSignatureModal({ isOpen, onOpenChange, onSave, fieldType = 
              fieldType === 'full_name' ? t('esign.signature.typeName') :
              t('esign.signature.typeText')}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            {fieldType === 'full_name' || fieldType === 'text'
+              ? t('esign.fields.enterValue')
+              : t('esign.signature.previewAppears')}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">

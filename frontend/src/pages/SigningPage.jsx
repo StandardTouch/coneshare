@@ -262,9 +262,9 @@ export default function SigningPage() {
                     </span>
                   </span>
                   {fieldValues[field.id] ? (
-                    <span className="text-green-600">✓ {t('esign.field.filled')}</span>
+                    <span className="text-green-600">✓ {t('esign.fields.filled')}</span>
                   ) : (
-                    <span className="text-blue-600">{t('esign.field.clickToFill')}</span>
+                    <span className="text-blue-600">{t('esign.fields.clickToFill')}</span>
                   )}
                 </div>
               </div>

@@ -29,6 +29,8 @@
     "src/tests/components/esign/CreateRequestDialog.test.jsx",
     "src/tests/components/esign/fieldPlacementUtils.test.js",
     "src/tests/components/esign/FieldPlacementEditor.test.jsx",
+    "src/tests/components/esign/SignatureDrawModal.test.jsx",
+    "src/tests/components/esign/TypedSignatureModal.test.jsx",
     "src/tests/services/esignUlid.test.js",
     "src/tests/pages/SignatureRequestsPage.test.jsx",
     "src/tests/hooks/useSortedList.test.js",

@@ -45,7 +45,8 @@
     "showAllFolders": "Show all {{count}} folders",
     "showLess": "Show less",
     "showingCount": "Showing {{count}}",
-    "actionsFor": "Actions for {{name}}"
+    "actionsFor": "Actions for {{name}}",
+    "page": "Page"
   },
   "dashboard": {
     "title": "Dashboard",
