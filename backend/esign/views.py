@@ -3,6 +3,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.translation import gettext as _
@@ -60,6 +61,12 @@ class SignatureRequestViewSet(viewsets.ModelViewSet):
         
         # Filter based on view type
         view_type = self.request.query_params.get('view', 'created')
+
+        if self.action in ('retrieve', 'download_signed', 'download_certificate'):
+            return SignatureRequest.objects.filter(
+                Q(organization=user.organization, created_by=user)
+                | Q(signers__user=user)
+            ).distinct().select_related('document', 'created_by')
         
         if view_type == 'awaiting':
             # Requests where user is a signer and hasn't signed yet
@@ -393,6 +400,11 @@ class SigningViewSet(viewsets.ViewSet):
         can_sign, reason = signer.can_sign()
         data['can_sign'] = can_sign
         data['can_sign_reason'] = reason
+
+        data['all_fields'] = SignatureFieldSerializer(
+            signature_request.fields.select_related('signer').all(),
+            many=True,
+        ).data
         
         return Response(data)
     
@@ -586,6 +598,11 @@ class SigningViewSet(viewsets.ViewSet):
             # Update signer status
             signer.status = 'signed'
             signer.signed_at = timezone.now()
+            ip_address, user_agent = get_client_info(request)
+            if ip_address and not signer.ip_address:
+                signer.ip_address = ip_address
+            if user_agent and not signer.user_agent:
+                signer.user_agent = user_agent
             signer.save()
             
             # Record signing action

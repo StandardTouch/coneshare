@@ -135,6 +135,23 @@ def download_document_pdf(document_version: DocumentVersion) -> bytes:
         client.close()
 
 
+def _field_rect_from_top_left_percent(
+    page_width: float,
+    page_height: float,
+    x_percent: float,
+    y_percent: float,
+    width_percent: float,
+    height_percent: float,
+) -> tuple:
+    """Convert top-left percentage box to ReportLab bottom-left coordinates."""
+    width = (width_percent / 100) * page_width
+    height = (height_percent / 100) * page_height
+    x = (x_percent / 100) * page_width
+    y_top = page_height - (y_percent / 100) * page_height
+    y = y_top - height
+    return x, y, width, height
+
+
 def create_text_overlay_pdf(
     text: str,
     page_width: float,
@@ -149,14 +166,12 @@ def create_text_overlay_pdf(
 ) -> bytes:
     """
     Create a transparent PDF with text at specified position.
-    Coordinates are in percentages.
+    Coordinates are in percentages from the top-left of the page.
     Uses DancingScript for Latin text and Amiri for Arabic text.
     """
-    # Convert percentages to points
-    x = (x_percent / 100) * page_width
-    y = (y_percent / 100) * page_height
-    width = (width_percent / 100) * page_width
-    height = (height_percent / 100) * page_height
+    x, y, width, height = _field_rect_from_top_left_percent(
+        page_width, page_height, x_percent, y_percent, width_percent, height_percent
+    )
     
     # Create PDF in memory
     buffer = io.BytesIO()
@@ -221,11 +236,9 @@ def create_signature_image_overlay_pdf(
     header, encoded = image_data_url.split(',', 1)
     image_bytes = base64.b64decode(encoded)
     
-    # Convert percentages to points
-    x = (x_percent / 100) * page_width
-    y = (y_percent / 100) * page_height
-    width = (width_percent / 100) * page_width
-    height = (height_percent / 100) * page_height
+    x, y, width, height = _field_rect_from_top_left_percent(
+        page_width, page_height, x_percent, y_percent, width_percent, height_percent
+    )
     
     # Load image
     img = Image.open(io.BytesIO(image_bytes))
@@ -396,12 +409,19 @@ def generate_certificate_of_completion(
     ))
     story.append(Spacer(1, 0.3 * inch))
     
+    created_riyadh = signature_request.created_at.astimezone(riyadh_tz)
+    story.append(Paragraph(
+        f"<b>Created:</b> {created_riyadh.strftime('%Y-%m-%d %H:%M:%S')} (Asia/Riyadh)",
+        styles['Normal']
+    ))
+    story.append(Spacer(1, 0.2 * inch))
+
     # Signers table - build manually to support Arabic names
     story.append(Paragraph("<b>Signers:</b>", styles['Heading2']))
     story.append(Spacer(1, 0.1 * inch))
     
     # Header row
-    signer_data = [['#', 'Name', 'Email', 'Signed At (AST)', 'IP Address', 'OTP Verified']]
+    signer_data = [['#', 'Name', 'Email', 'Signed At (AST)', 'IP Address', 'User Agent', 'OTP Verified']]
     
     # Data rows with proper timezone handling
     for idx, signer in enumerate(signers, 1):
@@ -412,10 +432,11 @@ def generate_certificate_of_completion(
             signed_time = '-'
         
         ip = signer.ip_address or '-'
+        ua = (signer.user_agent[:40] + '...') if len(signer.user_agent or '') > 40 else (signer.user_agent or '-')
         
         if signer.otp_verified_at:
             otp_time_riyadh = signer.otp_verified_at.astimezone(riyadh_tz)
-            verification = otp_time_riyadh.strftime('%H:%M:%S')
+            verification = otp_time_riyadh.strftime('%Y-%m-%d %H:%M:%S')
         else:
             verification = '-'
         
@@ -425,10 +446,14 @@ def generate_certificate_of_completion(
             signer.user.email,
             signed_time,
             ip,
+            ua,
             verification
         ])
     
-    signer_table = Table(signer_data, colWidths=[0.5*inch, 1.5*inch, 2*inch, 1.5*inch, 1.2*inch, 1*inch])
+    signer_table = Table(
+        signer_data,
+        colWidths=[0.4*inch, 1.2*inch, 1.6*inch, 1.3*inch, 1*inch, 1.2*inch, 1.1*inch],
+    )
     signer_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),

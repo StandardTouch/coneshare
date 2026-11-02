@@ -1288,7 +1288,15 @@
     "readyToSign": "You're verified and ready to sign",
     "document": {
       "preview": "Document Preview",
-      "pdfViewerPlaceholder": "PDF Viewer will be displayed here"
+      "pdfViewerPlaceholder": "PDF Viewer will be displayed here",
+      "downloadOriginal": "Download original PDF",
+      "downloadFailed": "Could not download the document"
+    },
+    "viewer": {
+      "loadFailed": "Could not load the PDF document",
+      "pageJump": "Page number",
+      "go": "Go",
+      "jumpToLastPage": "Jump to last page"
     },
     "fields": {
       "toSign": "Fields to Sign",

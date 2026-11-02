@@ -1,6 +1,9 @@
 import pytest
+from django.conf import settings
 from rest_framework.settings import api_settings
 from rest_framework.views import APIView
+
+pytest_plugins = ["esign.tests.test_views"]
 
 
 @pytest.fixture(autouse=True)
@@ -11,6 +14,13 @@ def disable_redis_cache(settings):
             "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
         }
     }
+
+
+@pytest.fixture
+def enable_esign(db, monkeypatch):
+    monkeypatch.setattr(settings, "ESIGN_ENABLED", True)
+    yield
+    monkeypatch.setattr(settings, "ESIGN_ENABLED", False)
 
 
 @pytest.fixture(autouse=True)

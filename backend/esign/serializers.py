@@ -13,13 +13,15 @@ from .models import (
 
 
 class SignatureFieldSerializer(serializers.ModelSerializer):
+    signer_id = serializers.CharField(source='signer.id', read_only=True)
+
     class Meta:
         model = SignatureField
         fields = [
-            'id', 'field_type', 'page_number', 'x', 'y', 'width', 'height',
+            'id', 'signer_id', 'field_type', 'page_number', 'x', 'y', 'width', 'height',
             'label', 'required', 'value', 'filled_at'
         ]
-        read_only_fields = ['id', 'filled_at']
+        read_only_fields = ['id', 'signer_id', 'filled_at']
 
 
 class SignerSerializer(serializers.ModelSerializer):

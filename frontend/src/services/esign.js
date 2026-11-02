@@ -1,5 +1,15 @@
 import api from './api';
 
+/** Same-origin PDF URL for pdf.js (Authorization header added in useEsignPdfDocument). */
+export const getEsignDocumentPdfUrl = (documentId) =>
+  `/api/v1/esign/documents/${documentId}/pdf/`;
+
+export const getEsignRequestPdfUrl = (requestId) =>
+  `/api/v1/esign/requests/${requestId}/pdf/`;
+
+export const getSignerDocumentPdfUrl = (token) =>
+  `/api/v1/esign/sign/${encodeURIComponent(token)}/pdf/`;
+
 /**
  * E-Signature API Service
  * 
@@ -130,6 +140,22 @@ export const submitSignature = async (token, fields) => {
 export const declineToSign = async (token, reason = '') => {
   const response = await api.post(`/esign/sign/${token}/decline/`, { reason });
   return response.data;
+};
+
+/**
+ * Download original PDF for signer (requires verified OTP session).
+ */
+export const downloadSignerSourcePdf = async (token, filename = 'document.pdf') => {
+  const response = await api.get(`/esign/sign/${encodeURIComponent(token)}/pdf/`, {
+    params: { download: '1' },
+    responseType: 'blob',
+  });
+  const blobUrl = URL.createObjectURL(response.data);
+  const anchor = document.createElement('a');
+  anchor.href = blobUrl;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(blobUrl);
 };
 
 // ==================== Field Templates (Optional) ====================
