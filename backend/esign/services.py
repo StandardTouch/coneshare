@@ -17,6 +17,7 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.pdfgen import canvas as pdf_canvas
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.utils import ImageReader
 from PIL import Image
 import pypdf
 
@@ -249,7 +250,7 @@ def create_signature_image_overlay_pdf(
     
     # Draw image
     c.drawImage(
-        pypdf.generic.ImageReader(img),
+        ImageReader(img),
         x, y, width, height,
         preserveAspectRatio=True,
         mask='auto'
@@ -327,7 +328,7 @@ def flatten_signature_fields(
                     page.merge_page(overlay_reader.pages[0])
             
             except Exception as e:
-                logger.error(f"Error overlaying field {field.id}: {e}")
+                logger.exception("Error overlaying field %s: %s", field.id, e)
                 # Continue processing other fields
         
         pdf_writer.add_page(page)
@@ -545,6 +546,24 @@ def append_certificate_to_pdf(pdf_bytes: bytes, certificate_pdf_bytes: bytes) ->
     return output_buffer.getvalue()
 
 
+def get_stamping_source_version(signature_request: SignatureRequest) -> DocumentVersion:
+    """
+    PDF version to stamp fields onto (unsigned source).
+    After completion the signed copy is primary; exclude it when regenerating.
+    """
+    document = signature_request.document
+    signed_version = signature_request.signed_document_version
+    qs = document.versions.order_by('version_number')
+    if signed_version:
+        qs = qs.exclude(pk=signed_version.pk)
+    source = qs.first()
+    if not source:
+        source = document.versions.filter(is_primary=True).first()
+    if not source:
+        raise ValueError("No document version available for signature stamping")
+    return source
+
+
 def process_signature_completion(signature_request: SignatureRequest) -> tuple:
     """
     Process signature request completion:
@@ -555,10 +574,10 @@ def process_signature_completion(signature_request: SignatureRequest) -> tuple:
     5. Upload signed PDF
     6. Calculate hashes
     
-    Returns: (signed_pdf_storage_key, certificate_storage_key, original_hash, signed_hash)
+    Returns: (signed_pdf_storage_key, certificate_storage_key, original_hash, signed_hash, final_pdf_bytes)
     """
-    # Download original PDF
-    original_pdf_bytes = download_document_pdf(signature_request.document.versions.filter(is_primary=True).first())
+    source_version = get_stamping_source_version(signature_request)
+    original_pdf_bytes = download_document_pdf(source_version)
     
     # Calculate original hash
     original_hash = calculate_document_hash(original_pdf_bytes)
@@ -621,4 +640,4 @@ def process_signature_completion(signature_request: SignatureRequest) -> tuple:
     finally:
         client.close()
     
-    return signed_storage_key, cert_storage_key, original_hash, final_hash
+    return signed_storage_key, cert_storage_key, original_hash, final_hash, final_pdf_bytes

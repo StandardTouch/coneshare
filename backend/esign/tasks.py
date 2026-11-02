@@ -233,68 +233,103 @@ def send_completion_email_task(self, signature_request_id):
 
 
 @shared_task(bind=True, max_retries=3)
-def generate_signed_pdf_task(self, signature_request_id):
+def generate_signed_pdf_task(self, signature_request_id, send_completion_emails=True):
     """
-    Generate signed PDF with all signatures and certificate.
+    Generate signed PDF with all signatures and certificate (audit page appended).
+    Idempotent: re-runs overwrite storage on the existing signed version when present.
     """
+    from documents.tasks import generate_pdf_pages_task
+
     try:
         signature_request = SignatureRequest.objects.select_related('document').get(id=signature_request_id)
-        
-        # Process completion (flatten, generate certificate, upload)
-        signed_storage_key, cert_storage_key, original_hash, final_hash = process_signature_completion(
-            signature_request
+
+        (
+            signed_storage_key,
+            cert_storage_key,
+            original_hash,
+            final_hash,
+            final_pdf_bytes,
+        ) = process_signature_completion(signature_request)
+
+        file_size = len(final_pdf_bytes)
+        document = signature_request.document
+        existing_signed = signature_request.signed_document_version
+        signed_at = (
+            signature_request.completed_at.isoformat()
+            if signature_request.completed_at
+            else timezone.now().isoformat()
         )
-        
-        # Create new document version
-        original_version = signature_request.document.versions.filter(is_primary=True).first()
-        
-        # Get next version number
-        max_version = signature_request.document.versions.aggregate(
-            max_ver=models.Max('version_number')
-        )['max_ver'] or 0
-        new_version_number = max_version + 1
-        
-        # Create signed version
-        signed_version = DocumentVersion.objects.create(
-            document=signature_request.document,
-            version_number=new_version_number,
-            storage_key=signed_storage_key,
-            original_storage_key=signed_storage_key,
-            content_type='application/pdf',
-            type='pdf',
-            file_size=0,  # Will be updated by file server callback
-            is_primary=True,
-            has_pages=False,
-            render_status=DocumentVersion.RENDER_NOT_APPLICABLE,
-            metadata={
-                'signature_request_id': str(signature_request.id),
-                'original_document_hash': original_hash,
-                'signed_document_hash': final_hash,
-                'signed_at': signature_request.completed_at.isoformat()
-            }
-        )
-        
-        # Mark original version as not primary
-        if original_version:
-            original_version.is_primary = False
-            original_version.save()
-        
-        # Update signature request
-        signature_request.signed_document_version = signed_version
+        version_metadata = {
+            'signature_request_id': str(signature_request.id),
+            'original_document_hash': original_hash,
+            'signed_document_hash': final_hash,
+            'signed_at': signed_at,
+        }
+
+        if existing_signed:
+            signed_version = existing_signed
+            signed_version.storage_key = signed_storage_key
+            signed_version.original_storage_key = signed_storage_key
+            signed_version.file_size = file_size
+            signed_version.has_pages = False
+            signed_version.render_status = DocumentVersion.RENDER_NOT_GENERATED
+            signed_version.render_error = ''
+            signed_version.metadata = {**(signed_version.metadata or {}), **version_metadata}
+            signed_version.save()
+            signed_version.pages.all().delete()
+            logger.info(
+                "Regenerated signed PDF for signature request %s (version %s)",
+                signature_request_id,
+                signed_version.id,
+            )
+        else:
+            original_version = document.versions.filter(is_primary=True).first()
+            max_version = document.versions.aggregate(max_ver=models.Max('version_number'))['max_ver'] or 0
+
+            signed_version = DocumentVersion.objects.create(
+                document=document,
+                version_number=max_version + 1,
+                storage_key=signed_storage_key,
+                original_storage_key=signed_storage_key,
+                content_type='application/pdf',
+                type='pdf',
+                file_size=file_size,
+                is_primary=True,
+                has_pages=False,
+                render_status=DocumentVersion.RENDER_NOT_GENERATED,
+                metadata=version_metadata,
+            )
+
+            if original_version and original_version.pk != signed_version.pk:
+                original_version.is_primary = False
+                original_version.save(update_fields=['is_primary', 'updated_at'])
+
+            signature_request.signed_document_version = signed_version
+            logger.info(
+                "Created signed PDF version for signature request %s (version %s)",
+                signature_request_id,
+                signed_version.id,
+            )
+
         signature_request.certificate_storage_key = cert_storage_key
         signature_request.original_document_hash = original_hash
         signature_request.metadata['signed_document_hash'] = final_hash
         signature_request.save()
-        
-        # Send completion emails
-        send_completion_email_task.delay(signature_request_id)
-        
-        logger.info(f"Generated signed PDF for signature request {signature_request_id}")
-        
+
+        generate_pdf_pages_task.delay(signed_version.id)
+        if send_completion_emails:
+            send_completion_email_task.delay(signature_request_id)
+
+        logger.info("Generated signed PDF for signature request %s", signature_request_id)
+
     except SignatureRequest.DoesNotExist:
-        logger.error(f"SignatureRequest {signature_request_id} not found")
+        logger.error("SignatureRequest %s not found for signed PDF generation", signature_request_id)
     except Exception as exc:
-        logger.error(f"Error generating signed PDF: {exc}")
+        logger.exception(
+            "Error generating signed PDF for signature request %s: %s",
+            signature_request_id,
+            exc,
+        )
         raise self.retry(exc=exc, countdown=60)
 
 
