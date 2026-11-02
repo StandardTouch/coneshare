@@ -21,5 +21,14 @@ export default defineConfig({
       },
       dependencies: ['setup'],
     },
+    {
+      name: 'esign-e2e',
+      testMatch: /esign-large-pdf-flow.spec.js/,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1400, height: 900 },
+      },
+      timeout: 600_000,
+    },
   ],
 });

@@ -13,6 +13,7 @@ import { PdfPage } from '../documents/PdfPage';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { clientPointToFieldPercent, signerOverlayColor } from './fieldPlacementUtils';
+import { EsignPdfThumbnailSidebar } from './EsignPdfThumbnailSidebar';
 
 const VIEWER_SCALE = 1;
 
@@ -127,6 +128,13 @@ export const EsignPdfViewer = forwardRef(function EsignPdfViewer(
   const handleJumpToLast = () => {
     if (!numPages) return;
     const el = pageRefs.current.get(numPages);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const handleSelectPage = (pageNumber) => {
+    const el = pageRefs.current.get(pageNumber);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
@@ -288,26 +296,13 @@ export const EsignPdfViewer = forwardRef(function EsignPdfViewer(
 
       <div className="flex flex-1 min-h-0">
         {showThumbnails && (
-          <aside className="hidden md:block w-28 shrink-0 overflow-y-auto border-r bg-gray-50 p-2 space-y-2">
-            {Array.from({ length: numPages }, (_, i) => {
-              const pageNumber = i + 1;
-              return (
-                <button
-                  key={pageNumber}
-                  type="button"
-                  className={`w-full rounded border bg-white p-1 text-xs ${
-                    currentPage === pageNumber ? 'border-blue-500' : 'border-gray-200'
-                  }`}
-                  onClick={() => {
-                    const el = pageRefs.current.get(pageNumber);
-                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }}
-                >
-                  {pageNumber}
-                </button>
-              );
-            })}
-          </aside>
+          <EsignPdfThumbnailSidebar
+            pdfDoc={pdfDoc}
+            numPages={numPages}
+            currentPage={currentPage}
+            fields={fields}
+            onPageSelect={handleSelectPage}
+          />
         )}
 
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto bg-gray-100 min-h-0">

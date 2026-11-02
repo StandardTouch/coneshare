@@ -10,6 +10,7 @@ vi.mock('../../../services/esign', () => ({
   createSignatureRequest: vi.fn(),
   getSignatureRequest: vi.fn(),
   updateSignatureFields: vi.fn(),
+  sendSignatureRequest: vi.fn(),
 }));
 
 vi.mock('../../../components/esign/FieldPlacementEditor', () => ({

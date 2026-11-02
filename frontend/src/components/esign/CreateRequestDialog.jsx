@@ -7,7 +7,12 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Label } from '../ui/Label';
 import { toast } from 'sonner';
-import { createSignatureRequest, getSignatureRequest, updateSignatureFields } from '../../services/esign';
+import {
+  createSignatureRequest,
+  getSignatureRequest,
+  updateSignatureFields,
+  sendSignatureRequest,
+} from '../../services/esign';
 import { FieldPlacementEditor } from './FieldPlacementEditor';
 
 export function CreateRequestDialog({ isOpen, onOpenChange, document, users }) {
@@ -106,6 +111,7 @@ export function CreateRequestDialog({ isOpen, onOpenChange, document, users }) {
     setIsSubmitting(true);
     try {
       await updateSignatureFields(requestId, fields);
+      await sendSignatureRequest(requestId);
       toast.success(t('esign.create.requestCreated'));
       onOpenChange(false);
       navigate('/signatures');
