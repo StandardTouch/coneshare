@@ -10,6 +10,7 @@ from .models import (
     SignatureRequest, Signer, SignatureField,
     SignerAction, FieldTemplate, SignatureOTP
 )
+from .awaiting_list_context import get_awaiting_signer_for_user
 
 
 class SignatureFieldSerializer(serializers.ModelSerializer):
@@ -73,21 +74,54 @@ class SignatureRequestListSerializer(serializers.ModelSerializer):
     document = DocumentSerializer(read_only=True)
     signers_count = serializers.SerializerMethodField()
     signed_count = serializers.SerializerMethodField()
+    signer_token = serializers.SerializerMethodField()
+    signer_status = serializers.SerializerMethodField()
+    can_sign = serializers.SerializerMethodField()
+    can_sign_reason = serializers.SerializerMethodField()
     
     class Meta:
         model = SignatureRequest
         fields = [
             'id', 'title', 'document', 'created_by', 'status',
             'signing_order', 'expires_at', 'created_at', 'completed_at',
-            'signers_count', 'signed_count'
+            'signers_count', 'signed_count',
+            'signer_token', 'signer_status', 'can_sign', 'can_sign_reason',
         ]
         read_only_fields = fields
+
+    def _awaiting_signer(self, obj):
+        request = self.context.get('request')
+        view_type = self.context.get('view_type', 'created')
+        user = getattr(request, 'user', None) if request else None
+        return get_awaiting_signer_for_user(obj, user, view_type=view_type)
     
     def get_signers_count(self, obj):
         return obj.signers.count()
     
     def get_signed_count(self, obj):
         return obj.signers.filter(status='signed').count()
+
+    def get_signer_token(self, obj):
+        signer = self._awaiting_signer(obj)
+        return signer.token if signer else None
+
+    def get_signer_status(self, obj):
+        signer = self._awaiting_signer(obj)
+        return signer.status if signer else None
+
+    def get_can_sign(self, obj):
+        signer = self._awaiting_signer(obj)
+        if not signer:
+            return None
+        allowed, _ = signer.can_sign()
+        return allowed
+
+    def get_can_sign_reason(self, obj):
+        signer = self._awaiting_signer(obj)
+        if not signer:
+            return None
+        _, reason = signer.can_sign()
+        return reason
 
 
 class SignatureRequestDetailSerializer(serializers.ModelSerializer):

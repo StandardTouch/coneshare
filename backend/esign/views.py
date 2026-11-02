@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Prefetch
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.translation import gettext as _
@@ -70,10 +70,17 @@ class SignatureRequestViewSet(viewsets.ModelViewSet):
         
         if view_type == 'awaiting':
             # Requests where user is a signer and hasn't signed yet
+            user_signers = Signer.objects.filter(user=user)
             return SignatureRequest.objects.filter(
                 signers__user=user,
                 signers__status__in=['sent', 'otp_verified', 'viewed']
-            ).distinct().select_related('document', 'created_by')
+            ).distinct().select_related('document', 'created_by').prefetch_related(
+                Prefetch(
+                    'signers',
+                    queryset=user_signers,
+                    to_attr='_awaiting_signer_list',
+                )
+            )
         else:
             # Requests created by user
             return SignatureRequest.objects.filter(
@@ -88,6 +95,11 @@ class SignatureRequestViewSet(viewsets.ModelViewSet):
             return SignatureRequestListSerializer
         else:
             return SignatureRequestDetailSerializer
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['view_type'] = self.request.query_params.get('view', 'created')
+        return context
     
     def perform_create(self, serializer):
         check_esign_enabled()
