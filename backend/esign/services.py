@@ -546,22 +546,61 @@ def append_certificate_to_pdf(pdf_bytes: bytes, certificate_pdf_bytes: bytes) ->
     return output_buffer.getvalue()
 
 
+def _normalize_stored_document_hash(stored_hash: str) -> str:
+    """Compare hashes whether the DB holds hex-only or sha256:hex."""
+    value = (stored_hash or "").strip()
+    if not value:
+        return ""
+    if value.startswith("sha256:"):
+        return value
+    return f"sha256:{value}"
+
+
+def _document_hashes_match(stored_hash: str, computed_hash: str) -> bool:
+    return _normalize_stored_document_hash(stored_hash) == _normalize_stored_document_hash(
+        computed_hash
+    )
+
+
 def get_stamping_source_version(signature_request: SignatureRequest) -> DocumentVersion:
     """
     PDF version to stamp fields onto (unsigned source).
     After completion the signed copy is primary; exclude it when regenerating.
+    Prefer the version whose content matches original_document_hash; otherwise the
+    newest non-signed version (highest version_number).
     """
     document = signature_request.document
     signed_version = signature_request.signed_document_version
-    qs = document.versions.order_by('version_number')
+    candidates = document.versions.order_by("-version_number")
     if signed_version:
-        qs = qs.exclude(pk=signed_version.pk)
-    source = qs.first()
-    if not source:
-        source = document.versions.filter(is_primary=True).first()
-    if not source:
-        raise ValueError("No document version available for signature stamping")
-    return source
+        candidates = candidates.exclude(pk=signed_version.pk)
+
+    candidate_list = list(candidates)
+    if not candidate_list:
+        fallback = document.versions.filter(is_primary=True).first()
+        if not fallback:
+            raise ValueError("No document version available for signature stamping")
+        return fallback
+
+    target_hash = (signature_request.original_document_hash or "").strip()
+    if target_hash:
+        for version in candidate_list:
+            try:
+                pdf_bytes = download_document_pdf(version)
+            except Exception as exc:
+                logger.warning(
+                    "Could not download version %s for hash match: %s", version.id, exc
+                )
+                continue
+            if _document_hashes_match(target_hash, calculate_document_hash(pdf_bytes)):
+                return version
+        logger.warning(
+            "No document version matched original_document_hash for request %s; "
+            "using newest non-signed version",
+            signature_request.id,
+        )
+
+    return candidate_list[0]
 
 
 def process_signature_completion(signature_request: SignatureRequest) -> tuple:
