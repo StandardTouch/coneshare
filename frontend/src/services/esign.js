@@ -19,6 +19,12 @@ export const getSignerDocumentPdfUrl = (token) =>
 
 // ==================== Signature Requests (Authenticated) ====================
 
+/** Document id from list/detail payloads (nested `document`, optional legacy `document_id`). */
+export function getSignatureRequestDocumentId(request) {
+  if (!request) return undefined;
+  return request.document?.id ?? request.document_id ?? undefined;
+}
+
 /**
  * List signature requests
  * @param {string} view - 'created' (default) or 'awaiting' (requests where user is a signer)

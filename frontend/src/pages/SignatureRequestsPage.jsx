@@ -3,8 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../components/ui/Button';
 import { toast } from 'sonner';
-import { listSignatureRequests, cancelSignatureRequest, sendReminder } from '../services/esign';
-import { STATUS_COLORS, SIGNER_STATUS_COLORS } from '../services/esign';
+import {
+  listSignatureRequests,
+  cancelSignatureRequest,
+  sendReminder,
+  getSignatureRequestDocumentId,
+  STATUS_COLORS,
+  SIGNER_STATUS_COLORS,
+} from '../services/esign';
 
 export default function SignatureRequestsPage() {
   const { t } = useTranslation();
@@ -99,7 +105,9 @@ export default function SignatureRequestsPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {requests.map(request => (
+          {requests.map((request) => {
+            const documentId = getSignatureRequestDocumentId(request);
+            return (
             <div key={request.id} className="bg-white border rounded-lg p-4 hover:shadow-md transition-shadow">
               <div className="flex justify-between items-start">
                 <div className="flex-1">
@@ -153,11 +161,11 @@ export default function SignatureRequestsPage() {
                   
                   {activeTab === 'created' && (
                     <>
-                      {request.status === 'completed' && (
+                      {request.status === 'completed' && documentId && (
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => navigate(`/documents/${request.document_id}`)}
+                          onClick={() => navigate(`/documents/${documentId}`)}
                         >
                           {t('esign.action.viewDocument')}
                         </Button>
@@ -186,7 +194,8 @@ export default function SignatureRequestsPage() {
                 </div>
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
       )}
     </div>
