@@ -38,8 +38,17 @@ export const SIGNER_OVERLAY_COLORS = [
   'bg-teal-100/90 border-teal-500',
 ];
 
+function stableSignerColorIndex(signerId) {
+  const id = String(signerId ?? '');
+  let hash = 0;
+  for (let i = 0; i < id.length; i += 1) {
+    hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  }
+  return hash % SIGNER_OVERLAY_COLORS.length;
+}
+
 export function signerOverlayColor(signerId, signerIdsInOrder = []) {
   const index = signerIdsInOrder.indexOf(signerId);
-  const idx = index >= 0 ? index : Math.abs(Number(signerId) || 0) % SIGNER_OVERLAY_COLORS.length;
+  const idx = index >= 0 ? index : stableSignerColorIndex(signerId);
   return SIGNER_OVERLAY_COLORS[idx % SIGNER_OVERLAY_COLORS.length];
 }
