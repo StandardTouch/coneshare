@@ -19,7 +19,7 @@ signing_router.register(r'sign', SigningViewSet, basename='signing')
 urlpatterns = [
     path('', include(router.urls)),
     path('', include(signing_router.urls)),
-    path('documents/<int:document_id>/pdf/', EsignDocumentPdfView.as_view(), name='esign-document-pdf'),
-    path('requests/<int:request_id>/pdf/', EsignRequestDocumentPdfView.as_view(), name='esign-request-pdf'),
+    path('documents/<str:document_id>/pdf/', EsignDocumentPdfView.as_view(), name='esign-document-pdf'),
+    path('requests/<str:request_id>/pdf/', EsignRequestDocumentPdfView.as_view(), name='esign-request-pdf'),
     path('sign/<str:token>/pdf/', EsignSignerDocumentPdfView.as_view(), name='esign-signer-pdf'),
 ]

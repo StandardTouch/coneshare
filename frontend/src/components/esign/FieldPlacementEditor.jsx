@@ -81,9 +81,10 @@ export function FieldPlacementEditor({ documentId, signers, users, onSave, onCan
     onSave(apiFields);
   };
 
-  const getUserName = (userId) => {
-    const user = users?.find((u) => u.id === userId);
-    return user ? user.name : 'Unknown';
+  const getSignerLabel = (signer) => {
+    if (signer.displayName) return signer.displayName;
+    const user = users?.find((u) => u.id === signer.user_id);
+    return user?.name || user?.email || t('esign.create.selectUser');
   };
 
   return (
@@ -99,7 +100,7 @@ export function FieldPlacementEditor({ documentId, signers, users, onSave, onCan
             >
               {signers.map((signer, idx) => (
                 <option key={signer.id ?? idx} value={idx}>
-                  {getUserName(signer.user_id)}
+                  {getSignerLabel(signer)}
                 </option>
               ))}
             </select>
@@ -144,7 +145,7 @@ export function FieldPlacementEditor({ documentId, signers, users, onSave, onCan
           const signerFields = fields.filter((f) => f.signer_id === signer.id);
           return (
             <div key={signer.id ?? idx} className="text-xs text-gray-500">
-              {getUserName(signer.user_id)}: {signerFields.length} {t('esign.create.fields')}
+              {getSignerLabel(signer)}: {signerFields.length} {t('esign.create.fields')}
             </div>
           );
         })}

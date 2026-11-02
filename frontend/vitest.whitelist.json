@@ -28,6 +28,8 @@
     "src/tests/i18n.test.jsx",
     "src/tests/components/esign/CreateRequestDialog.test.jsx",
     "src/tests/components/esign/fieldPlacementUtils.test.js",
+    "src/tests/components/esign/FieldPlacementEditor.test.jsx",
+    "src/tests/services/esignUlid.test.js",
     "src/tests/hooks/useSortedList.test.js",
     "src/tests/hooks/usePrintProtection.test.jsx",
     "src/tests/components/dialogs/DataroomMoveItemsDialog.test.jsx",

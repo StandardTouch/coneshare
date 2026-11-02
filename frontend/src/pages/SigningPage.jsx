@@ -110,7 +110,7 @@ export default function SigningPage() {
   const handleSubmit = async () => {
     try {
       const fields = Object.entries(fieldValues).map(([field_id, value]) => ({
-        field_id: parseInt(field_id, 10),
+        field_id,
         value,
       }));
 
@@ -141,10 +141,7 @@ export default function SigningPage() {
     }
   };
 
-  const filledFieldIds = useMemo(
-    () => new Set(Object.keys(fieldValues).map((id) => parseInt(id, 10))),
-    [fieldValues]
-  );
+  const filledFieldIds = useMemo(() => new Set(Object.keys(fieldValues)), [fieldValues]);
 
   useEffect(() => {
     if (!otpVerified || !signingData?.fields?.length) return;

@@ -111,7 +111,7 @@ export default function SignatureRequestsPage() {
                   </div>
                   
                   <p className="text-sm text-gray-600 mb-2">
-                    {t('esign.request.document')}: {request.document_name}
+                    {t('esign.request.document')}: {request.document?.name ?? request.document_name ?? '—'}
                   </p>
                   
                   {activeTab === 'created' && (

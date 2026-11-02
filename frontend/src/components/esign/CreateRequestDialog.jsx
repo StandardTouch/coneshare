@@ -95,6 +95,7 @@ export function CreateRequestDialog({ isOpen, onOpenChange, document, users }) {
           detail.signers.map((s) => ({
             id: s.id,
             user_id: s.user?.id ?? s.user_id,
+            displayName: s.user?.name || s.user?.email || '',
             signing_order: s.signing_order,
           }))
         );

@@ -3,6 +3,7 @@ import {
   clientPointToFieldPercent,
   clampPercent,
   defaultFieldSize,
+  signerOverlayColor,
 } from '../../../components/esign/fieldPlacementUtils';
 
 describe('fieldPlacementUtils', () => {
@@ -21,5 +22,11 @@ describe('fieldPlacementUtils', () => {
   it('returns default sizes by field type', () => {
     expect(defaultFieldSize('initials').width).toBe(15);
     expect(defaultFieldSize('signature').width).toBe(30);
+  });
+
+  it('assigns stable overlay colors for ULID signer ids', () => {
+    const ulid = '01M6BBPMBM7QFDG413TWMECWQH';
+    expect(signerOverlayColor(ulid)).toBe(signerOverlayColor(ulid));
+    expect(signerOverlayColor(ulid)).not.toBe(signerOverlayColor('01M6DR9ZF681SZEKXA8CJBX7F6'));
   });
 });
