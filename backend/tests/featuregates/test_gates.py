@@ -87,9 +87,47 @@ class TestApiKeyAdminAndToggle:
         )
         _set_toggle('API_KEYS_ENABLED', False)
         public_client.credentials(HTTP_AUTHORIZATION=f'Bearer {raw_key}')
-        url = reverse('health-check')
-        response = public_client.get(url)
+        response = public_client.get('/api/v1/documents/')
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_health_and_public_settings_work_when_api_keys_disabled(self, public_client):
+        _set_toggle('API_KEYS_ENABLED', False)
+        assert public_client.get(reverse('health-check')).status_code == status.HTTP_200_OK
+        assert public_client.get('/api/v1/public/settings/').status_code == status.HTTP_200_OK
+
+
+TOGGLE_KEYS = (
+    'MCP_ENABLED',
+    'API_KEYS_ENABLED',
+    'AUTOMATION_ENABLED',
+    'SWAGGER_ENABLED',
+)
+
+
+@pytest.mark.django_db
+class TestCriticalPathsWhenSingleToggleOff:
+    @pytest.mark.parametrize('toggle_key', TOGGLE_KEYS)
+    def test_health_public_settings_login_and_jwt_when_toggle_off(
+        self, public_client, api_client, user, toggle_key
+    ):
+        _set_toggle(toggle_key, False)
+
+        health = public_client.get(reverse('health-check'))
+        assert health.status_code == status.HTTP_200_OK
+
+        settings_resp = public_client.get('/api/v1/public/settings/')
+        assert settings_resp.status_code == status.HTTP_200_OK
+
+        login_resp = public_client.post(
+            reverse('token_obtain_pair'),
+            {'email': user.email, 'password': 'password'},
+            format='json',
+        )
+        assert login_resp.status_code == status.HTTP_200_OK
+        assert 'access' in login_resp.data
+
+        jwt_resp = api_client.get('/api/v1/documents/')
+        assert jwt_resp.status_code == status.HTTP_200_OK
 
 
 @pytest.mark.django_db
