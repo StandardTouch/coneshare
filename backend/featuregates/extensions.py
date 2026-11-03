@@ -9,6 +9,7 @@ from automations.views import (
 from core.authentication import APIKeyAuthentication
 from core.views import APIKeyViewSet, PublicSettingsView
 
+from .auth_helpers import request_uses_api_key_bearer
 from .services import (
     ensure_admin_user,
     ensure_api_keys_feature_enabled,
@@ -46,7 +47,7 @@ _original_api_key_authenticate = APIKeyAuthentication.authenticate
 
 
 def _patched_api_key_authenticate(self, request):
-    if not api_keys_enabled():
+    if not api_keys_enabled() and request_uses_api_key_bearer(request):
         raise AuthenticationFailed('API key authentication is disabled.')
     return _original_api_key_authenticate(self, request)
 
