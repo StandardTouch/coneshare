@@ -89,13 +89,19 @@ class TestCertificateLayout:
         artifact_dir = Path('/opt/cursor/artifacts')
         artifact_dir.mkdir(parents=True, exist_ok=True)
         png_path = artifact_dir / 'certificate_sample.png'
+        (artifact_dir / 'certificate_sample.pdf').write_bytes(pdf_bytes)
         try:
             from pdf2image import convert_from_bytes
 
             images = convert_from_bytes(pdf_bytes, dpi=144, first_page=1, last_page=1)
             images[0].save(png_path, 'PNG')
         except Exception:
-            (artifact_dir / 'certificate_sample.pdf').write_bytes(pdf_bytes)
-            pytest.skip('pdf2image/poppler unavailable; saved PDF artifact instead')
+            try:
+                import fitz
+
+                doc = fitz.open(stream=pdf_bytes, filetype='pdf')
+                doc[0].get_pixmap(dpi=144).save(png_path)
+            except Exception:
+                pytest.skip('No PDF rasterizer available; PDF artifact saved')
 
         assert png_path.exists()
