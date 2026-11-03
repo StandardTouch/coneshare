@@ -232,6 +232,53 @@ def send_completion_email_task(self, signature_request_id):
         raise self.retry(exc=exc, countdown=60)
 
 
+def _execute_signed_pdf_followups(
+    signed_version_id,
+    signature_request_id,
+    send_completion_emails,
+    *,
+    sync=False,
+):
+    """
+    Preview render + optional completion emails after signed PDF is stored.
+    Broker enqueue failures must not fail the signing/regenerate task itself.
+    """
+    from documents.tasks import generate_pdf_pages_task
+
+    try:
+        if sync:
+            generate_pdf_pages_task.run(signed_version_id)
+            if send_completion_emails:
+                send_completion_email_task.run(signature_request_id)
+            return
+    except Exception as exc:
+        logger.exception(
+            "Signed PDF follow-up failed synchronously for request %s: %s",
+            signature_request_id,
+            exc,
+        )
+        return
+
+    try:
+        generate_pdf_pages_task.delay(signed_version_id)
+    except Exception as exc:
+        logger.exception(
+            "Failed to enqueue PDF preview task for signed version %s: %s",
+            signed_version_id,
+            exc,
+        )
+
+    if send_completion_emails:
+        try:
+            send_completion_email_task.delay(signature_request_id)
+        except Exception as exc:
+            logger.exception(
+                "Failed to enqueue completion email task for request %s: %s",
+                signature_request_id,
+                exc,
+            )
+
+
 def _find_signed_version_for_request(signature_request, document):
     """Reuse FK or orphaned version from a partial signed-PDF task run."""
     if signature_request.signed_document_version_id:
@@ -245,13 +292,16 @@ def _find_signed_version_for_request(signature_request, document):
 
 
 @shared_task(bind=True, max_retries=3)
-def generate_signed_pdf_task(self, signature_request_id, send_completion_emails=True):
+def generate_signed_pdf_task(
+    self,
+    signature_request_id,
+    send_completion_emails=True,
+    run_followups_sync=False,
+):
     """
     Generate signed PDF with all signatures and certificate (audit page appended).
     Idempotent: re-runs overwrite storage on the existing signed version when present.
     """
-    from documents.tasks import generate_pdf_pages_task
-
     try:
         signature_request = SignatureRequest.objects.select_related('document').get(id=signature_request_id)
 
@@ -348,9 +398,12 @@ def generate_signed_pdf_task(self, signature_request_id, send_completion_emails=
             signed_version_id = signed_version.id
 
         def enqueue_followups():
-            generate_pdf_pages_task.delay(signed_version_id)
-            if send_completion_emails:
-                send_completion_email_task.delay(signature_request_id)
+            _execute_signed_pdf_followups(
+                signed_version_id,
+                signature_request_id,
+                send_completion_emails,
+                sync=run_followups_sync,
+            )
 
         transaction.on_commit(enqueue_followups)
 
