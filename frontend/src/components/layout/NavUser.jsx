@@ -15,6 +15,7 @@ import {
 import { useSidebar } from "./SidebarProvider";
 import { cn } from "../../lib/utils";
 import { useUser } from "../../contexts/UserProvider";
+import { useFeatureGates } from "../../featuregates/useFeatureGates";
 import { getAvatarInitial } from "../../utils/formatters";
 
 function NavUser() {
@@ -22,6 +23,7 @@ function NavUser() {
   const { isCollapsed } = useSidebar();
   const navigate = useNavigate();
   const { user, handleLogout } = useUser();
+  const { canAccessApiKeys } = useFeatureGates();
 
   if (!user) {
     return (
@@ -81,10 +83,12 @@ function NavUser() {
             <Cloud className="mr-2 h-4 w-4" />
             <span>{t('settings.cloudStorage')}</span>
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => navigate("/settings/api-keys")}>
-            <Sparkles className="mr-2 h-4 w-4" />
-            <span>{t('settings.mcpAndKeys')}</span>
-          </DropdownMenuItem>
+          {canAccessApiKeys && (
+            <DropdownMenuItem onSelect={() => navigate("/settings/api-keys")}>
+              <Sparkles className="mr-2 h-4 w-4" />
+              <span>{t('settings.mcpAndKeys')}</span>
+            </DropdownMenuItem>
+          )}
         </DropdownMenuGroup>
         {user?.role == 'admin' && (
           <>

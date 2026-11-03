@@ -16,12 +16,19 @@ const getSettingGroups = (t) => [
   { key: 'quota', label: t('admin.groupQuota'), help: t('admin.groupQuotaHelp') },
   { key: 'cloud', label: t('admin.groupCloud'), help: t('admin.groupCloudHelp') },
   { key: 'security', label: t('admin.groupSecurity'), help: t('admin.groupSecurityHelp') },
+  { key: 'features', label: t('admin.groupFeatures'), help: t('admin.groupFeaturesHelp') },
   { key: 'other', label: t('admin.groupOther'), help: t('admin.groupOtherHelp') },
 ];
 
 const SETTING_GROUP_BY_KEY = {
   ENABLE_PUBLIC_SIGNUP: 'security',
   FLATTEN_WATERMARKED_DOWNLOADS: 'security',
+  MCP_ENABLED: 'features',
+  API_KEYS_ENABLED: 'features',
+  AUTOMATION_ENABLED: 'features',
+  SWAGGER_ENABLED: 'features',
+  ESIGN_ENABLED: 'features',
+  ROLE_LABELS_ENABLED: 'features',
   COLLABORATORS_OWN_DELETE_ONLY: 'security',
   MAX_PREVIEW_FILE_SIZE_MB: 'quota',
   MAX_VIDEO_PREVIEW_SIZE_MB: 'quota',

@@ -4,6 +4,7 @@ import { Toaster } from 'sonner';
 import './App.css';
 import MainLayout from './components/layout/MainLayout';
 import RequireAuth from './components/auth/RequireAuth';
+import RequireAdminFeature from './featuregates/RequireAdminFeature';
 import { UploadProvider } from './contexts/UploadProvider';
 import { UserProvider } from './contexts/UserProvider';
 import { BrandingProvider } from './contexts/BrandingProvider';
@@ -106,13 +107,27 @@ function App() {
                   <Route path="/file-requests/:requestId" element={<FileRequestDetailPage />} />
                   <Route path="/analytics/links" element={<AllLinksPage />} />
                   <Route path="/analytics/view-sessions" element={<AllViewSessionsPage />} />
-                  <Route path="/automations" element={<AutomationsPage />} />
+                  <Route
+                    path="/automations"
+                    element={
+                      <RequireAdminFeature feature="automation">
+                        <AutomationsPage />
+                      </RequireAdminFeature>
+                    }
+                  />
                   <Route path="/signatures" element={<SignatureRequestsPage />} />
                   <Route path="/signatures/:requestId" element={<SignatureRequestDetailPage />} />
                   <Route path="/settings" element={<UserSettingsPage />} />
                   <Route path="/settings/password" element={<PasswordSettingsPage />} />
                   <Route path="/settings/integrations" element={<IntegrationsSettingsPage />} />
-                  <Route path="/settings/api-keys" element={<ApiKeysSettingsPage />} />
+                  <Route
+                    path="/settings/api-keys"
+                    element={
+                      <RequireAdminFeature feature="apiKeys">
+                        <ApiKeysSettingsPage />
+                      </RequireAdminFeature>
+                    }
+                  />
                   <Route path="/admin/settings" element={<RequireAuth adminOnly><AdminSettingsPage /></RequireAuth>} />
                   <Route path="/admin/branding" element={<RequireAuth adminOnly><AdminBrandingPage /></RequireAuth>} />
                   <Route path="/admin/users" element={<RequireAuth adminOnly><AdminUsersPage /></RequireAuth>} />

@@ -11,8 +11,8 @@ pytestmark = pytest.mark.django_db
 
 
 class TestAutomationDestinationViewSet:
-    def test_create_destination_sets_org_and_creator(self, api_client, user):
-        response = api_client.post(
+    def test_create_destination_sets_org_and_creator(self, admin_api_client, admin_user):
+        response = admin_api_client.post(
             '/api/v1/automation-destinations/',
             {
                 'name': 'Primary Webhook',
@@ -28,12 +28,12 @@ class TestAutomationDestinationViewSet:
 
         assert response.status_code == status.HTTP_201_CREATED
         destination = AutomationDestination.objects.get(id=response.data['id'])
-        assert destination.organization == user.organization
-        assert destination.created_by == user
+        assert destination.organization == admin_user.organization
+        assert destination.created_by == admin_user
         assert destination.destination_type == 'webhook'
 
-    def test_create_email_destination_manually_fails(self, api_client):
-        response = api_client.post(
+    def test_create_email_destination_manually_fails(self, admin_api_client):
+        response = admin_api_client.post(
             '/api/v1/automation-destinations/',
             {
                 'name': 'My Email Destination',
@@ -48,39 +48,39 @@ class TestAutomationDestinationViewSet:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert 'Email destination type cannot be created manually' in str(response.data)
 
-    def test_list_destinations_is_scoped_to_request_user(self, api_client, user, user2):
+    def test_list_destinations_is_scoped_to_request_user(self, admin_api_client, admin_user, user2):
         own_destination = AutomationDestination.objects.create(
-            organization=user.organization,
-            created_by=user,
+            organization=admin_user.organization,
+            created_by=admin_user,
             name='Own Destination',
             destination_type='webhook',
             endpoint_url='https://example.com/a',
         )
         AutomationDestination.objects.create(
-            organization=user.organization,
+            organization=admin_user.organization,
             created_by=user2,
             name='Other User Destination',
             destination_type='webhook',
             endpoint_url='https://example.com/b',
         )
 
-        response = api_client.get('/api/v1/automation-destinations/')
+        response = admin_api_client.get('/api/v1/automation-destinations/')
 
         assert response.status_code == status.HTTP_200_OK
         ids = {item['id'] for item in response.data}
         assert own_destination.id in ids
         assert len(ids) == 1
 
-    def test_create_rule_rejects_destination_owned_by_other_user_in_same_org(self, api_client, user, user2):
+    def test_create_rule_rejects_destination_owned_by_other_user_in_same_org(self, admin_api_client, admin_user, user2):
         foreign_owned_destination = AutomationDestination.objects.create(
-            organization=user.organization,
+            organization=admin_user.organization,
             created_by=user2,
             name='Other User Destination',
             destination_type='webhook',
             endpoint_url='https://example.com/other-user',
         )
 
-        response = api_client.post(
+        response = admin_api_client.post(
             '/api/v1/automations/',
             {
                 'name': 'Cross User Rule',
@@ -95,29 +95,29 @@ class TestAutomationDestinationViewSet:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert 'must be owned by you' in str(response.data).lower()
 
-    def test_detail_destination_of_other_user_returns_404(self, api_client, user, user2):
+    def test_detail_destination_of_other_user_returns_404(self, admin_api_client, admin_user, user2):
         other_user_destination = AutomationDestination.objects.create(
-            organization=user.organization,
+            organization=admin_user.organization,
             created_by=user2,
             name='Other User Destination',
             destination_type='webhook',
             endpoint_url='https://example.com/other-user',
         )
 
-        response = api_client.get(f'/api/v1/automation-destinations/{other_user_destination.id}/')
+        response = admin_api_client.get(f'/api/v1/automation-destinations/{other_user_destination.id}/')
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_update_destination_of_other_user_returns_404(self, api_client, user, user2):
+    def test_update_destination_of_other_user_returns_404(self, admin_api_client, admin_user, user2):
         other_user_destination = AutomationDestination.objects.create(
-            organization=user.organization,
+            organization=admin_user.organization,
             created_by=user2,
             name='Other User Destination',
             destination_type='webhook',
             endpoint_url='https://example.com/other-user',
         )
 
-        response = api_client.patch(
+        response = admin_api_client.patch(
             f'/api/v1/automation-destinations/{other_user_destination.id}/',
             {'name': 'Hacked'},
             format='json',
@@ -125,7 +125,7 @@ class TestAutomationDestinationViewSet:
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_list_destinations_hides_other_org(self, api_client, user):
+    def test_list_destinations_hides_other_org(self, admin_api_client, user):
         other_org = Organization.objects.create(name='Other Org')
         other_user = User.objects.create_user(
             username='other-org-user@example.com',
@@ -142,12 +142,12 @@ class TestAutomationDestinationViewSet:
             endpoint_url='https://example.com/b',
         )
 
-        response = api_client.get('/api/v1/automation-destinations/')
+        response = admin_api_client.get('/api/v1/automation-destinations/')
 
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data) == 0
 
-    def test_create_destination_allows_duplicate_name_in_same_org(self, api_client):
+    def test_create_destination_allows_duplicate_name_in_same_org(self, admin_api_client):
         payload = {
             'name': 'Shared Name',
             'destination_type': 'webhook',
@@ -156,21 +156,21 @@ class TestAutomationDestinationViewSet:
             'headers': {},
             'is_active': True,
         }
-        first = api_client.post('/api/v1/automation-destinations/', payload, format='json')
+        first = admin_api_client.post('/api/v1/automation-destinations/', payload, format='json')
         assert first.status_code == status.HTTP_201_CREATED
 
         second_payload = {
             **payload,
             'endpoint_url': 'https://example.com/webhook-b',
         }
-        second = api_client.post('/api/v1/automation-destinations/', second_payload, format='json')
+        second = admin_api_client.post('/api/v1/automation-destinations/', second_payload, format='json')
         assert second.status_code == status.HTTP_201_CREATED
         assert second.data['name'] == payload['name']
 
 
 class TestAutomationRuleViewSet:
-    def test_create_rule_requires_at_least_one_destination(self, api_client):
-        response = api_client.post(
+    def test_create_rule_requires_at_least_one_destination(self, admin_api_client):
+        response = admin_api_client.post(
             '/api/v1/automations/',
             {
                 'name': 'No Destination Rule',
@@ -185,10 +185,10 @@ class TestAutomationRuleViewSet:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert 'at least one destination is required' in str(response.data).lower()
 
-    def test_create_rule_allows_duplicate_name_in_same_org(self, api_client, user):
+    def test_create_rule_allows_duplicate_name_in_same_org(self, admin_api_client, admin_user):
         destination = AutomationDestination.objects.create(
-            organization=user.organization,
-            created_by=user,
+            organization=admin_user.organization,
+            created_by=admin_user,
             name='Rule Destination',
             destination_type='webhook',
             endpoint_url='https://example.com/rule-destination',
@@ -201,15 +201,15 @@ class TestAutomationRuleViewSet:
             'destinations': [str(destination.id)],
         }
 
-        first = api_client.post('/api/v1/automations/', payload, format='json')
+        first = admin_api_client.post('/api/v1/automations/', payload, format='json')
         assert first.status_code == status.HTTP_201_CREATED
 
-        second = api_client.post('/api/v1/automations/', payload, format='json')
+        second = admin_api_client.post('/api/v1/automations/', payload, format='json')
         assert second.status_code == status.HTTP_201_CREATED
         assert second.data['name'] == payload['name']
 
-    def test_create_share_link_scope_requires_share_link(self, api_client):
-        response = api_client.post(
+    def test_create_share_link_scope_requires_share_link(self, admin_api_client):
+        response = admin_api_client.post(
             '/api/v1/automations/',
             {
                 'name': 'Missing Target Rule',
@@ -223,8 +223,8 @@ class TestAutomationRuleViewSet:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert 'requires a share_link' in str(response.data).lower()
 
-    def test_create_dataroom_scope_requires_dataroom(self, api_client):
-        response = api_client.post(
+    def test_create_dataroom_scope_requires_dataroom(self, admin_api_client):
+        response = admin_api_client.post(
             '/api/v1/automations/',
             {
                 'name': 'Missing Dataroom Rule',
@@ -238,7 +238,7 @@ class TestAutomationRuleViewSet:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert 'requires a dataroom' in str(response.data).lower()
 
-    def test_create_rule_rejects_destination_from_other_org(self, api_client, user):
+    def test_create_rule_rejects_destination_from_other_org(self, admin_api_client, admin_user):
         other_org = Organization.objects.create(name='Other Org')
         other_user = User.objects.create_user(
             username='x-org@example.com',
@@ -254,7 +254,7 @@ class TestAutomationRuleViewSet:
             endpoint_url='https://example.com/foreign',
         )
 
-        response = api_client.post(
+        response = admin_api_client.post(
             '/api/v1/automations/',
             {
                 'name': 'Cross Org Rule',
@@ -269,10 +269,10 @@ class TestAutomationRuleViewSet:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert 'outside your organization' in str(response.data)
 
-    def test_create_rule_with_valid_dataroom_scope(self, api_client, user, organization):
+    def test_create_rule_with_valid_dataroom_scope(self, admin_api_client, admin_user, organization):
         destination = AutomationDestination.objects.create(
-            organization=user.organization,
-            created_by=user,
+            organization=admin_user.organization,
+            created_by=admin_user,
             name='Dataroom Destination',
             destination_type='webhook',
             endpoint_url='https://example.com/dataroom',
@@ -280,10 +280,10 @@ class TestAutomationRuleViewSet:
         dataroom = Dataroom.objects.create(
             name='Automation Dataroom',
             organization=organization,
-            created_by=user,
+            created_by=admin_user,
         )
 
-        response = api_client.post(
+        response = admin_api_client.post(
             '/api/v1/automations/',
             {
                 'name': 'Dataroom Rule',
@@ -298,20 +298,20 @@ class TestAutomationRuleViewSet:
 
         assert response.status_code == status.HTTP_201_CREATED
         rule = AutomationRule.objects.get(id=response.data['id'])
-        assert rule.organization == user.organization
-        assert rule.created_by == user
+        assert rule.organization == admin_user.organization
+        assert rule.created_by == admin_user
         assert rule.dataroom == dataroom
 
-    def test_create_file_request_uploaded_rule_rejects_non_global_scope(self, api_client, user, share_link):
+    def test_create_file_request_uploaded_rule_rejects_non_global_scope(self, admin_api_client, admin_user, share_link):
         destination = AutomationDestination.objects.create(
-            organization=user.organization,
-            created_by=user,
+            organization=admin_user.organization,
+            created_by=admin_user,
             name='FR Destination',
             destination_type='webhook',
             endpoint_url='https://example.com/fr',
         )
 
-        response = api_client.post(
+        response = admin_api_client.post(
             '/api/v1/automations/',
             {
                 'name': 'Invalid FR Scope Rule',
@@ -327,16 +327,16 @@ class TestAutomationRuleViewSet:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert 'only supported for global scope' in str(response.data).lower()
 
-    def test_create_file_request_security_rule_rejects_non_global_scope(self, api_client, user, share_link):
+    def test_create_file_request_security_rule_rejects_non_global_scope(self, admin_api_client, admin_user, share_link):
         destination = AutomationDestination.objects.create(
-            organization=user.organization,
-            created_by=user,
+            organization=admin_user.organization,
+            created_by=admin_user,
             name='FR Security Destination',
             destination_type='webhook',
             endpoint_url='https://example.com/fr-security',
         )
 
-        response = api_client.post(
+        response = admin_api_client.post(
             '/api/v1/automations/',
             {
                 'name': 'Invalid FR Security Scope Rule',
@@ -354,17 +354,17 @@ class TestAutomationRuleViewSet:
 
 
 class TestAutomationDeliveryViewSet:
-    def test_list_deliveries_is_scoped_to_request_user(self, api_client, user, user2, share_link):
+    def test_list_deliveries_is_scoped_to_request_user(self, admin_api_client, admin_user, user2, share_link):
         destination = AutomationDestination.objects.create(
-            organization=user.organization,
-            created_by=user,
+            organization=admin_user.organization,
+            created_by=admin_user,
             name='Own Delivery Destination',
             destination_type='webhook',
             endpoint_url='https://example.com/own',
         )
         rule = AutomationRule.objects.create(
-            organization=user.organization,
-            created_by=user,
+            organization=admin_user.organization,
+            created_by=admin_user,
             name='Own Rule',
             scope_type='share_link',
             share_link=share_link,
@@ -372,7 +372,7 @@ class TestAutomationDeliveryViewSet:
             actions=[{'type': 'notify_destination'}],
         )
         own_delivery = AutomationDelivery.objects.create(
-            organization=user.organization,
+            organization=admin_user.organization,
             rule=rule,
             destination=destination,
             event_type='document_viewed',
@@ -380,7 +380,7 @@ class TestAutomationDeliveryViewSet:
         )
 
         other_destination = AutomationDestination.objects.create(
-            organization=user.organization,
+            organization=admin_user.organization,
             created_by=user2,
             name='Other Delivery Destination',
             destination_type='webhook',
@@ -388,11 +388,11 @@ class TestAutomationDeliveryViewSet:
         )
         other_dataroom = Dataroom.objects.create(
             name='Other Dataroom',
-            organization=user.organization,
+            organization=admin_user.organization,
             created_by=user2,
         )
         other_rule = AutomationRule.objects.create(
-            organization=user.organization,
+            organization=admin_user.organization,
             created_by=user2,
             name='Other Rule',
             scope_type='dataroom',
@@ -401,22 +401,22 @@ class TestAutomationDeliveryViewSet:
             actions=[{'type': 'notify_destination'}],
         )
         AutomationDelivery.objects.create(
-            organization=user.organization,
+            organization=admin_user.organization,
             rule=other_rule,
             destination=other_destination,
             event_type='dataroom_opened',
             payload={'dataroom_id': str(other_dataroom.id)},
         )
 
-        response = api_client.get('/api/v1/automation-deliveries/')
+        response = admin_api_client.get('/api/v1/automation-deliveries/')
 
         assert response.status_code == status.HTTP_200_OK
         ids = {item['id'] for item in response.data['results']}
         assert own_delivery.id in ids
         assert len(ids) == 1
 
-    def test_deliveries_endpoint_is_read_only(self, api_client):
-        response = api_client.post(
+    def test_deliveries_endpoint_is_read_only(self, admin_api_client):
+        response = admin_api_client.post(
             '/api/v1/automation-deliveries/',
             {
                 'event_type': 'document_viewed',
@@ -427,24 +427,24 @@ class TestAutomationDeliveryViewSet:
 
         assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
-    def test_list_deliveries_supports_destination_filter(self, api_client, user, share_link):
+    def test_list_deliveries_supports_destination_filter(self, admin_api_client, admin_user, share_link):
         destination_a = AutomationDestination.objects.create(
-            organization=user.organization,
-            created_by=user,
+            organization=admin_user.organization,
+            created_by=admin_user,
             name='Destination A',
             destination_type='webhook',
             endpoint_url='https://example.com/a',
         )
         destination_b = AutomationDestination.objects.create(
-            organization=user.organization,
-            created_by=user,
+            organization=admin_user.organization,
+            created_by=admin_user,
             name='Destination B',
             destination_type='webhook',
             endpoint_url='https://example.com/b',
         )
         rule = AutomationRule.objects.create(
-            organization=user.organization,
-            created_by=user,
+            organization=admin_user.organization,
+            created_by=admin_user,
             name='Rule for Filter',
             scope_type='share_link',
             share_link=share_link,
@@ -452,38 +452,38 @@ class TestAutomationDeliveryViewSet:
             actions=[{'type': 'notify_destination'}],
         )
         delivery_a = AutomationDelivery.objects.create(
-            organization=user.organization,
+            organization=admin_user.organization,
             rule=rule,
             destination=destination_a,
             event_type='document_viewed',
             payload={'share_link_id': str(share_link.id)},
         )
         AutomationDelivery.objects.create(
-            organization=user.organization,
+            organization=admin_user.organization,
             rule=rule,
             destination=destination_b,
             event_type='document_viewed',
             payload={'share_link_id': str(share_link.id)},
         )
 
-        response = api_client.get(f'/api/v1/automation-deliveries/?destination_id={destination_a.id}')
+        response = admin_api_client.get(f'/api/v1/automation-deliveries/?destination_id={destination_a.id}')
 
         assert response.status_code == status.HTTP_200_OK
         assert response.data['count'] == 1
         assert response.data['results'][0]['id'] == delivery_a.id
 
     @patch('automations.views.deliver_automation_delivery_task.delay')
-    def test_replay_endpoint_resets_and_queues_delivery(self, mock_delay, api_client, user, share_link):
+    def test_replay_endpoint_resets_and_queues_delivery(self, mock_delay, admin_api_client, admin_user, share_link):
         destination = AutomationDestination.objects.create(
-            organization=user.organization,
-            created_by=user,
+            organization=admin_user.organization,
+            created_by=admin_user,
             name='Replay Destination',
             destination_type='webhook',
             endpoint_url='https://example.com/replay',
         )
         rule = AutomationRule.objects.create(
-            organization=user.organization,
-            created_by=user,
+            organization=admin_user.organization,
+            created_by=admin_user,
             name='Replay Rule',
             scope_type='share_link',
             share_link=share_link,
@@ -491,7 +491,7 @@ class TestAutomationDeliveryViewSet:
             actions=[{'type': 'notify_destination'}],
         )
         delivery = AutomationDelivery.objects.create(
-            organization=user.organization,
+            organization=admin_user.organization,
             rule=rule,
             destination=destination,
             event_type='document_viewed',
@@ -502,7 +502,7 @@ class TestAutomationDeliveryViewSet:
             attempt_count=3,
         )
 
-        response = api_client.post(f'/api/v1/automation-deliveries/{delivery.id}/replay/')
+        response = admin_api_client.post(f'/api/v1/automation-deliveries/{delivery.id}/replay/')
 
         assert response.status_code == status.HTTP_202_ACCEPTED
         delivery.refresh_from_db()

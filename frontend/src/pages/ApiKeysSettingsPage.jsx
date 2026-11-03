@@ -9,9 +9,11 @@ import { Label } from "../components/ui/Label";
 import { Select } from "../components/ui/Select";
 import { getApiKeys, createApiKey, deleteApiKey } from "../services/api";
 import { McpSetupGuide } from "../components/settings/McpSetupGuide";
+import { useFeatureGates } from "../featuregates/useFeatureGates";
 
 export default function ApiKeysSettingsPage() {
   const { t } = useTranslation();
+  const { canAccessMcpSetup } = useFeatureGates();
   const [keys, setKeys] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
@@ -128,7 +130,7 @@ export default function ApiKeysSettingsPage() {
         <h1 className="text-2xl font-bold mb-6">{t('settings.title')}</h1>
         <SettingsTabs />
 
-        {/* Collapsible MCP Setup Guide */}
+        {canAccessMcpSetup && (
         <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
           <button
             type="button"
@@ -149,6 +151,7 @@ export default function ApiKeysSettingsPage() {
             </div>
           )}
         </div>
+        )}
 
         {/* Newly Created Key Alert Banner */}
         {createdRawKey && (
@@ -176,10 +179,11 @@ export default function ApiKeysSettingsPage() {
               </Button>
             </div>
 
-            {/* Embedded Live Secret Setup Snippets */}
+            {canAccessMcpSetup && (
             <div className="pt-3 border-t border-green-200 dark:border-green-800">
               <McpSetupGuide rawKey={createdRawKey} />
             </div>
+            )}
           </div>
         )}
 

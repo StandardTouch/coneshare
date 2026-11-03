@@ -18,7 +18,11 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
-from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+from featuregates.schema_views import (
+    GatedSpectacularAPIView,
+    GatedSpectacularRedocView,
+    GatedSpectacularSwaggerView,
+)
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from core.views import (CustomTokenObtainPairView, LanguagesView, LogoutView, PublicSettingsView,
@@ -29,8 +33,9 @@ from core.views import (CustomTokenObtainPairView, LanguagesView, LogoutView, Pu
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api-auth/', include('rest_framework.urls')),
-    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    path('api/schema/swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/schema/', GatedSpectacularAPIView.as_view(), name='schema'),
+    path('api/schema/swagger/', GatedSpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/schema/redoc/', GatedSpectacularRedocView.as_view(url_name='schema'), name='redoc'),
     # path('api/v1/register/', RegisterView.as_view(), name='register'),
     path('api/v1/signup/', SignupRequestView.as_view(), name='signup_request'),
     path('api/v1/signup/verify/', SignupVerifyView.as_view(), name='signup_verify'),
