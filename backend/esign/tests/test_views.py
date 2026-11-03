@@ -87,23 +87,13 @@ def mock_esign_pdf_pipeline(monkeypatch):
     def fake_download(_version):
         return pdf_bytes
 
-    class FakeResponse:
-        def raise_for_status(self):
-            return None
+    uploads = {}
 
-    class FakeClient:
-        def put(self, *_args, **_kwargs):
-            return FakeResponse()
-
-        def close(self):
-            return None
+    def fake_upload(storage_key, data, content_type=None, timeout=(10, 60)):
+        uploads[storage_key] = data
 
     monkeypatch.setattr("esign.services.download_document_pdf", fake_download)
-    monkeypatch.setattr("httpx.Client", FakeClient)
-    monkeypatch.setattr(
-        "esign.services.fileserver_client.generate_upload_url",
-        lambda **_kwargs: {"url": "/test-upload"},
-    )
+    monkeypatch.setattr("esign.services.fileserver_client.upload_file", fake_upload)
 
 
 @pytest.fixture

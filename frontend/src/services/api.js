@@ -109,10 +109,11 @@ api.interceptors.response.use(
     }
 
     // For other errors, show a toast, preferring translated/mapped error messages.
+    const skipGlobalErrorToast = originalRequest?.skipGlobalErrorToast === true;
     const errorMessage = getLocalizedErrorMessage(error);
 
     // Avoid showing a toast for the initial password prompt on the viewer page.
-    if (!isInitialPasswordPrompt && errorMessage) {
+    if (!isInitialPasswordPrompt && !skipGlobalErrorToast && errorMessage) {
       toast.error(errorMessage);
     }
 

@@ -115,21 +115,19 @@ def download_document_pdf(document_version: DocumentVersion) -> bytes:
     if not storage_key:
         raise ValueError("Document version has no storage key")
     
-    # Generate download URL
-    response = fileserver_client.generate_download_url(
-        storage_key=storage_key,
-        filename=document_version.document.name
+    download_url = fileserver_client.generate_download_url(
+        storage_key,
+        filename=document_version.document.name,
+        is_internal=True,
     )
-    download_url = response.get('url')
-    
     if not download_url:
         raise ValueError("Failed to generate download URL")
-    
-    # Download file
+
     import httpx
-    client = httpx.Client()
+
+    client = httpx.Client(follow_redirects=True)
     try:
-        resp = client.get(settings.CORE_API_URL + download_url)
+        resp = client.get(download_url)
         resp.raise_for_status()
         return resp.content
     finally:
@@ -608,36 +606,18 @@ def process_signature_completion(signature_request: SignatureRequest) -> tuple:
     # Calculate final hash
     final_hash = calculate_document_hash(final_pdf_bytes)
     
-    # Upload signed PDF
     signed_storage_key = f"signatures/{signature_request.id}/signed_{signature_request.document.id}.pdf"
-    upload_response = fileserver_client.generate_upload_url(
-        storage_key=signed_storage_key,
-        filename=f"signed_{signature_request.document.name}"
+    fileserver_client.upload_file(
+        signed_storage_key,
+        final_pdf_bytes,
+        content_type="application/pdf",
     )
-    upload_url = upload_response.get('url')
-    
-    # Upload file
-    import httpx
-    client = httpx.Client()
-    try:
-        resp = client.put(settings.CORE_API_URL + upload_url, content=final_pdf_bytes)
-        resp.raise_for_status()
-    finally:
-        client.close()
-    
-    # Upload certificate separately (for download)
+
     cert_storage_key = f"signatures/{signature_request.id}/certificate.pdf"
-    cert_upload_response = fileserver_client.generate_upload_url(
-        storage_key=cert_storage_key,
-        filename=f"certificate_{signature_request.document.name}"
+    fileserver_client.upload_file(
+        cert_storage_key,
+        certificate_pdf_bytes,
+        content_type="application/pdf",
     )
-    cert_upload_url = cert_upload_response.get('url')
-    
-    client = httpx.Client()
-    try:
-        resp = client.put(settings.CORE_API_URL + cert_upload_url, content=certificate_pdf_bytes)
-        resp.raise_for_status()
-    finally:
-        client.close()
     
     return signed_storage_key, cert_storage_key, original_hash, final_hash, final_pdf_bytes
