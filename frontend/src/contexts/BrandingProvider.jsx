@@ -14,6 +14,7 @@ export function BrandingProvider({ children }) {
     privacyPolicyUrl: BRAND_CONFIG.links.privacy,
     esignEnabled: false,
     roleLabelsEnabled: false,
+    collaboratorsOwnDeleteOnly: true,
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -32,6 +33,7 @@ export function BrandingProvider({ children }) {
         privacyPolicyUrl: (privacy && isSafeUrl(privacy)) ? privacy : BRAND_CONFIG.links.privacy,
         esignEnabled: data?.esign_enabled || false,
         roleLabelsEnabled: data?.role_labels_enabled || false,
+        collaboratorsOwnDeleteOnly: data?.collaborators_own_delete_only !== false,
       });
     } catch (error) {
       console.error("Failed to fetch public settings/branding:", error);

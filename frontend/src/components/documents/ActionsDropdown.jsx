@@ -14,6 +14,7 @@ export function ActionsDropdown({
   onDownload,
   onCopy,
   deleteLabel,
+  showDelete = true,
 }) {
   const { t } = useTranslation();
 
@@ -105,18 +106,22 @@ export function ActionsDropdown({
             </DropdownMenu.Item>
           )}
 
-          <DropdownMenu.Separator className="my-1 h-px bg-gray-200 dark:bg-gray-700" />
-          
-          <DropdownMenu.Item
-            onSelect={(e) => {
-              e.stopPropagation();
-              onDelete(item);
-            }}
-            className="flex w-full cursor-pointer items-center gap-x-2 rounded-sm px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 focus:bg-red-50 focus:text-red-700 focus:outline-none dark:text-red-500 dark:hover:bg-red-900/20 dark:focus:bg-red-900/20"
-          >
-            <Trash2 className="h-4 w-4" aria-hidden="true" />
-            <span>{deleteLabel || t('common.delete')}</span>
-          </DropdownMenu.Item>
+          {showDelete && onDelete && (
+            <>
+              <DropdownMenu.Separator className="my-1 h-px bg-gray-200 dark:bg-gray-700" />
+
+              <DropdownMenu.Item
+                onSelect={(e) => {
+                  e.stopPropagation();
+                  onDelete(item);
+                }}
+                className="flex w-full cursor-pointer items-center gap-x-2 rounded-sm px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 focus:bg-red-50 focus:text-red-700 focus:outline-none dark:text-red-500 dark:hover:bg-red-900/20 dark:focus:bg-red-900/20"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                <span>{deleteLabel || t('common.delete')}</span>
+              </DropdownMenu.Item>
+            </>
+          )}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>

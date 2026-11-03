@@ -57,6 +57,7 @@
     "src/tests/components/datarooms/TransferOwnershipDialog.test.jsx",
     "src/tests/components/datarooms/ManagePermissionsDialog.test.jsx",
     "src/tests/utils/formatters.test.js",
+    "src/tests/utils/dataroomDeletePermissions.test.js",
     "src/tests/hooks/useDebounce.test.js",
     "src/tests/pages/DocumentPage.test.jsx",
     "src/tests/pages/AdminDataroomsPage.test.jsx",

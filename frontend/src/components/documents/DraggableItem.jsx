@@ -36,6 +36,7 @@ export function DraggableItem({
   showIndex = false,
   itemIndex = null,
   deleteLabel,
+  allowDelete,
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -71,6 +72,12 @@ export function DraggableItem({
 
   const userContext = useUser();
   const currentUser = userContext?.user;
+  const showDeleteAction =
+    allowDelete !== undefined
+      ? allowDelete
+      : item.can_delete !== undefined
+        ? item.can_delete
+        : true;
 
   const getOwnerDetails = () => {
     const resolvedOwner = (typeof item.created_by === 'object' && item.created_by) || item.created_by_user || item.owner;
@@ -233,6 +240,7 @@ export function DraggableItem({
               onDownload={onDownload}
               onCopy={onCopy}
               deleteLabel={deleteLabel}
+              showDelete={showDeleteAction}
             />
           </div>
         )}
