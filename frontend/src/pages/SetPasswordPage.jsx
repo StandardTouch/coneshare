@@ -48,14 +48,15 @@ export function SetPasswordPage() {
         return;
       }
       try {
-        const data = await api.validateInviteToken({ uid, token });
+        const response = await api.validateInviteToken({ uid, token });
         if (!mounted) return;
-        if (data?.valid) {
-          setEmail(data.email || '');
+        const payload = response?.data ?? response;
+        if (payload?.valid) {
+          setEmail(payload.email || '');
           setPhase('ready');
         } else {
           setPhase('invalid');
-          setError(inviteErrorMessage(data));
+          setError(inviteErrorMessage(payload));
         }
       } catch (err) {
         if (!mounted) return;

@@ -461,7 +461,10 @@ export const getUser = (id) => api.get(`/users/${id}/`);
 export const setPassword = (data) => api.post('/users/set-password/', data);
 
 export const validateInviteToken = ({ uid, token }) =>
-  api.get('/onboarding/invite/validate/', { params: { uid, token } });
+  api.get('/onboarding/invite/validate/', {
+    params: { uid, token },
+    skipGlobalErrorToast: true,
+  });
 
 export const completeInviteSetPassword = (data) =>
   api.post('/onboarding/invite/set-password/', data);

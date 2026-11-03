@@ -44,6 +44,51 @@ describe('SetPasswordPage', () => {
     expect(screen.getByText(/user@example.com/i)).toBeInTheDocument();
   });
 
+  it('renders password form when validate returns an axios response body', async () => {
+    api.validateInviteToken.mockResolvedValue({
+      data: { valid: true, email: 'user@example.com' },
+      status: 200,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/set-password/uid123/token456']}>
+        <Routes>
+          <Route path="/set-password/:uid/:token" element={<SetPasswordPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('New Password')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('This invite link is invalid.')).not.toBeInTheDocument();
+    expect(screen.getByText(/user@example.com/i)).toBeInTheDocument();
+  });
+
+  it('shows expired message when validate returns expired code', async () => {
+    api.validateInviteToken.mockRejectedValue({
+      response: {
+        data: {
+          valid: false,
+          code: 'expired',
+          detail: 'This invite link has expired.',
+        },
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/set-password/uid123/token456']}>
+        <Routes>
+          <Route path="/set-password/:uid/:token" element={<SetPasswordPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('This invite link has expired.')).toBeInTheDocument();
+    });
+  });
+
   it('shows already-used message when validate returns used code', async () => {
     api.validateInviteToken.mockRejectedValue({
       response: {
