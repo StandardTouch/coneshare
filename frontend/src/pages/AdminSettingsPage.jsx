@@ -22,6 +22,7 @@ const getSettingGroups = (t) => [
 const SETTING_GROUP_BY_KEY = {
   ENABLE_PUBLIC_SIGNUP: 'security',
   FLATTEN_WATERMARKED_DOWNLOADS: 'security',
+  COLLABORATORS_OWN_DELETE_ONLY: 'security',
   MAX_PREVIEW_FILE_SIZE_MB: 'quota',
   MAX_VIDEO_PREVIEW_SIZE_MB: 'quota',
   MAX_PREVIEW_PAGES: 'quota',

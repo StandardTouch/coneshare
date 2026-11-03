@@ -49,6 +49,7 @@ from .services import (
     sync_dataroom_document_rename,
     get_dataroom_storage_used_bytes,
 )
+from .collaborator_delete_permissions import assert_user_may_remove_dataroom_content
 from .utils import (
     get_dataroom_storage_folder_name,
     build_ordered_dataroom_items,
@@ -309,6 +310,13 @@ class DataroomViewSet(viewsets.ModelViewSet):
         data = serializer.validated_data
         dataroom_doc_ids = data.get('dataroom_document_ids', [])
         dataroom_folder_ids = data.get('dataroom_folder_ids', [])
+
+        try:
+            assert_user_may_remove_dataroom_content(
+                request.user, dataroom, dataroom_doc_ids, dataroom_folder_ids
+            )
+        except PermissionDenied as exc:
+            return Response({"detail": str(exc.detail)}, status=status.HTTP_403_FORBIDDEN)
 
         remove_dataroom_content(dataroom, dataroom_doc_ids, dataroom_folder_ids)
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -1333,4 +1341,10 @@ class DataroomFolderViewSet(viewsets.ModelViewSet):
             sync_dataroom_folder_rename(instance, old_name, new_name)
 
     def perform_destroy(self, instance):
+        assert_user_may_remove_dataroom_content(
+            self.request.user,
+            instance.dataroom,
+            dataroom_doc_ids=[],
+            dataroom_folder_ids=[instance.id],
+        )
         remove_dataroom_content(instance.dataroom, dataroom_doc_ids=[], dataroom_folder_ids=[instance.id])

@@ -599,6 +599,9 @@ ROLE_LABELS_ENABLED = os.environ.get('ROLE_LABELS_ENABLED', 'False').lower() in 
 # Admin user invite email (set password via link).
 USER_INVITE_EMAIL_ENABLED = False
 
+# Dataroom collaborator delete policy (default ON).
+COLLABORATORS_OWN_DELETE_ONLY = True
+
 
 # Path to the TTF/OTF font file to be used for watermarking.
 # This font should support the characters you intend to display (e.g., CJK for Chinese).
