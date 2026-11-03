@@ -9,8 +9,8 @@ vi.mock('../../services/esign', async (importOriginal) => {
   return {
     ...actual,
     getSignatureRequest: vi.fn(),
-    getDownloadSignedUrl: vi.fn(),
-    getDownloadCertificateUrl: vi.fn(),
+    downloadSignedDocument: vi.fn(),
+    downloadCertificate: vi.fn(),
   };
 });
 
