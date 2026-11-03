@@ -5,8 +5,10 @@ import os
 import secrets
 from datetime import datetime
 from typing import Dict, List
+from xml.sax.saxutils import escape
 
 from django.conf import settings
+from backend.utils import get_client_ip
 from django.utils import timezone
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
@@ -76,16 +78,9 @@ def calculate_document_hash(pdf_bytes: bytes) -> str:
 
 
 def get_client_info(request) -> tuple:
-    """Extract IP address and user agent from request."""
-    # Get IP address (handle proxy headers)
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        ip_address = x_forwarded_for.split(',')[0].strip()
-    else:
-        ip_address = request.META.get('REMOTE_ADDR')
-    
-    user_agent = request.META.get('HTTP_USER_AGENT', '')[:512]
-    
+    """Extract IP address and user agent from request (via shared proxy-aware helper)."""
+    ip_address = get_client_ip(request) if request else None
+    user_agent = request.META.get('HTTP_USER_AGENT', '')[:512] if request else ''
     return ip_address, user_agent
 
 
@@ -338,6 +333,44 @@ def flatten_signature_fields(
     return output_buffer.getvalue()
 
 
+def _certificate_content_width() -> float:
+    """Usable width inside letter page with default SimpleDocTemplate margins."""
+    return letter[0] - 144  # 72pt left + 72pt right
+
+
+def _certificate_paragraph(text, style) -> Paragraph:
+    safe = escape(str(text if text not in (None, '') else '-'))
+    return Paragraph(safe, style)
+
+
+def _certificate_table_rows(header_labels, body_rows, col_widths, header_style, cell_style):
+    """Build a wrapped table that fits the certificate content area."""
+    table_data = [[_certificate_paragraph(label, header_style) for label in header_labels]]
+    for row in body_rows:
+        table_data.append([_certificate_paragraph(cell, cell_style) for cell in row])
+    table = Table(table_data, colWidths=col_widths, repeatRows=1)
+    table.setStyle(
+        TableStyle(
+            [
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 7),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
+                ('LEFTPADDING', (0, 0), (-1, -1), 4),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('FONTSIZE', (0, 1), (-1, -1), 7),
+            ]
+        )
+    )
+    return table
+
+
 def generate_certificate_of_completion(
     signature_request: SignatureRequest,
     signers: List[Signer],
@@ -415,85 +448,82 @@ def generate_certificate_of_completion(
     ))
     story.append(Spacer(1, 0.2 * inch))
 
-    # Signers table - build manually to support Arabic names
+    content_width = _certificate_content_width()
+    cell_style = ParagraphStyle(
+        'CertTableCell',
+        parent=styles['Normal'],
+        fontSize=7,
+        leading=8,
+        wordWrap='CJK',
+    )
+    header_style = ParagraphStyle(
+        'CertTableHeader',
+        parent=cell_style,
+        fontName='Helvetica-Bold',
+    )
+
+    # Signers table (Paragraph cells wrap long email / user agent on one page width)
     story.append(Paragraph("<b>Signers:</b>", styles['Heading2']))
     story.append(Spacer(1, 0.1 * inch))
-    
-    # Header row
-    signer_data = [['#', 'Name', 'Email', 'Signed At (AST)', 'IP Address', 'User Agent', 'OTP Verified']]
-    
-    # Data rows with proper timezone handling
+
+    signer_col_fracs = [0.05, 0.13, 0.20, 0.15, 0.11, 0.26, 0.10]
+    signer_col_widths = [content_width * f for f in signer_col_fracs]
+    signer_header = ['#', 'Name', 'Email', 'Signed At (AST)', 'IP Address', 'User Agent', 'OTP Verified']
+    signer_rows = []
     for idx, signer in enumerate(signers, 1):
         if signer.signed_at:
             signed_riyadh = signer.signed_at.astimezone(riyadh_tz)
             signed_time = signed_riyadh.strftime('%Y-%m-%d %H:%M:%S')
         else:
             signed_time = '-'
-        
-        ip = signer.ip_address or '-'
-        ua = (signer.user_agent[:40] + '...') if len(signer.user_agent or '') > 40 else (signer.user_agent or '-')
-        
+
         if signer.otp_verified_at:
             otp_time_riyadh = signer.otp_verified_at.astimezone(riyadh_tz)
             verification = otp_time_riyadh.strftime('%Y-%m-%d %H:%M:%S')
         else:
             verification = '-'
-        
-        signer_data.append([
-            str(idx),
-            signer.user.name,  # ReportLab handles Unicode
-            signer.user.email,
-            signed_time,
-            ip,
-            ua,
-            verification
-        ])
-    
-    signer_table = Table(
-        signer_data,
-        colWidths=[0.4*inch, 1.2*inch, 1.6*inch, 1.3*inch, 1*inch, 1.2*inch, 1.1*inch],
+
+        signer_rows.append(
+            [
+                str(idx),
+                signer.user.name,
+                signer.user.email,
+                signed_time,
+                signer.ip_address or '-',
+                signer.user_agent or '-',
+                verification,
+            ]
+        )
+
+    signer_table = _certificate_table_rows(
+        signer_header, signer_rows, signer_col_widths, header_style, cell_style
     )
-    signer_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('FONTSIZE', (0, 1), (-1, -1), 8),
-    ]))
     story.append(signer_table)
     story.append(Spacer(1, 0.3 * inch))
-    
+
     # Event log table
     story.append(Paragraph("<b>Event Log:</b>", styles['Heading2']))
     story.append(Spacer(1, 0.1 * inch))
-    
-    event_data = [['Timestamp (AST)', 'Signer', 'Action', 'User Agent']]
+
+    event_col_fracs = [0.18, 0.15, 0.16, 0.51]
+    event_col_widths = [content_width * f for f in event_col_fracs]
+    event_header = ['Timestamp (AST)', 'Signer', 'Action', 'User Agent']
+    event_rows = []
     for signer in signers:
         for action in signer.actions.all().order_by('timestamp'):
             action_riyadh = action.timestamp.astimezone(riyadh_tz)
-            event_data.append([
-                action_riyadh.strftime('%Y-%m-%d %H:%M:%S'),
-                signer.user.name,
-                action.get_action_display(),
-                (action.user_agent[:30] + '...') if len(action.user_agent) > 30 else action.user_agent
-            ])
-    
-    event_table = Table(event_data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch, 3*inch])
-    event_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 9),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('FONTSIZE', (0, 1), (-1, -1), 7),
-    ]))
+            event_rows.append(
+                [
+                    action_riyadh.strftime('%Y-%m-%d %H:%M:%S'),
+                    signer.user.name,
+                    action.get_action_display(),
+                    action.user_agent or '-',
+                ]
+            )
+
+    event_table = _certificate_table_rows(
+        event_header, event_rows, event_col_widths, header_style, cell_style
+    )
     story.append(event_table)
     story.append(Spacer(1, 0.3 * inch))
     
