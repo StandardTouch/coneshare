@@ -41,7 +41,11 @@ class Command(BaseCommand):
 
         send_emails = bool(options["notify"])
         if options["sync"]:
-            generate_signed_pdf_task.run(request_id, send_completion_emails=send_emails)
+            generate_signed_pdf_task.run(
+                request_id,
+                send_completion_emails=send_emails,
+                run_followups_sync=True,
+            )
             self.stdout.write(
                 self.style.SUCCESS(f"Regenerated signed PDF synchronously for {request_id}")
             )
