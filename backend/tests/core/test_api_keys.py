@@ -8,28 +8,28 @@ from core.authentication import generate_raw_api_key
 
 
 @pytest.mark.django_db
-def test_create_api_key(api_client, user):
+def test_create_api_key(admin_api_client, admin_user):
     url = reverse('api-key-list')
     payload = {
         'name': 'Test Integration Key',
         'tier': 'read_write',
         'expires_in_days': 30,
     }
-    response = api_client.post(url, payload, format='json')
+    response = admin_api_client.post(url, payload, format='json')
     assert response.status_code == status.HTTP_201_CREATED
     data = response.data
     assert data['name'] == 'Test Integration Key'
     assert data['tier'] == 'read_write'
     assert 'raw_key' in data
     assert data['raw_key'].startswith('cs_live_')
-    assert APIKey.objects.filter(user=user, name='Test Integration Key').exists()
+    assert APIKey.objects.filter(user=admin_user, name='Test Integration Key').exists()
 
 
 @pytest.mark.django_db
-def test_list_api_keys(api_client, user):
+def test_list_api_keys(admin_api_client, admin_user):
     raw_key, prefix, hashed_key = generate_raw_api_key()
     APIKey.objects.create(
-        user=user,
+        user=admin_user,
         name='My MCP Key',
         prefix=prefix,
         hashed_key=hashed_key,
@@ -37,7 +37,7 @@ def test_list_api_keys(api_client, user):
     )
 
     url = reverse('api-key-list')
-    response = api_client.get(url)
+    response = admin_api_client.get(url)
     assert response.status_code == status.HTTP_200_OK
     results = response.data if isinstance(response.data, list) else response.data.get('results', [])
     assert len(results) >= 1
@@ -59,10 +59,14 @@ def test_api_key_authentication_read_only_tier(public_client, user):
 
     public_client.credentials(HTTP_AUTHORIZATION=f'Bearer {raw_key}')
 
-    # GET request allowed
+    # GET on resource endpoints allowed for read_only keys
+    response = public_client.get('/api/v1/documents/')
+    assert response.status_code == status.HTTP_200_OK
+
+    # API key management requires admin (even for GET)
     url = reverse('api-key-list')
     response = public_client.get(url)
-    assert response.status_code == status.HTTP_200_OK
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
     # POST request blocked by read_only tier -> 403 Forbidden
     response = public_client.post(url, {'name': 'Illegal Key'}, format='json')
@@ -82,12 +86,14 @@ def test_api_key_authentication_read_write_tier(public_client, user):
 
     public_client.credentials(HTTP_AUTHORIZATION=f'Bearer {raw_key}')
 
-    # GET request allowed
-    url = reverse('api-key-list')
-    response = public_client.get(url)
+    response = public_client.get('/api/v1/documents/')
     assert response.status_code == status.HTTP_200_OK
 
-    # DELETE request blocked by read_write tier -> 403 Forbidden
+    url = reverse('api-key-list')
+    response = public_client.get(url)
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    # DELETE request blocked (admin gate and read_write tier) -> 403 Forbidden
     delete_url = reverse('api-key-detail', kwargs={'pk': key_obj.id})
     response = public_client.delete(delete_url)
     assert response.status_code == status.HTTP_403_FORBIDDEN

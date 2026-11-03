@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 import { useSidebar } from "./SidebarProvider";
 import { useBranding } from "../../contexts/BrandingProvider";
+import { useUser } from "../../contexts/UserProvider";
 
 export const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: Home },
@@ -18,7 +19,9 @@ export const NAV_ITEMS = [
 
 export function useNavItems() {
   const { t } = useTranslation();
-  const { esignEnabled } = useBranding();
+  const { esignEnabled, automationEnabled } = useBranding();
+  const { user } = useUser();
+  const isAdmin = user?.role === 'admin';
   
   const items = [
     { href: "/", label: t('nav.dashboard'), icon: Home },
@@ -26,14 +29,16 @@ export function useNavItems() {
     { href: "/datarooms", label: t('nav.datarooms'), icon: LayoutGrid },
     { href: "/file-requests", label: t('nav.fileRequests'), icon: UploadCloud },
     { href: "/signatures", label: t('nav.signatures'), icon: PenLine, requiresEsign: true },
-    { href: "/automations", label: t('nav.automations'), icon: Bot },
+    { href: "/automations", label: t('nav.automations'), icon: Bot, requiresAutomation: true, adminOnly: true },
     { href: "/trash", label: t('nav.trash'), icon: Trash2, hasDivider: true },
   ];
   
-  // Filter items based on esign enabled setting
-  return items.filter(item => {
-    if (item.requiresEsign) {
-      return esignEnabled;
+  return items.filter((item) => {
+    if (item.requiresEsign && !esignEnabled) {
+      return false;
+    }
+    if (item.requiresAutomation && (!automationEnabled || !isAdmin)) {
+      return false;
     }
     return true;
   });

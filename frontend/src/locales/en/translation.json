@@ -1025,6 +1025,8 @@
     "groupCloudHelp": "Provider credentials and import mapping settings.",
     "groupSecurity": "Security",
     "groupSecurityHelp": "Authentication and public access controls.",
+    "groupFeatures": "Features",
+    "groupFeaturesHelp": "Enable or disable product features for this deployment.",
     "groupOther": "Other",
     "groupOtherHelp": "Uncategorized settings.",
     "brandingTitle": "White-Labeling & Branding",
@@ -1191,7 +1193,11 @@
       "ENABLE_PUBLIC_SIGNUP": "Enable public signup with email verification.",
       "FLATTEN_WATERMARKED_DOWNLOADS": "If true, watermarked PDF downloads are flattened (rasterized to JPEGs and recompiled to PDF) to prevent watermark stripping.",
       "ESIGN_ENABLED": "Enable electronic signature feature. When OFF, all esign UI is hidden and all esign API endpoints return 404/403.",
-      "ROLE_LABELS_ENABLED": "Enable custom display role labels in the admin panel. When OFF, role label UI and API endpoints are hidden."
+      "ROLE_LABELS_ENABLED": "Enable custom display role labels in the admin panel. When OFF, role label UI and API endpoints are hidden.",
+      "MCP_ENABLED": "Enable Coneshare MCP (remote AI agent integration). When OFF, MCP setup UI and the MCP server endpoint are unavailable.",
+      "API_KEYS_ENABLED": "Enable API key management and API key authentication. When OFF, existing keys cannot authenticate and management endpoints are hidden.",
+      "AUTOMATION_ENABLED": "Enable workflow automations. When OFF, automation UI and API endpoints are hidden.",
+      "SWAGGER_ENABLED": "Enable OpenAPI schema and Swagger/ReDoc documentation. When OFF, those URLs return 404."
     }
   },
   "esign": {

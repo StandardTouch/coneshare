@@ -7,6 +7,7 @@ from coneshare_mcp.tools.datarooms import register_dataroom_tools
 from coneshare_mcp.tools.share_links import register_share_link_tools
 from coneshare_mcp.tools.analytics import register_analytics_tools
 from coneshare_mcp.tools.admin import register_admin_tools
+from coneshare_mcp.http_gate import McpFeatureGateMiddleware
 
 log_level_str = os.getenv("LOG_LEVEL", "INFO").upper()
 log_level = getattr(logging, log_level_str, logging.INFO)
@@ -31,7 +32,13 @@ def main() -> None:
     path = os.getenv("MCP_PATH", "/mcp/sse")
 
     if transport in ("http", "streamable-http", "sse"):
-        mcp.run(transport=transport, host=host, port=port, path=path)
+        mcp.run(
+            transport=transport,
+            host=host,
+            port=port,
+            path=path,
+            middleware=[McpFeatureGateMiddleware],
+        )
     elif transport == "stdio":
         mcp.run(transport="stdio")
     else:
