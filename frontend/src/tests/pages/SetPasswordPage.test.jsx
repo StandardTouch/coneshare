@@ -44,6 +44,30 @@ describe('SetPasswordPage', () => {
     expect(screen.getByText(/user@example.com/i)).toBeInTheDocument();
   });
 
+  it('shows already-used message when validate returns used code', async () => {
+    api.validateInviteToken.mockRejectedValue({
+      response: {
+        data: {
+          valid: false,
+          code: 'used',
+          detail: 'This invite link has already been used.',
+        },
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/set-password/uid123/token456']}>
+        <Routes>
+          <Route path="/set-password/:uid/:token" element={<SetPasswordPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('This invite link has already been used.')).toBeInTheDocument();
+    });
+  });
+
   it('submits new password via invite API', async () => {
     api.validateInviteToken.mockResolvedValue({ valid: true, email: 'user@example.com' });
     api.completeInviteSetPassword.mockResolvedValue({ detail: 'ok' });

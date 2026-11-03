@@ -104,23 +104,52 @@ def create_user_with_invite(validated_data, request):
 
 @transaction.atomic
 def resend_user_invite(user, request):
+    ok, reason = issue_fresh_invite_link(user, request, respect_rate_limit=True)
+    if ok:
+        logger.info(
+            'user_invite_resent user_id=%s user_email=%s admin_email=%s',
+            user.id,
+            user.email,
+            getattr(request.user, 'email', None),
+        )
+    return ok, reason
+
+
+def validate_invite_token(uid: str, token: str):
+    from .invite_validation import validate_invite_token as _validate_invite_token
+
+    return _validate_invite_token(uid, token)
+
+
+def issue_fresh_invite_link(user, request, *, respect_rate_limit: bool = True):
+    """
+    Bump invite nonce and queue a new set-password email.
+    Used for resend-invite and admin reset for users who have not set a password yet.
+    """
     if not invite_feature_enabled():
         return False, 'disabled'
 
-    cache_key = f'user_invite_resend:{user.id}'
-    if cache.get(cache_key):
-        return False, 'rate_limited'
+    if respect_rate_limit:
+        cache_key = f'user_invite_resend:{user.id}'
+        if cache.get(cache_key):
+            return False, 'rate_limited'
+    else:
+        cache_key = None
 
     state = ensure_invite_state(user)
+    if user.has_usable_password():
+        return False, 'already_active'
+
     state.invite_nonce += 1
     state.last_invite_sent_at = timezone.now()
     state.save(update_fields=['invite_nonce', 'last_invite_sent_at', 'updated_at'])
 
-    cache.set(cache_key, 1, timeout=RESEND_RATE_LIMIT_SECONDS)
+    if cache_key:
+        cache.set(cache_key, 1, timeout=RESEND_RATE_LIMIT_SECONDS)
 
-    admin_email = getattr(request.user, 'email', None)
+    admin_email = getattr(request.user, 'email', None) if request else None
     logger.info(
-        'user_invite_resent user_id=%s user_email=%s admin_email=%s',
+        'user_invite_link_issued user_id=%s user_email=%s admin_email=%s',
         user.id,
         user.email,
         admin_email,
@@ -128,26 +157,3 @@ def resend_user_invite(user, request):
 
     _queue_invite_email(user, request)
     return True, 'sent'
-
-
-def validate_invite_token(uid: str, token: str):
-    from django.utils.encoding import force_str
-    from django.utils.http import urlsafe_base64_decode
-    from django.core.exceptions import ValidationError
-
-    if not uid or not token:
-        return None, 'missing'
-
-    try:
-        user_id = force_str(urlsafe_base64_decode(uid))
-        user = User.objects.select_related('organization').get(pk=user_id)
-    except (TypeError, ValueError, OverflowError, ValidationError, User.DoesNotExist):
-        return None, 'invalid'
-
-    if user.has_usable_password():
-        return None, 'used'
-
-    if not user_invite_token_generator.check_token(user, token):
-        return None, 'invalid'
-
-    return user, 'valid'

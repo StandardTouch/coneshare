@@ -332,7 +332,9 @@
     "settingPassword": "Setting password...",
     "setPasswordSuccess": "Your password has been set. You can sign in now.",
     "setPasswordFailed": "Could not set your password.",
-    "inviteLinkInvalid": "This invite link is invalid or has expired.",
+    "inviteLinkInvalid": "This invite link is invalid.",
+    "inviteLinkExpired": "This invite link has expired.",
+    "inviteLinkUsed": "This invite link has already been used.",
     "backToSignIn": "Back to sign in",
     "passwordSetSignInPrompt": "Your password is set. Sign in with your new credentials."
   },

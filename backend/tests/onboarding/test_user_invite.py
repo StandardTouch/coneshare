@@ -81,16 +81,17 @@ class TestInviteTokenLifecycle:
         token = user_invite_token_generator.make_token(user)
         return user, uid, token
 
-    def test_validate_and_set_password_single_use(self, public_client, organization):
+    def test_validate_twice_then_set_password(self, public_client, organization):
         _set_user_invite_enabled(True)
         user, uid, token = self._invite_user(organization)
 
-        validate_resp = public_client.get(
-            '/api/v1/onboarding/invite/validate/',
-            {'uid': uid, 'token': token},
-        )
-        assert validate_resp.status_code == status.HTTP_200_OK
-        assert validate_resp.data['valid'] is True
+        for _ in range(2):
+            validate_resp = public_client.get(
+                '/api/v1/onboarding/invite/validate/',
+                {'uid': uid, 'token': token},
+            )
+            assert validate_resp.status_code == status.HTTP_200_OK
+            assert validate_resp.data['valid'] is True
 
         set_resp = public_client.post(
             '/api/v1/onboarding/invite/set-password/',
@@ -106,11 +107,28 @@ class TestInviteTokenLifecycle:
         user.refresh_from_db()
         assert user.check_password('StrongPass123!') is True
 
+    def test_link_rejected_after_successful_set_password(self, public_client, organization):
+        _set_user_invite_enabled(True)
+        user, uid, token = self._invite_user(organization)
+
+        set_resp = public_client.post(
+            '/api/v1/onboarding/invite/set-password/',
+            {
+                'uid': uid,
+                'token': token,
+                'password1': 'StrongPass123!',
+                'password2': 'StrongPass123!',
+            },
+            format='json',
+        )
+        assert set_resp.status_code == status.HTTP_200_OK
+
         reuse_resp = public_client.get(
             '/api/v1/onboarding/invite/validate/',
             {'uid': uid, 'token': token},
         )
         assert reuse_resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert reuse_resp.data.get('code') == 'used'
 
     def test_token_expires_after_72_hours(self, organization):
         from datetime import datetime
@@ -119,12 +137,25 @@ class TestInviteTokenLifecycle:
         future = datetime.utcnow() + timedelta(seconds=INVITE_TOKEN_TIMEOUT_SECONDS + 60)
         with patch.object(user_invite_token_generator, '_now', return_value=future):
             assert user_invite_token_generator.check_token(user, token) is False
+            assert user_invite_token_generator.token_status(user, token) == 'expired'
             _, reason = validate_invite_token(uid, token)
-            assert reason == 'invalid'
+            assert reason == 'expired'
+
+    def test_invite_token_survives_profile_save_before_password_set(self, organization):
+        user, uid, token = self._invite_user(organization)
+        user.name = 'Updated name'
+        user.save(update_fields=['name', 'updated_at'])
+        user.refresh_from_db()
+        assert user.has_usable_password() is False
+        assert user_invite_token_generator.check_token(user, token) is True
+        _, reason = validate_invite_token(uid, token)
+        assert reason == 'valid'
 
     @patch('django.db.transaction.on_commit', side_effect=lambda func: func())
     @patch('onboarding.services.send_user_invite_email_task.delay')
-    def test_resend_invalidates_previous_token(self, mock_delay, _on_commit, admin_api_client, admin_user, organization):
+    def test_resend_invalidates_previous_token(
+        self, mock_delay, _on_commit, admin_api_client, admin_user, organization, public_client
+    ):
         _set_user_invite_enabled(True)
         user, uid, old_token = self._invite_user(organization)
         user.organization = admin_user.organization
@@ -140,6 +171,34 @@ class TestInviteTokenLifecycle:
 
         new_token = user_invite_token_generator.make_token(user)
         assert user_invite_token_generator.check_token(user, new_token) is True
+
+        validate_resp = public_client.get(
+            '/api/v1/onboarding/invite/validate/',
+            {'uid': uid, 'token': new_token},
+        )
+        assert validate_resp.status_code == status.HTTP_200_OK
+        mock_delay.assert_called_once()
+
+    @patch('django.db.transaction.on_commit', side_effect=lambda func: func())
+    @patch('onboarding.services.send_user_invite_email_task.delay')
+    def test_admin_reset_for_invited_user_sends_link(
+        self, mock_delay, _on_commit, admin_api_client, organization
+    ):
+        _set_user_invite_enabled(True)
+        user, uid, old_token = self._invite_user(organization)
+
+        url = f'/api/v1/admin/users/{user.id}/reset-password/'
+        response = admin_api_client.post(url, {}, format='json')
+        assert response.status_code == status.HTTP_200_OK
+        assert 'set-password link' in response.data['message'].lower()
+
+        user.refresh_from_db()
+        assert user.has_usable_password() is False
+        assert user.invite_state.invite_nonce == 1
+        assert user_invite_token_generator.check_token(user, old_token) is False
+        new_token = user_invite_token_generator.make_token(user)
+        _, reason = validate_invite_token(uid, new_token)
+        assert reason == 'valid'
         mock_delay.assert_called_once()
 
     def test_public_endpoints_hidden_when_toggle_off(self, public_client, organization):

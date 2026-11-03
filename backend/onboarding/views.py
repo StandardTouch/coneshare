@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 from core.services import get_dynamic_setting
 
 from .serializers import InviteSetPasswordSerializer
+from .models import UserInviteState
 from .services import invite_feature_enabled, validate_invite_token
 from .tokens import user_invite_token_generator
 
@@ -43,10 +44,36 @@ class InviteValidateView(InviteFeatureRequiredMixin, APIView):
         if reason == 'valid' and user:
             return Response({'valid': True, 'email': user.email}, status=status.HTTP_200_OK)
         if reason == 'used':
-            return Response({'valid': False, 'detail': _('This invite link has already been used.')}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {
+                    'valid': False,
+                    'code': 'used',
+                    'detail': _('This invite link has already been used.'),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if reason == 'expired':
+            return Response(
+                {
+                    'valid': False,
+                    'code': 'expired',
+                    'detail': _('This invite link has expired.'),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if reason == 'missing':
-            return Response({'valid': False, 'detail': _('Invalid invite link.')}, status=status.HTTP_400_BAD_REQUEST)
-        return Response({'valid': False, 'detail': _('Invalid or expired invite link.')}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'valid': False, 'code': 'invalid', 'detail': _('Invalid invite link.')},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(
+            {
+                'valid': False,
+                'code': 'invalid',
+                'detail': _('This invite link is invalid.'),
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
 
 @extend_schema(tags=['onboarding'])
@@ -70,19 +97,28 @@ class InviteSetPasswordView(InviteFeatureRequiredMixin, APIView):
         if reason != 'valid' or not user:
             if reason == 'used':
                 return Response({'detail': _('This invite link has already been used.')}, status=status.HTTP_400_BAD_REQUEST)
-            return Response({'detail': _('Invalid or expired invite link.')}, status=status.HTTP_400_BAD_REQUEST)
+            if reason == 'expired':
+                return Response({'detail': _('This invite link has expired.')}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': _('This invite link is invalid.')}, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
             locked = User.objects.select_for_update().get(pk=user.pk)
             if locked.has_usable_password():
                 return Response({'detail': _('This invite link has already been used.')}, status=status.HTTP_400_BAD_REQUEST)
-            if not user_invite_token_generator.check_token(locked, token):
-                return Response({'detail': _('Invalid or expired invite link.')}, status=status.HTTP_400_BAD_REQUEST)
+            token_status = user_invite_token_generator.token_status(locked, token)
+            if token_status == 'expired':
+                return Response({'detail': _('This invite link has expired.')}, status=status.HTTP_400_BAD_REQUEST)
+            if token_status != 'valid':
+                return Response({'detail': _('This invite link is invalid.')}, status=status.HTTP_400_BAD_REQUEST)
 
             locked.set_password(password)
             if not locked.is_active:
                 locked.is_active = True
             locked.updated_at = timezone.now()
             locked.save(update_fields=['password', 'is_active', 'updated_at'])
+
+            state, _created = UserInviteState.objects.select_for_update().get_or_create(user=locked)
+            state.invite_nonce += 1
+            state.save(update_fields=['invite_nonce', 'updated_at'])
 
         return Response({'detail': _('Password set successfully. You can now sign in.')}, status=status.HTTP_200_OK)

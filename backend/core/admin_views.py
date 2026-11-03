@@ -448,6 +448,11 @@ class AdminUserViewSet(viewsets.ModelViewSet):
 
         user = self.get_object()
         ok, reason = resend_user_invite(user, request)
+        if reason == 'already_active':
+            return Response(
+                {'detail': _('This user has already set a password.')},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if reason == 'rate_limited':
             return Response(
                 {'detail': _('Please wait before resending another invite.')},
@@ -474,8 +479,28 @@ class AdminUserViewSet(viewsets.ModelViewSet):
     def reset_password(self, request, pk=None):
         """
         Resets a user's password and blacklists all active JWT refresh tokens.
+        For users who have not set a password yet (invite pending), sends a fresh set-password link instead.
         """
+        from onboarding.services import invite_feature_enabled, issue_fresh_invite_link
+
         user = self.get_object()
+        if not user.has_usable_password() and invite_feature_enabled():
+            ok, reason = issue_fresh_invite_link(user, request, respect_rate_limit=False)
+            if reason == 'disabled':
+                return Response(
+                    {'detail': _('User invite email is not enabled.')},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if not ok:
+                return Response(
+                    {'detail': _('Could not send a set-password link.')},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            return Response(
+                {'message': _('A new set-password link has been sent by email.')},
+                status=status.HTTP_200_OK,
+            )
+
         serializer = AdminResetPasswordSerializer(data=request.data, context={'user': user})
         serializer.is_valid(raise_exception=True)
         serializer.save()
