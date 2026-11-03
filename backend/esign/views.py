@@ -288,13 +288,14 @@ class SignatureRequestViewSet(viewsets.ModelViewSet):
         # Generate download URL
         from documents.fileserver import fileserver_client
         
-        response = fileserver_client.generate_download_url(
-            storage_key=signature_request.signed_document_version.storage_key,
-            filename=f"signed_{signature_request.document.name}"
+        download_url = fileserver_client.generate_download_url(
+            signature_request.signed_document_version.storage_key,
+            filename=f"signed_{signature_request.document.name}",
+            is_internal=False,
         )
-        
+
         return Response({
-            'download_url': response.get('url'),
+            'download_url': download_url,
             'filename': f"signed_{signature_request.document.name}"
         })
     
@@ -316,13 +317,14 @@ class SignatureRequestViewSet(viewsets.ModelViewSet):
         # Generate download URL
         from documents.fileserver import fileserver_client
         
-        response = fileserver_client.generate_download_url(
-            storage_key=signature_request.certificate_storage_key,
-            filename=f"certificate_{signature_request.document.name}.pdf"
+        download_url = fileserver_client.generate_download_url(
+            signature_request.certificate_storage_key,
+            filename=f"certificate_{signature_request.document.name}.pdf",
+            is_internal=False,
         )
-        
+
         return Response({
-            'download_url': response.get('url'),
+            'download_url': download_url,
             'filename': f"certificate_{signature_request.document.name}.pdf"
         })
     

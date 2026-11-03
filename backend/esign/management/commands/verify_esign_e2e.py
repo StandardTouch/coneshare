@@ -48,7 +48,7 @@ class Command(BaseCommand):
             filename="signed.pdf",
             is_internal=True,
         )
-        resp = httpx.get(settings.CORE_API_URL + download_url, timeout=120.0)
+        resp = httpx.get(download_url, timeout=120.0, follow_redirects=True)
         resp.raise_for_status()
         pdf_bytes = resp.content
 
