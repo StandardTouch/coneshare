@@ -17,6 +17,13 @@ vi.mock('../../contexts/UserProvider', () => ({
     }),
 }));
 
+vi.mock('../../contexts/BrandingProvider', () => ({
+    useBranding: () => ({
+        dataroomCreateAdminOnly: true,
+        collaboratorsOwnDeleteOnly: true,
+    }),
+}));
+
 const mockedNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {
     const original = await vi.importActual('react-router-dom');
@@ -115,6 +122,13 @@ describe('DataroomsPage', () => {
     });
 
     describe('Dataroom Actions', () => {
+        it('hides create dataroom entry for non-admin members when admin-only policy is on', async () => {
+            mockCurrentUser = { id: 'u2', email: 'member@example.com', role: 'member' };
+            renderComponent();
+            await screen.findByText('Dataroom One');
+            expect(screen.queryByRole('button', { name: /Add Dataroom/i })).not.toBeInTheDocument();
+        });
+
         it('should create a new dataroom and refresh the list', async () => {
             const user = userEvent.setup();
             renderComponent();

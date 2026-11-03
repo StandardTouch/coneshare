@@ -16,6 +16,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../com
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/Tabs';
 import { getDatarooms, deleteDataroom, removeDataroomCollaborator } from '../services/api';
 import { useUser } from '../contexts/UserProvider';
+import { useBranding } from '../contexts/BrandingProvider';
 import { formatDate, getAvatarInitial, isDataroomOwner, isDataroomCollaborator } from '../utils/formatters';
 
 function DataroomCardIcon({ dataroom }) {
@@ -118,6 +119,8 @@ export function DataroomsPage() {
   };
 
   const isOrgAdmin = currentUser?.role === 'admin';
+  const { dataroomCreateAdminOnly } = useBranding();
+  const canCreateDataroom = isOrgAdmin || !dataroomCreateAdminOnly;
 
   return (
     <TooltipProvider>
@@ -129,10 +132,12 @@ export function DataroomsPage() {
             {t('datarooms.addDescription')}
           </p>
         </div>
+        {canCreateDataroom && (
         <Button onClick={() => setIsAddDataroomOpen(true)} className="gap-2">
           <PlusIcon className="h-4 w-4" />
           {t('datarooms.addDataroom')}
         </Button>
+        )}
       </div>
 
       {/* Scope Filter Tabs */}
@@ -346,11 +351,13 @@ export function DataroomsPage() {
         </div>
       )}
 
+      {canCreateDataroom && (
       <AddDataroomDialog
         isOpen={isAddDataroomOpen}
         onOpenChange={setIsAddDataroomOpen}
         onSuccess={handleSuccess}
       />
+      )}
       <ConfirmationDialog
         isOpen={!!dataroomToDelete}
         onOpenChange={() => setDataroomToDelete(null)}

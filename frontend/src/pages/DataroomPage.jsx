@@ -8,6 +8,10 @@ import { toast } from 'sonner';
 import { formatBytes } from '../lib/formatters';
 import { isDataroomOwner, isDataroomCollaborator } from '../utils/formatters';
 import { selectionIncludesNonDeletableItems } from '../utils/dataroomDeletePermissions';
+import {
+  selectionIncludesNonModifiableItems,
+  scopeIncludesNonModifiableItems,
+} from '../utils/dataroomItemPermissions';
 import { useBranding } from '../contexts/BrandingProvider';
 import { getDataroom, addContentToDataroom, createDataroomFolder, moveDataroomContent, getDataroomFolderContents, getShareLinksForDataroom, deleteShareLink, getDataroomViewSessions, getDataroomStats, removeContentFromDataroom, updateDataroomFolder, updateDataroomDocument, updateDataroomBranding, reorderDataroomItems, deleteDataroom, ensureDataroomFolderPaths, uploadDataroomDocument, upgradeDataroomStorage, getDataroomBannerImages } from '../services/api';
 import { useBreadcrumb } from '../components/layout/BreadcrumbProvider';
@@ -970,6 +974,20 @@ export function DataroomPage() {
     dataroom,
     collaboratorsOwnDeleteOnly,
   });
+  const bulkModifyBlocked = selectionIncludesNonModifiableItems({
+    allItems,
+    selectedDocuments: selection.documents,
+    selectedFolders: selection.folders,
+    user,
+    dataroom,
+    collaboratorsOwnDeleteOnly,
+  });
+  const reorderBlocked = scopeIncludesNonModifiableItems({
+    allItems,
+    user,
+    dataroom,
+    collaboratorsOwnDeleteOnly,
+  });
 
   // Derived storage quota calculations with live preview support
   const currentQuotaMb = dataroom?.storage_quota_mb || 0;
@@ -1149,6 +1167,7 @@ export function DataroomPage() {
                 onDelete={handleRemoveContent}
                 deleteText={t('common.remove')}
                 deleteDisabled={bulkRemoveBlocked}
+                moveDisabled={bulkModifyBlocked}
               />
             ) : (
               <div className="flex min-h-[48px] items-center">
@@ -1165,7 +1184,7 @@ export function DataroomPage() {
                   size="sm"
                   className="ml-2"
                   onClick={() => setIsReorderDialogOpen(true)}
-                  disabled={!hasContent}
+                  disabled={!hasContent || reorderBlocked}
                 >
                   {t('datarooms.reorderItems')}
                 </Button>

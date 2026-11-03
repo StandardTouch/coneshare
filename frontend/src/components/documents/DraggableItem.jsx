@@ -37,6 +37,7 @@ export function DraggableItem({
   itemIndex = null,
   deleteLabel,
   allowDelete,
+  allowModify,
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -77,7 +78,18 @@ export function DraggableItem({
       ? allowDelete
       : item.can_delete !== undefined
         ? item.can_delete
-        : true;
+        : item.can_modify !== undefined
+          ? item.can_modify
+          : true;
+
+  const showModifyAction =
+    allowModify !== undefined
+      ? allowModify
+      : item.can_modify !== undefined
+        ? item.can_modify
+        : item.can_delete !== undefined
+          ? item.can_delete
+          : true;
 
   const getOwnerDetails = () => {
     const resolvedOwner = (typeof item.created_by === 'object' && item.created_by) || item.created_by_user || item.owner;
@@ -150,7 +162,7 @@ export function DraggableItem({
         >
           {item.name}
         </button>
-        {showActions && !isReadOnly && (
+        {showActions && !isReadOnly && showModifyAction && (
           <button
             data-star-button
             onClick={(e) => {
@@ -233,7 +245,7 @@ export function DraggableItem({
             <ActionsDropdown
               item={item}
               type={type}
-              onRename={onRename}
+              onRename={showModifyAction ? onRename : undefined}
               onDelete={onDelete}
               onShare={onShare}
               onRequestFiles={onRequestFiles}
@@ -241,6 +253,7 @@ export function DraggableItem({
               onCopy={onCopy}
               deleteLabel={deleteLabel}
               showDelete={showDeleteAction}
+              showRename={showModifyAction}
             />
           </div>
         )}

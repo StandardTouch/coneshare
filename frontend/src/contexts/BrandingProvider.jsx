@@ -19,6 +19,7 @@ export function BrandingProvider({ children }) {
     apiKeysEnabled: true,
     fileRequestsEnabled: true,
     collaboratorsOwnDeleteOnly: true,
+    dataroomCreateAdminOnly: true,
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -42,6 +43,7 @@ export function BrandingProvider({ children }) {
         apiKeysEnabled: data?.api_keys_enabled !== false,
         fileRequestsEnabled: data?.file_requests_enabled !== false,
         collaboratorsOwnDeleteOnly: data?.collaborators_own_delete_only !== false,
+        dataroomCreateAdminOnly: data?.dataroom_create_admin_only !== false,
       });
     } catch (error) {
       console.error("Failed to fetch public settings/branding:", error);
@@ -90,6 +92,7 @@ export function useBranding() {
       apiKeysEnabled: true,
       fileRequestsEnabled: true,
       collaboratorsOwnDeleteOnly: true,
+      dataroomCreateAdminOnly: true,
       isLoading: false,
       refetchBranding: async () => {},
     };

@@ -72,8 +72,9 @@ class TestDataroomViewSet:
         names = [item['name'] for item in response.data]
         assert names == ["Third Room", "Second Room", "First Room"]
 
-    def test_create_dataroom(self, api_client, user, organization):
-        """Test creating a new dataroom."""
+    @patch('datarooms.dataroom_create_policy.get_dynamic_setting', return_value=False)
+    def test_create_dataroom(self, _mock_setting, api_client, user, organization):
+        """Test creating a new dataroom when admin-only creation is disabled."""
         assert Dataroom.objects.count() == 0
         data = {'name': 'New API Dataroom'}
         response = api_client.post('/api/v1/datarooms/', data)
@@ -171,9 +172,9 @@ class TestDataroomViewSet:
 
         # The number of queries should remain constant regardless of document count.
         # Current expected queries:
-        # 1 (get folder + dataroom via select_related) + 1 (get children) + 1 (get documents)
-        # + 2 (for 2 ancestors) + 1 (check item-order rows for this scope) = 6
-        with django_assert_num_queries(6):
+        # 1 (get folder + dataroom via select_related) + 2 (ancestor chain) + 1 (AppConfiguration for modify policy)
+        # + 1 (get children) + 1 (get documents) + 1 (check item-order rows for this scope) = 7
+        with django_assert_num_queries(7):
             url = f'/api/v1/dataroom-folders/{target_folder.id}/'
             response = api_client.get(url)
             print(response.json()['ancestors'])
@@ -2203,7 +2204,8 @@ class TestDataroomFolderMtimeUpdates:
             })
             assert res.status_code == status.HTTP_200_OK
 
-    def test_dataroom_storage_version_defaults_and_vault_hierarchy(self, api_client, user, organization):
+    @patch('datarooms.dataroom_create_policy.get_dynamic_setting', return_value=False)
+    def test_dataroom_storage_version_defaults_and_vault_hierarchy(self, _mock_setting, api_client, user, organization):
         """Test newly created dataroom defaults to storage_version=2 and uses __datarooms__ vault."""
         api_client.force_authenticate(user=user)
         res = api_client.post('/api/v1/datarooms/', {'name': 'Modern Vault Dataroom'})

@@ -15,6 +15,7 @@ export function ActionsDropdown({
   onCopy,
   deleteLabel,
   showDelete = true,
+  showRename = true,
 }) {
   const { t } = useTranslation();
 
@@ -43,6 +44,7 @@ export function ActionsDropdown({
           // Prevent focus from returning to trigger, which can re-trigger card navigation.
           onCloseAutoFocus={(e) => e.preventDefault()}
         >
+          {showRename && onRename && (
           <DropdownMenu.Item
             onSelect={(e) => {
               e.stopPropagation();
@@ -53,6 +55,7 @@ export function ActionsDropdown({
             <Edit className="h-4 w-4" aria-hidden="true" />
             <span>{t('documents.rename')}</span>
           </DropdownMenu.Item>
+          )}
 
           {type === 'document' && onCopy && (
             <DropdownMenu.Item

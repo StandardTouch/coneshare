@@ -27,6 +27,9 @@ export function canRemoveDataroomItem({
   if (typeof item.can_delete === 'boolean') {
     return item.can_delete;
   }
+  if (typeof item.can_modify === 'boolean') {
+    return item.can_modify;
+  }
   if (isDataroomOwner(dataroom, user) || user.role === 'admin') {
     return true;
   }

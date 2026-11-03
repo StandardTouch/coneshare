@@ -331,6 +331,7 @@ class PublicSettingsView(APIView):
         esign_enabled = serializers.BooleanField()
         role_labels_enabled = serializers.BooleanField()
         collaborators_own_delete_only = serializers.BooleanField()
+        dataroom_create_admin_only = serializers.BooleanField()
         brand_name = serializers.CharField(allow_null=True)
         brand_logo_url = serializers.CharField(allow_null=True)
         brand_website_url = serializers.CharField(allow_null=True)
@@ -356,6 +357,7 @@ class PublicSettingsView(APIView):
             'esign_enabled': get_dynamic_setting('ESIGN_ENABLED'),
             'role_labels_enabled': get_dynamic_setting('ROLE_LABELS_ENABLED'),
             'collaborators_own_delete_only': get_dynamic_setting('COLLABORATORS_OWN_DELETE_ONLY'),
+            'dataroom_create_admin_only': get_dynamic_setting('DATAROOM_CREATE_ADMIN_ONLY'),
             'brand_name': brand_name,
             'brand_logo_url': brand_logo_url,
             'brand_website_url': brand_website_url,

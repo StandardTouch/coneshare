@@ -767,6 +767,35 @@ class ShareLinkViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        from datarooms.collaborator_delete_permissions import (
+            COLLABORATOR_MODIFY_DENIED_DETAIL,
+            assert_user_may_modify_dataroom_document,
+            assert_user_may_modify_dataroom_folder,
+            collaborators_own_delete_only_enabled,
+        )
+        from datarooms.utils import is_dataroom_owner_or_admin
+
+        if (
+            collaborators_own_delete_only_enabled()
+            and share_link.dataroom
+            and not is_dataroom_owner_or_admin(request.user, share_link.dataroom)
+        ):
+            settings_qs = ShareLinkDataroomSetting.objects.filter(
+                id__in=setting_ids, share_link=share_link
+            ).select_related('dataroom_document', 'dataroom_folder')
+            try:
+                for setting in settings_qs:
+                    if setting.dataroom_document_id:
+                        assert_user_may_modify_dataroom_document(
+                            request.user, setting.dataroom_document
+                        )
+                    elif setting.dataroom_folder_id:
+                        assert_user_may_modify_dataroom_folder(
+                            request.user, setting.dataroom_folder
+                        )
+            except PermissionDenied:
+                raise PermissionDenied(COLLABORATOR_MODIFY_DENIED_DETAIL)
+
         try:
             with transaction.atomic():
                 # TODO: potential N+1 query problem!
