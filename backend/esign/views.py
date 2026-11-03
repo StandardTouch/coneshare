@@ -191,30 +191,41 @@ class SignatureRequestViewSet(viewsets.ModelViewSet):
         if not signature_request.fields.exists():
             raise DRFValidationError(_("Request must have at least one signature field."))
         
-        # Update status
-        signature_request.status = 'sent'
-        signature_request.save()
-        
-        # Send emails
-        if signature_request.signing_order:
-            # Sequential: send only to first signer
-            first_signer = signers[0]
-            first_signer.status = 'sent'
-            first_signer.email_sent_at = timezone.now()
-            first_signer.save()
-            
-            record_signer_action(first_signer, 'email_sent')
-            send_signature_request_email_task.delay(first_signer.id)
-        else:
-            # Parallel: send to all signers
-            for signer in signers:
-                signer.status = 'sent'
-                signer.email_sent_at = timezone.now()
-                signer.save()
-                
-                record_signer_action(signer, 'email_sent')
-                send_signature_request_email_task.delay(signer.id)
-        
+        signer_ids_for_email = []
+
+        with transaction.atomic():
+            signature_request = SignatureRequest.objects.select_for_update().get(
+                pk=signature_request.pk
+            )
+            if signature_request.status != 'draft':
+                raise DRFValidationError(_("Request has already been sent."))
+
+            signature_request.status = 'sent'
+            signature_request.save(update_fields=['status', 'updated_at'])
+
+            signers = list(signature_request.signers.select_for_update().order_by('signing_order'))
+
+            if signature_request.signing_order:
+                first_signer = signers[0]
+                first_signer.status = 'sent'
+                first_signer.email_sent_at = timezone.now()
+                first_signer.save(update_fields=['status', 'email_sent_at', 'updated_at'])
+                record_signer_action(first_signer, 'email_sent', request)
+                signer_ids_for_email.append(first_signer.id)
+            else:
+                for signer in signers:
+                    signer.status = 'sent'
+                    signer.email_sent_at = timezone.now()
+                    signer.save(update_fields=['status', 'email_sent_at', 'updated_at'])
+                    record_signer_action(signer, 'email_sent', request)
+                    signer_ids_for_email.append(signer.id)
+
+        def enqueue_signer_emails():
+            for signer_id in signer_ids_for_email:
+                send_signature_request_email_task.delay(signer_id)
+
+        transaction.on_commit(enqueue_signer_emails)
+
         return Response({'message': _('Signature request sent successfully.')})
     
     @action(detail=True, methods=['post'])

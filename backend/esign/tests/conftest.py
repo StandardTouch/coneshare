@@ -6,6 +6,21 @@ from rest_framework.views import APIView
 pytest_plugins = ["esign.tests.test_views"]
 
 
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "postgres: requires PostgreSQL (enforces varchar length limits)",
+    )
+
+
+@pytest.fixture
+def require_postgres(db):
+    from django.db import connection
+
+    if connection.vendor != "postgresql":
+        pytest.skip("PostgreSQL-only test")
+
+
 @pytest.fixture(autouse=True)
 def disable_redis_cache(settings):
     """Use in-memory cache when pytest runs outside Docker."""
