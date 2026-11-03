@@ -6,6 +6,7 @@ import { cn } from "../../lib/utils";
 import { useSidebar } from "./SidebarProvider";
 import { useBranding } from "../../contexts/BrandingProvider";
 import { useUser } from "../../contexts/UserProvider";
+import { useFeatureGates } from "../../featuregates/useFeatureGates";
 
 export const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: Home },
@@ -21,20 +22,27 @@ export function useNavItems() {
   const { t } = useTranslation();
   const { esignEnabled } = useBranding();
   const { user } = useUser();
+  const { canAccessFileRequests, canAccessAutomations } = useFeatureGates();
   const isAdmin = user?.role === 'admin';
   
   const items = [
     { href: "/", label: t('nav.dashboard'), icon: Home },
     { href: "/documents", label: t('nav.documents'), icon: File },
     { href: "/datarooms", label: t('nav.datarooms'), icon: LayoutGrid },
-    { href: "/file-requests", label: t('nav.fileRequests'), icon: UploadCloud },
+    { href: "/file-requests", label: t('nav.fileRequests'), icon: UploadCloud, requiresFileRequests: true },
     { href: "/signatures", label: t('nav.signatures'), icon: PenLine, requiresEsign: true },
-    { href: "/automations", label: t('nav.automations'), icon: Bot, adminOnly: true },
+    { href: "/automations", label: t('nav.automations'), icon: Bot, requiresAutomation: true },
     { href: "/trash", label: t('nav.trash'), icon: Trash2, hasDivider: true },
   ];
   
   return items.filter((item) => {
     if (item.requiresEsign && !esignEnabled) {
+      return false;
+    }
+    if (item.requiresFileRequests && !canAccessFileRequests) {
+      return false;
+    }
+    if (item.requiresAutomation && !canAccessAutomations) {
       return false;
     }
     if (item.adminOnly && !isAdmin) {

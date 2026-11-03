@@ -1196,6 +1196,9 @@
       "FLATTEN_WATERMARKED_DOWNLOADS": "If true, watermarked PDF downloads are flattened (rasterized to JPEGs and recompiled to PDF) to prevent watermark stripping.",
       "ESIGN_ENABLED": "Enable electronic signature feature. When OFF, all esign UI is hidden and all esign API endpoints return 404/403.",
       "ROLE_LABELS_ENABLED": "Enable custom display role labels in the admin panel. When OFF, role label UI and API endpoints are hidden.",
+      "AUTOMATION_ENABLED": "Enable automation rules (admin-only). When OFF, automation UI and API endpoints are hidden.",
+      "API_KEYS_ENABLED": "Enable API keys and MCP setup (admin-only). When OFF, MCP/API key UI is hidden and cs_live_ Bearer requests are rejected; JWT and normal browsing keep working.",
+      "FILE_REQUESTS_ENABLED": "Enable file request collections and public upload links. When OFF, file request UI and anonymous upload URLs are blocked.",
       "SWAGGER_ENABLED": "Enable OpenAPI schema and Swagger/ReDoc documentation. When OFF, those URLs return 404."
     }
   },

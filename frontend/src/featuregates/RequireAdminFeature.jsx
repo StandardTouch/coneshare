@@ -1,7 +1,7 @@
 import { Navigate } from 'react-router';
 import { useFeatureGates } from './useFeatureGates';
 
-/** Route guard: admin role required. */
+/** Route guard: admin role and feature toggle required. */
 export default function RequireAdminFeature({ feature, children }) {
   const gates = useFeatureGates();
 
@@ -13,6 +13,17 @@ export default function RequireAdminFeature({ feature, children }) {
         : false;
 
   if (!allowed) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
+
+/** Route guard: file requests feature toggle (any authenticated user). */
+export function RequireFileRequestsFeature({ children }) {
+  const { canAccessFileRequests } = useFeatureGates();
+
+  if (!canAccessFileRequests) {
     return <Navigate to="/" replace />;
   }
 
