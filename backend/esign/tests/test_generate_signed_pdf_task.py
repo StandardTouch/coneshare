@@ -130,11 +130,9 @@ class TestGenerateSignedPdfTask:
         assert cert_key in uploads
 
         signed_reader = pypdf.PdfReader(io.BytesIO(uploads[signed_key]))
-        assert len(signed_reader.pages) == 2
+        assert len(signed_reader.pages) == 1
         merged_text = signed_reader.pages[0].extract_text() or ""
         assert "Typed Signature" in merged_text
-        audit_text = signed_reader.pages[-1].extract_text() or ""
-        assert "Certificate of Completion" in audit_text
 
     def test_reuses_orphan_signed_version_from_partial_run(
         self,

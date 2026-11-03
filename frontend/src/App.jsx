@@ -56,6 +56,7 @@ const AdminSecurityAlertsPage = lazyNamed(() => import('./pages/AdminSecurityAle
 
 // E-signature routes
 const SignatureRequestsPage = lazy(() => import('./pages/SignatureRequestsPage'));
+const SignatureRequestDetailPage = lazy(() => import('./pages/SignatureRequestDetailPage'));
 const SigningPage = lazy(() => import('./pages/SigningPage'));
 
 function RouteLoadingFallback() {
@@ -107,6 +108,7 @@ function App() {
                   <Route path="/analytics/view-sessions" element={<AllViewSessionsPage />} />
                   <Route path="/automations" element={<AutomationsPage />} />
                   <Route path="/signatures" element={<SignatureRequestsPage />} />
+                  <Route path="/signatures/:requestId" element={<SignatureRequestDetailPage />} />
                   <Route path="/settings" element={<UserSettingsPage />} />
                   <Route path="/settings/password" element={<PasswordSettingsPage />} />
                   <Route path="/settings/integrations" element={<IntegrationsSettingsPage />} />

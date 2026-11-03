@@ -161,6 +161,13 @@ export default function SignatureRequestsPage() {
                   
                   {activeTab === 'created' && (
                     <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => navigate(`/signatures/${request.id}`)}
+                      >
+                        Audit trail
+                      </Button>
                       {request.status === 'completed' && documentId && (
                         <Button
                           size="sm"
