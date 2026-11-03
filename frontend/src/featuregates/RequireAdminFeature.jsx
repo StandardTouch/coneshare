@@ -1,9 +1,7 @@
 import { Navigate } from 'react-router';
 import { useFeatureGates } from './useFeatureGates';
 
-/**
- * Route guard: feature must be enabled and user must be admin.
- */
+/** Route guard: admin role required. */
 export default function RequireAdminFeature({ feature, children }) {
   const gates = useFeatureGates();
 

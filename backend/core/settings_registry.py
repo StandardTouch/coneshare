@@ -25,9 +25,6 @@ DEFAULT_SETTINGS = {
     'ESIGN_ENABLED': {'description': 'Enable electronic signature feature. When OFF, all esign UI is hidden and all esign API endpoints return 404/403.', 'type': 'bool'},
     'ROLE_LABELS_ENABLED': {'description': 'Enable custom display role labels in the admin panel. When OFF, role label UI and API endpoints are hidden.', 'type': 'bool'},
     'USER_INVITE_EMAIL_ENABLED': {'description': 'When ON, admins can create users with an invite email instead of setting a password directly.', 'type': 'bool'},
-    'MCP_ENABLED': {'description': 'Enable Coneshare MCP (remote AI agent integration). When OFF, MCP UI and the MCP server endpoint are unavailable.', 'type': 'bool'},
-    'API_KEYS_ENABLED': {'description': 'Enable API key management and API key authentication. When OFF, keys cannot be used and management endpoints are hidden.', 'type': 'bool'},
-    'AUTOMATION_ENABLED': {'description': 'Enable workflow automations. When OFF, automation UI and API endpoints are hidden.', 'type': 'bool'},
     'SWAGGER_ENABLED': {'description': 'Enable OpenAPI schema and Swagger/ReDoc documentation URLs. When OFF, those URLs return 404.', 'type': 'bool'},
     'COLLABORATORS_OWN_DELETE_ONLY': {
         'description': 'Collaborators can only delete their own files. When ON, dataroom collaborators may remove only items they uploaded or created; owners and admins are unaffected.',

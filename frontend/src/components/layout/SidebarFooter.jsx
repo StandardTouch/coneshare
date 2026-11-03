@@ -7,12 +7,14 @@ import NavUser from "./NavUser";
 import { useSidebar } from "./SidebarProvider";
 import { formatBytes } from "../../lib/formatters";
 import { useUser } from "../../contexts/UserProvider";
+import { useFeatureGates } from "../../featuregates/useFeatureGates";
 import { APP_DISPLAY_VERSION } from "../../lib/constants";
 
 function SidebarFooter() {
   const { t } = useTranslation();
   const { isCollapsed } = useSidebar();
   const { user } = useUser();
+  const { canAccessApiDocs } = useFeatureGates();
 
   const quotaMB = user?.file_size_quota_mb || 0;
   const usageBytes = user?.total_document_size || 0;
@@ -21,18 +23,20 @@ function SidebarFooter() {
 
   return (
     <div className="mt-auto flex flex-col gap-4 p-2">
-      <a
-        href="/api/schema/swagger/"
-        target="_blank"
-        rel="noopener noreferrer"
-        className={cn(
-          "flex items-center gap-3 rounded-lg py-2 text-gray-500 transition-all hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50",
-          isCollapsed ? "justify-center px-0 h-10 w-10" : "px-3"
-        )}
-      >
-        <BookOpen className="h-5 w-5" />
-        <span className={cn(isCollapsed && "hidden")}>{t('nav.apiDocs')}</span>
-      </a>
+      {canAccessApiDocs && (
+        <a
+          href="/api/schema/swagger/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(
+            "flex items-center gap-3 rounded-lg py-2 text-gray-500 transition-all hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50",
+            isCollapsed ? "justify-center px-0 h-10 w-10" : "px-3"
+          )}
+        >
+          <BookOpen className="h-5 w-5" />
+          <span className={cn(isCollapsed && "hidden")}>{t('nav.apiDocs')}</span>
+        </a>
+      )}
       {user ? (
         <div className={cn("px-2 text-xs", isCollapsed && "hidden")}>
           <div className="mb-2 flex justify-between font-medium text-muted-foreground">

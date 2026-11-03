@@ -19,7 +19,7 @@ export const NAV_ITEMS = [
 
 export function useNavItems() {
   const { t } = useTranslation();
-  const { esignEnabled, automationEnabled } = useBranding();
+  const { esignEnabled } = useBranding();
   const { user } = useUser();
   const isAdmin = user?.role === 'admin';
   
@@ -29,7 +29,7 @@ export function useNavItems() {
     { href: "/datarooms", label: t('nav.datarooms'), icon: LayoutGrid },
     { href: "/file-requests", label: t('nav.fileRequests'), icon: UploadCloud },
     { href: "/signatures", label: t('nav.signatures'), icon: PenLine, requiresEsign: true },
-    { href: "/automations", label: t('nav.automations'), icon: Bot, requiresAutomation: true, adminOnly: true },
+    { href: "/automations", label: t('nav.automations'), icon: Bot, adminOnly: true },
     { href: "/trash", label: t('nav.trash'), icon: Trash2, hasDivider: true },
   ];
   
@@ -37,7 +37,7 @@ export function useNavItems() {
     if (item.requiresEsign && !esignEnabled) {
       return false;
     }
-    if (item.requiresAutomation && (!automationEnabled || !isAdmin)) {
+    if (item.adminOnly && !isAdmin) {
       return false;
     }
     return true;
