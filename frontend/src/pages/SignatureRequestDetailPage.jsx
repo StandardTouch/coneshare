@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { getSignatureRequest, getDownloadSignedUrl, getDownloadCertificateUrl } from '../services/esign';
+import {
+  getSignatureRequest,
+  downloadSignedDocument,
+  downloadCertificate,
+} from '../services/esign';
 import { useBreadcrumb } from '../components/layout/BreadcrumbProvider';
 import { Button } from '../components/ui/Button';
 
@@ -98,8 +102,8 @@ export default function SignatureRequestDetailPage() {
               variant="outline"
               onClick={async () => {
                 try {
-                  const { url } = await getDownloadSignedUrl(request.id);
-                  window.open(url, '_blank', 'noopener,noreferrer');
+                  const { download_url: downloadUrl } = await downloadSignedDocument(request.id);
+                  window.open(downloadUrl, '_blank', 'noopener,noreferrer');
                 } catch {
                   toast.error('Download failed');
                 }
@@ -112,8 +116,8 @@ export default function SignatureRequestDetailPage() {
                 variant="outline"
                 onClick={async () => {
                   try {
-                    const { url } = await getDownloadCertificateUrl(request.id);
-                    window.open(url, '_blank', 'noopener,noreferrer');
+                    const { download_url: downloadUrl } = await downloadCertificate(request.id);
+                    window.open(downloadUrl, '_blank', 'noopener,noreferrer');
                   } catch {
                     toast.error('Certificate download failed');
                   }
