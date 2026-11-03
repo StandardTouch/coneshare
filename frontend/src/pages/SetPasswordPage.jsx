@@ -28,6 +28,14 @@ export function SetPasswordPage() {
     document.title = `${t('auth.setPasswordTitle')} - ${brandName}`;
   }, [brandName, t]);
 
+  const inviteErrorMessage = (payload) => {
+    const code = payload?.code;
+    if (code === 'used') return t('auth.inviteLinkUsed');
+    if (code === 'expired') return t('auth.inviteLinkExpired');
+    if (typeof payload?.detail === 'string' && payload.detail.trim()) return payload.detail;
+    return t('auth.inviteLinkInvalid');
+  };
+
   useEffect(() => {
     let mounted = true;
 
@@ -47,12 +55,13 @@ export function SetPasswordPage() {
           setPhase('ready');
         } else {
           setPhase('invalid');
-          setError(data?.detail || t('auth.inviteLinkInvalid'));
+          setError(inviteErrorMessage(data));
         }
       } catch (err) {
         if (!mounted) return;
         setPhase('invalid');
-        setError(extractApiErrorMessage(err, t('auth.inviteLinkInvalid')));
+        const payload = err?.response?.data;
+        setError(payload ? inviteErrorMessage(payload) : extractApiErrorMessage(err, t('auth.inviteLinkInvalid')));
       }
     };
 
