@@ -14,9 +14,7 @@ export function BrandingProvider({ children }) {
     privacyPolicyUrl: BRAND_CONFIG.links.privacy,
     esignEnabled: false,
     roleLabelsEnabled: false,
-    mcpEnabled: true,
-    apiKeysEnabled: true,
-    automationEnabled: true,
+    swaggerEnabled: true,
     collaboratorsOwnDeleteOnly: true,
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -36,9 +34,7 @@ export function BrandingProvider({ children }) {
         privacyPolicyUrl: (privacy && isSafeUrl(privacy)) ? privacy : BRAND_CONFIG.links.privacy,
         esignEnabled: data?.esign_enabled || false,
         roleLabelsEnabled: data?.role_labels_enabled || false,
-        mcpEnabled: data?.mcp_enabled !== false,
-        apiKeysEnabled: data?.api_keys_enabled !== false,
-        automationEnabled: data?.automation_enabled !== false,
+        swaggerEnabled: data?.swagger_enabled !== false,
         collaboratorsOwnDeleteOnly: data?.collaborators_own_delete_only !== false,
       });
     } catch (error) {
@@ -83,9 +79,7 @@ export function useBranding() {
       privacyPolicyUrl: BRAND_CONFIG.links.privacy,
       esignEnabled: false,
       roleLabelsEnabled: false,
-      mcpEnabled: true,
-      apiKeysEnabled: true,
-      automationEnabled: true,
+      swaggerEnabled: true,
       isLoading: false,
       refetchBranding: async () => {},
     };

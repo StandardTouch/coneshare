@@ -23,9 +23,6 @@ const getSettingGroups = (t) => [
 const SETTING_GROUP_BY_KEY = {
   ENABLE_PUBLIC_SIGNUP: 'security',
   FLATTEN_WATERMARKED_DOWNLOADS: 'security',
-  MCP_ENABLED: 'features',
-  API_KEYS_ENABLED: 'features',
-  AUTOMATION_ENABLED: 'features',
   SWAGGER_ENABLED: 'features',
   ESIGN_ENABLED: 'features',
   ROLE_LABELS_ENABLED: 'features',

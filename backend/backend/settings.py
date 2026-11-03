@@ -600,10 +600,7 @@ ROLE_LABELS_ENABLED = os.environ.get('ROLE_LABELS_ENABLED', 'False').lower() in 
 # Admin user invite email (set password via link).
 USER_INVITE_EMAIL_ENABLED = False
 
-# Feature gates (Allure deployment defaults: enabled).
-MCP_ENABLED = os.environ.get('MCP_ENABLED', 'True').lower() in ('true', '1', 'yes')
-API_KEYS_ENABLED = os.environ.get('API_KEYS_ENABLED', 'True').lower() in ('true', '1', 'yes')
-AUTOMATION_ENABLED = os.environ.get('AUTOMATION_ENABLED', 'True').lower() in ('true', '1', 'yes')
+# OpenAPI / Swagger documentation toggle (default ON).
 SWAGGER_ENABLED = os.environ.get('SWAGGER_ENABLED', 'True').lower() in ('true', '1', 'yes')
 # Dataroom collaborator delete policy (default ON).
 COLLABORATORS_OWN_DELETE_ONLY = True
