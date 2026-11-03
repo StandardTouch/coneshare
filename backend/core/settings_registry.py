@@ -39,7 +39,11 @@ DEFAULT_SETTINGS = {
     'USER_INVITE_EMAIL_ENABLED': {'description': 'When ON, admins can create users with an invite email instead of setting a password directly.', 'type': 'bool'},
     'SWAGGER_ENABLED': {'description': 'Enable OpenAPI schema and Swagger/ReDoc documentation URLs. When OFF, those URLs return 404.', 'type': 'bool'},
     'COLLABORATORS_OWN_DELETE_ONLY': {
-        'description': 'Collaborators can only delete their own files. When ON, dataroom collaborators may remove only items they uploaded or created; owners and admins are unaffected.',
+        'description': 'Collaborators can only modify or delete their own files. When ON, dataroom collaborators may change or remove only items they uploaded or created; owners and admins are unaffected.',
+        'type': 'bool',
+    },
+    'DATAROOM_CREATE_ADMIN_ONLY': {
+        'description': 'Only organization admins can create datarooms. When ON, members cannot create new datarooms but may still use rooms they are invited to.',
         'type': 'bool',
     },
 }

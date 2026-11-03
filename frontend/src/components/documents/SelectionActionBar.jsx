@@ -10,6 +10,7 @@ export function SelectionActionBar({
   onMove,
   deleteText,
   deleteDisabled = false,
+  moveDisabled = false,
 }) {
   const { t } = useTranslation();
   const totalSelected = (selectedDocumentsCount || 0) + (selectedFoldersCount || 0);
@@ -25,7 +26,7 @@ export function SelectionActionBar({
         </Button>
       </div>
       <div className="flex items-center gap-x-2">
-        <Button variant="outline" size="sm" onClick={onMove}>
+        <Button variant="outline" size="sm" onClick={onMove} disabled={moveDisabled}>
           <FolderInput className="mr-2 h-4 w-4" />
           {t('documents.move')}
         </Button>

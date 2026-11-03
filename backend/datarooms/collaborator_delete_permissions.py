@@ -1,9 +1,9 @@
 """
-Dataroom collaborator delete policy (Allure / configurable via admin settings).
+Dataroom collaborator content policy (Allure / configurable via admin settings).
 
 When COLLABORATORS_OWN_DELETE_ONLY is enabled (default), dataroom collaborators may
-remove only documents and folders they created or uploaded. Owners and org admins
-retain full delete access within the dataroom.
+modify or remove only documents and folders they created or uploaded. Owners and
+org admins retain full access within the dataroom.
 """
 from django.db.models import Q
 from rest_framework.exceptions import PermissionDenied
@@ -13,8 +13,9 @@ from datarooms.models import Dataroom, DataroomDocument, DataroomFolder
 from datarooms.utils import is_dataroom_owner_or_admin
 
 COLLABORATOR_DELETE_DENIED_DETAIL = (
-    "Collaborators can only delete files and folders they uploaded or created."
+    "Collaborators can only modify or delete files and folders they uploaded or created."
 )
+COLLABORATOR_MODIFY_DENIED_DETAIL = COLLABORATOR_DELETE_DENIED_DETAIL
 
 
 def collaborators_own_delete_only_enabled() -> bool:
@@ -39,16 +40,16 @@ def _expand_dataroom_folder_ids(dataroom: Dataroom, dataroom_folder_ids: list) -
     return all_folder_ids
 
 
-def assert_user_may_remove_dataroom_content(
+def assert_user_may_modify_dataroom_content(
     user,
     dataroom: Dataroom,
     dataroom_doc_ids=None,
     dataroom_folder_ids=None,
 ) -> None:
     """
-    Raises PermissionDenied (403) when a collaborator attempts to remove content
-    they did not create. Folder deletes are blocked if the folder or any nested
-    folder/document in the removal scope was created by someone else.
+    Raises PermissionDenied (403) when a collaborator attempts to modify content
+    they did not create. Folder changes are blocked if the folder or any nested
+    folder/document in the scope was created by someone else.
     """
     if not collaborators_own_delete_only_enabled():
         return
@@ -66,7 +67,7 @@ def assert_user_may_remove_dataroom_content(
             .exists()
         )
         if foreign_folder:
-            raise PermissionDenied(COLLABORATOR_DELETE_DENIED_DETAIL)
+            raise PermissionDenied(COLLABORATOR_MODIFY_DENIED_DETAIL)
 
     ddocs_qs = DataroomDocument.objects.filter(
         Q(id__in=dataroom_doc_ids)
@@ -78,7 +79,57 @@ def assert_user_may_remove_dataroom_content(
     for ddoc in ddocs_qs:
         doc = ddoc.document
         if doc is None or doc.created_by_id != user.id:
-            raise PermissionDenied(COLLABORATOR_DELETE_DENIED_DETAIL)
+            raise PermissionDenied(COLLABORATOR_MODIFY_DENIED_DETAIL)
+
+
+def assert_user_may_remove_dataroom_content(
+    user,
+    dataroom: Dataroom,
+    dataroom_doc_ids=None,
+    dataroom_folder_ids=None,
+) -> None:
+    """Alias for delete/remove endpoints."""
+    assert_user_may_modify_dataroom_content(
+        user, dataroom, dataroom_doc_ids, dataroom_folder_ids
+    )
+
+
+def assert_user_may_modify_dataroom_document(user, dataroom_document: DataroomDocument) -> None:
+    assert_user_may_modify_dataroom_content(
+        user,
+        dataroom_document.dataroom,
+        dataroom_doc_ids=[dataroom_document.id],
+        dataroom_folder_ids=[],
+    )
+
+
+def assert_user_may_modify_dataroom_folder(user, dataroom_folder: DataroomFolder) -> None:
+    assert_user_may_modify_dataroom_content(
+        user,
+        dataroom_folder.dataroom,
+        dataroom_doc_ids=[],
+        dataroom_folder_ids=[dataroom_folder.id],
+    )
+
+
+def assert_user_may_reorder_dataroom_items(user, dataroom: Dataroom, ordered_items) -> None:
+    if not collaborators_own_delete_only_enabled():
+        return
+    if is_dataroom_owner_or_admin(user, dataroom):
+        return
+
+    folder_ids = [item['id'] for item in ordered_items if item.get('type') == 'folder']
+    doc_ids = [item['id'] for item in ordered_items if item.get('type') == 'document']
+    assert_user_may_modify_dataroom_content(
+        user,
+        dataroom,
+        dataroom_doc_ids=doc_ids,
+        dataroom_folder_ids=folder_ids,
+    )
+
+
+def user_can_modify_dataroom_item(user, dataroom: Dataroom, item_type: str, item) -> bool:
+    return user_can_delete_dataroom_item(user, dataroom, item_type, item)
 
 
 def user_can_delete_dataroom_item(user, dataroom: Dataroom, item_type: str, item) -> bool:

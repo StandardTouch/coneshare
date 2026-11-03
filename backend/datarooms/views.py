@@ -49,7 +49,14 @@ from .services import (
     sync_dataroom_document_rename,
     get_dataroom_storage_used_bytes,
 )
-from .collaborator_delete_permissions import assert_user_may_remove_dataroom_content
+from .collaborator_delete_permissions import (
+    assert_user_may_modify_dataroom_content,
+    assert_user_may_modify_dataroom_document,
+    assert_user_may_modify_dataroom_folder,
+    assert_user_may_remove_dataroom_content,
+    assert_user_may_reorder_dataroom_items,
+)
+from .dataroom_create_policy import assert_user_may_create_dataroom
 from .utils import (
     get_dataroom_storage_folder_name,
     build_ordered_dataroom_items,
@@ -124,6 +131,7 @@ class DataroomViewSet(viewsets.ModelViewSet):
         """
         Automatically assign the organization and creator from the request user.
         """
+        assert_user_may_create_dataroom(self.request.user)
         serializer.save(
             organization=self.request.user.organization,
             created_by=self.request.user
@@ -347,6 +355,11 @@ class DataroomViewSet(viewsets.ModelViewSet):
         if parent_id:
             parent = get_object_or_404(DataroomFolder, id=parent_id, dataroom=dataroom)
 
+        try:
+            assert_user_may_reorder_dataroom_items(request.user, dataroom, ordered_items)
+        except PermissionDenied as exc:
+            return Response({"detail": str(exc.detail)}, status=status.HTTP_403_FORBIDDEN)
+
         existing_folders = DataroomFolder.objects.filter(dataroom=dataroom, parent=parent)
         existing_documents = DataroomDocument.objects.filter(dataroom=dataroom, folder=parent, document__deleted_at__isnull=True)
 
@@ -411,6 +424,9 @@ class DataroomViewSet(viewsets.ModelViewSet):
         dest_folder_id = data.get('destination_folder_id')
 
         try:
+            assert_user_may_modify_dataroom_content(
+                request.user, dataroom, doc_ids, folder_ids
+            )
             with transaction.atomic():
                 destination_folder = None
                 if dest_folder_id:
@@ -445,6 +461,8 @@ class DataroomViewSet(viewsets.ModelViewSet):
                     touch_dataroom_folder_ancestors(destination_folder)
 
             return Response({"detail": "Content moved successfully."}, status=status.HTTP_200_OK)
+        except PermissionDenied as exc:
+            return Response({"detail": str(exc.detail)}, status=status.HTTP_403_FORBIDDEN)
         except serializers.ValidationError as e:
             return Response({"detail": str(e.detail)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
@@ -1213,6 +1231,7 @@ class DataroomDocumentViewSet(mixins.RetrieveModelMixin,
 
     def perform_update(self, serializer):
         instance = self.get_object()
+        assert_user_may_modify_dataroom_document(self.request.user, instance)
         new_name = serializer.validated_data.get('name')
         old_name = instance.name
         old_folder = instance.folder
@@ -1319,6 +1338,7 @@ class DataroomFolderViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         instance = self.get_object()
+        assert_user_may_modify_dataroom_folder(self.request.user, instance)
         new_name = serializer.validated_data.get('name')
         old_name = instance.name
         old_parent = instance.parent

@@ -46,7 +46,7 @@ const buildTree = (items) => {
 };
 
 // --- Recursive Row Component ---
-function PermissionRow({ item, level, settings, onSettingChange, onBulkSettingChange, expandedFolders, toggleFolder, isSaving = false }) {
+function PermissionRow({ item, level, settings, onSettingChange, onBulkSettingChange, expandedFolders, toggleFolder, isSaving = false, itemCanModify = true }) {
   const { t } = useTranslation();
   const setting = settings[item.id];
   const isFolder = item.type === 'folder';
@@ -56,11 +56,15 @@ function PermissionRow({ item, level, settings, onSettingChange, onBulkSettingCh
     return null;
   }
 
+  const controlsDisabled = isSaving || !itemCanModify;
+
   const handleCheckboxChange = (key, checked) => {
+    if (controlsDisabled) return;
     onSettingChange(item.id, key, checked);
   };
   
   const handleBulkChange = (key, checked) => {
+    if (controlsDisabled) return;
     if (isFolder) {
       onBulkSettingChange(item, key, checked);
     }
@@ -82,16 +86,16 @@ function PermissionRow({ item, level, settings, onSettingChange, onBulkSettingCh
         </div>
         <div className="flex justify-center">
           {isFolder ? (
-            <Checkbox checked={setting.is_visible} onCheckedChange={(checked) => handleBulkChange('is_visible', checked)} disabled={isSaving} />
+            <Checkbox checked={setting.is_visible} onCheckedChange={(checked) => handleBulkChange('is_visible', checked)} disabled={controlsDisabled} />
           ) : (
-            <Checkbox id={`visible-${item.id}`} checked={setting.is_visible} onCheckedChange={(c) => handleCheckboxChange('is_visible', c)} disabled={isSaving} />
+            <Checkbox id={`visible-${item.id}`} checked={setting.is_visible} onCheckedChange={(c) => handleCheckboxChange('is_visible', c)} disabled={controlsDisabled} />
           )}
         </div>
         <div className="flex justify-center">
           {isFolder ? (
-            <Checkbox checked={setting.allow_download} onCheckedChange={(checked) => handleBulkChange('allow_download', checked)} disabled={isSaving} />
+            <Checkbox checked={setting.allow_download} onCheckedChange={(checked) => handleBulkChange('allow_download', checked)} disabled={controlsDisabled} />
           ) : (
-            <Checkbox id={`download-${item.id}`} checked={setting.allow_download} onCheckedChange={(c) => handleCheckboxChange('allow_download', c)} disabled={isSaving} />
+            <Checkbox id={`download-${item.id}`} checked={setting.allow_download} onCheckedChange={(c) => handleCheckboxChange('allow_download', c)} disabled={controlsDisabled} />
           )}
         </div>
         <div className="flex justify-center">
@@ -108,7 +112,7 @@ function PermissionRow({ item, level, settings, onSettingChange, onBulkSettingCh
               </TooltipContent>
             </Tooltip>
           ) : (
-            <Checkbox id={`watermark-${item.id}`} checked={setting.enable_watermark} onCheckedChange={(c) => handleCheckboxChange('enable_watermark', c)} disabled={isSaving} />
+            <Checkbox id={`watermark-${item.id}`} checked={setting.enable_watermark} onCheckedChange={(c) => handleCheckboxChange('enable_watermark', c)} disabled={controlsDisabled} />
           )}
         </div>
       </div>
@@ -123,6 +127,7 @@ function PermissionRow({ item, level, settings, onSettingChange, onBulkSettingCh
           expandedFolders={expandedFolders}
           toggleFolder={toggleFolder}
           isSaving={isSaving}
+          itemCanModify={child.can_modify !== false}
         />
       ))}
     </>
@@ -288,6 +293,7 @@ export function ManagePermissionsDialog({ isOpen, onOpenChange, link, onSuccess 
                    expandedFolders={expandedFolders}
                    toggleFolder={toggleFolder}
                    isSaving={isSaving}
+                   itemCanModify={item.can_modify !== false}
                  />
               ))
             )}
