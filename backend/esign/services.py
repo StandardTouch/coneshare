@@ -622,19 +622,27 @@ def process_signature_completion(signature_request: SignatureRequest) -> tuple:
     # Get signers for certificate
     signers = list(signature_request.signers.filter(status='signed').select_related('user').order_by('signing_order'))
     
-    # Generate certificate
-    certificate_pdf_bytes = generate_certificate_of_completion(
-        signature_request,
-        signers,
-        original_hash,
-        calculate_document_hash(flattened_pdf_bytes)
-    )
-    
-    # Append certificate to signed PDF
-    final_pdf_bytes = append_certificate_to_pdf(flattened_pdf_bytes, certificate_pdf_bytes)
-    
-    # Calculate final hash
-    final_hash = calculate_document_hash(final_pdf_bytes)
+    append_certificate = getattr(settings, 'ESIGN_APPEND_CERTIFICATE', False)
+    stamped_hash = calculate_document_hash(flattened_pdf_bytes)
+
+    if append_certificate:
+        certificate_pdf_bytes = generate_certificate_of_completion(
+            signature_request,
+            signers,
+            original_hash,
+            stamped_hash,
+        )
+        final_pdf_bytes = append_certificate_to_pdf(flattened_pdf_bytes, certificate_pdf_bytes)
+        final_hash = calculate_document_hash(final_pdf_bytes)
+    else:
+        final_pdf_bytes = flattened_pdf_bytes
+        final_hash = stamped_hash
+        certificate_pdf_bytes = generate_certificate_of_completion(
+            signature_request,
+            signers,
+            original_hash,
+            final_hash,
+        )
     
     signed_storage_key = f"signatures/{signature_request.id}/signed_{signature_request.document.id}.pdf"
     fileserver_client.upload_file(

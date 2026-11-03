@@ -299,7 +299,7 @@ def generate_signed_pdf_task(
     run_followups_sync=False,
 ):
     """
-    Generate signed PDF with all signatures and certificate (audit page appended).
+    Generate signed PDF with stamped fields (certificate pages appended only when ESIGN_APPEND_CERTIFICATE is on).
     Idempotent: re-runs overwrite storage on the existing signed version when present.
     """
     try:

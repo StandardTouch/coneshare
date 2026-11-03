@@ -53,7 +53,10 @@ class Command(BaseCommand):
         pdf_bytes = resp.content
 
         reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
-        expected_pages = num_pages + 1  # audit certificate appended
+        from django.conf import settings
+
+        append_cert = getattr(settings, "ESIGN_APPEND_CERTIFICATE", False)
+        expected_pages = num_pages + (1 if append_cert else 0)
         if len(reader.pages) != expected_pages:
             self.stderr.write(
                 f"Page count mismatch: got {len(reader.pages)}, expected {expected_pages}\n"
@@ -65,7 +68,9 @@ class Command(BaseCommand):
         page1_text = reader.pages[0].extract_text() or ""
         landscape_text = reader.pages[landscape_idx].extract_text() or ""
         last_text = reader.pages[last_idx].extract_text() or ""
-        audit_text = reader.pages[-1].extract_text() or ""
+        audit_text = (
+            (reader.pages[-1].extract_text() or "") if append_cert else ""
+        )
 
         fields = list(
             SignatureField.objects.filter(signature_request=signature_request).select_related(
@@ -92,19 +97,20 @@ class Command(BaseCommand):
                         f"Value {field.value!r} not on page {field.page_number}"
                     )
 
-        signers = Signer.objects.filter(signature_request=signature_request, status="signed")
-        for signer in signers:
-            if signer.user.email not in audit_text:
-                errors.append(f"Signer email {signer.user.email} missing from audit page")
-            if signer.user.name not in audit_text:
-                errors.append(f"Signer name {signer.user.name} missing from audit page")
+        if append_cert:
+            signers = Signer.objects.filter(signature_request=signature_request, status="signed")
+            for signer in signers:
+                if signer.user.email not in audit_text:
+                    errors.append(f"Signer email {signer.user.email} missing from audit page")
+                if signer.user.name not in audit_text:
+                    errors.append(f"Signer name {signer.user.name} missing from audit page")
 
-        if signature_request.original_document_hash:
-            if signature_request.original_document_hash.replace("sha256:", "") not in audit_text.replace(
-                "sha256:", ""
-            ):
-                if signature_request.original_document_hash not in audit_text:
-                    errors.append("Original document hash missing from audit page")
+            if signature_request.original_document_hash:
+                if signature_request.original_document_hash.replace("sha256:", "") not in audit_text.replace(
+                    "sha256:", ""
+                ):
+                    if signature_request.original_document_hash not in audit_text:
+                        errors.append("Original document hash missing from audit page")
 
         if errors:
             for err in errors:
