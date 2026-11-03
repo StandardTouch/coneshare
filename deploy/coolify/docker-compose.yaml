@@ -27,7 +27,7 @@ x-coneshare-defaults: &coneshare_defaults
     
     # Trusted proxy configuration for Traefik/Coolify
     # Docker bridge + Coolify internal network
-    TRUSTED_PROXIES: ${TRUSTED_PROXIES:-127.0.0.1,::1,172.16.0.0/12}
+    TRUSTED_PROXIES: ${TRUSTED_PROXIES:-127.0.0.1,::1,172.16.0.0/12,10.0.0.0/8}
     
     # Database
     DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/coneshare}
