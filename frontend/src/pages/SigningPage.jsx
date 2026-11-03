@@ -16,6 +16,11 @@ import { SignatureDrawModal } from '../components/esign/SignatureDrawModal';
 import { TypedSignatureModal } from '../components/esign/TypedSignatureModal';
 import { EsignPdfViewer } from '../components/esign/EsignPdfViewer';
 import { useUser } from '../contexts/UserProvider';
+import {
+  areAllRequiredSignerFieldsFilled,
+  buildSubmitFieldsPayload,
+  isSubmitDisabled,
+} from './signingPageUtils';
 
 export default function SigningPage() {
   const { token } = useParams();
@@ -42,16 +47,23 @@ export default function SigningPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const loadSigningData = async () => {
+  const loadSigningData = async ({ silent = false } = {}) => {
+    if (!silent) {
+      setLoading(true);
+    }
     try {
       const data = await getSigningData(token);
       setSigningData(data);
       setOtpVerified(!!data.otp_verified_at);
     } catch (error) {
       toast.error(t('esign.error.loadFailed'));
-      navigate('/');
+      if (!silent) {
+        navigate('/');
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -69,6 +81,7 @@ export default function SigningPage() {
     try {
       await verifyOTP(token, otpCode);
       setOtpVerified(true);
+      await loadSigningData({ silent: true });
       toast.success(t('esign.otp.verified'));
     } catch (error) {
       toast.error(t('esign.otp.verifyFailed'));
@@ -109,12 +122,8 @@ export default function SigningPage() {
 
   const handleSubmit = async () => {
     try {
-      const fields = Object.entries(fieldValues).map(([field_id, value]) => ({
-        field_id,
-        value,
-      }));
-
-      await submitSignature(token, fields);
+      const payloadFields = buildSubmitFieldsPayload(signingData?.fields, fieldValues);
+      await submitSignature(token, payloadFields);
       toast.success(t('esign.success.signed'));
       navigate('/signatures');
     } catch (error) {
@@ -172,6 +181,13 @@ export default function SigningPage() {
     signingData;
   const overlayFields = all_fields || fields;
   const pdfUrl = otpVerified ? getSignerDocumentPdfUrl(token) : null;
+  const submitDisabled = isSubmitDisabled({
+    canSign: can_sign,
+    signerFields: fields,
+    fieldValues,
+  });
+  const missingRequiredAfterFill =
+    can_sign && otpVerified && !areAllRequiredSignerFieldsFilled(fields, fieldValues);
 
   return (
     <div className="min-h-screen bg-gray-50 py-6">
@@ -273,17 +289,16 @@ export default function SigningPage() {
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
+          {submitDisabled && (!can_sign ? can_sign_reason : missingRequiredAfterFill) && (
+            <p className="text-sm text-amber-700 mb-3 text-right" role="status">
+              {!can_sign ? can_sign_reason : t('esign.fields.enterValue')}
+            </p>
+          )}
           <div className="flex gap-3 justify-end">
             <Button variant="outline" onClick={() => setShowDeclineDialog(true)}>
               {t('esign.action.decline')}
             </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={
-                !can_sign ||
-                Object.keys(fieldValues).length < (fields?.filter((f) => f.required).length || 0)
-              }
-            >
+            <Button onClick={handleSubmit} disabled={submitDisabled}>
               {t('esign.action.submit')}
             </Button>
           </div>

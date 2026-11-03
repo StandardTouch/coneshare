@@ -33,6 +33,8 @@
     "src/tests/components/esign/TypedSignatureModal.test.jsx",
     "src/tests/services/esignUlid.test.js",
     "src/tests/pages/SignatureRequestsPage.test.jsx",
+    "src/tests/pages/SigningPage.test.jsx",
+    "src/tests/pages/signingPageUtils.test.js",
     "src/tests/hooks/useSortedList.test.js",
     "src/tests/hooks/usePrintProtection.test.jsx",
     "src/tests/components/dialogs/DataroomMoveItemsDialog.test.jsx",
