@@ -29,6 +29,7 @@ const SETTING_GROUP_BY_KEY = {
   SWAGGER_ENABLED: 'features',
   ESIGN_ENABLED: 'features',
   ROLE_LABELS_ENABLED: 'features',
+  COLLABORATORS_OWN_DELETE_ONLY: 'security',
   MAX_PREVIEW_FILE_SIZE_MB: 'quota',
   MAX_VIDEO_PREVIEW_SIZE_MB: 'quota',
   MAX_PREVIEW_PAGES: 'quota',

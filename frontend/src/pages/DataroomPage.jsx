@@ -7,6 +7,8 @@ import { ShareIcon, Star, ArrowLeft, ChevronDown, FolderUp, Plus, Loader2, Alert
 import { toast } from 'sonner';
 import { formatBytes } from '../lib/formatters';
 import { isDataroomOwner, isDataroomCollaborator } from '../utils/formatters';
+import { selectionIncludesNonDeletableItems } from '../utils/dataroomDeletePermissions';
+import { useBranding } from '../contexts/BrandingProvider';
 import { getDataroom, addContentToDataroom, createDataroomFolder, moveDataroomContent, getDataroomFolderContents, getShareLinksForDataroom, deleteShareLink, getDataroomViewSessions, getDataroomStats, removeContentFromDataroom, updateDataroomFolder, updateDataroomDocument, updateDataroomBranding, reorderDataroomItems, deleteDataroom, ensureDataroomFolderPaths, uploadDataroomDocument, upgradeDataroomStorage, getDataroomBannerImages } from '../services/api';
 import { useBreadcrumb } from '../components/layout/BreadcrumbProvider';
 import { useUpload } from '../contexts/UploadProvider';
@@ -138,6 +140,7 @@ export function DataroomPage() {
   const folderInputRef = useRef(null);
   const { addUploads, updateUpload } = useUpload();
   const { user } = useUser();
+  const { collaboratorsOwnDeleteOnly } = useBranding();
 
   const handleFileSelect = () => {
     fileInputRef.current.click();
@@ -959,6 +962,14 @@ export function DataroomPage() {
   const isCollaborator = isDataroomCollaborator(dataroom, user);
   const isOrgAdmin = user?.role === 'admin';
   const canManage = isOwner || isOrgAdmin;
+  const bulkRemoveBlocked = selectionIncludesNonDeletableItems({
+    allItems,
+    selectedDocuments: selection.documents,
+    selectedFolders: selection.folders,
+    user,
+    dataroom,
+    collaboratorsOwnDeleteOnly,
+  });
 
   // Derived storage quota calculations with live preview support
   const currentQuotaMb = dataroom?.storage_quota_mb || 0;
@@ -1137,6 +1148,7 @@ export function DataroomPage() {
                 onMove={() => setIsMoveItemsOpen(true)}
                 onDelete={handleRemoveContent}
                 deleteText={t('common.remove')}
+                deleteDisabled={bulkRemoveBlocked}
               />
             ) : (
               <div className="flex min-h-[48px] items-center">

@@ -587,6 +587,12 @@ FLATTEN_WATERMARKED_DOWNLOADS = False
 # E-Signature feature toggle (Phase 1 - internal signers only).
 # E-signature feature is controlled via ESIGN_ENABLED environment variable (default OFF)
 ESIGN_ENABLED = os.environ.get('ESIGN_ENABLED', 'False').lower() in ('true', '1', 'yes')
+# When True, append Certificate of Completion pages to the stored signed PDF (default OFF).
+ESIGN_APPEND_CERTIFICATE = os.environ.get('ESIGN_APPEND_CERTIFICATE', 'False').lower() in (
+    'true',
+    '1',
+    'yes',
+)
 
 # Custom display role labels in admin (default OFF).
 ROLE_LABELS_ENABLED = os.environ.get('ROLE_LABELS_ENABLED', 'False').lower() in ('true', '1', 'yes')
@@ -599,6 +605,8 @@ MCP_ENABLED = os.environ.get('MCP_ENABLED', 'True').lower() in ('true', '1', 'ye
 API_KEYS_ENABLED = os.environ.get('API_KEYS_ENABLED', 'True').lower() in ('true', '1', 'yes')
 AUTOMATION_ENABLED = os.environ.get('AUTOMATION_ENABLED', 'True').lower() in ('true', '1', 'yes')
 SWAGGER_ENABLED = os.environ.get('SWAGGER_ENABLED', 'True').lower() in ('true', '1', 'yes')
+# Dataroom collaborator delete policy (default ON).
+COLLABORATORS_OWN_DELETE_ONLY = True
 
 
 # Path to the TTF/OTF font file to be used for watermarking.

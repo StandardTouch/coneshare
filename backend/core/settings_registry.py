@@ -29,6 +29,10 @@ DEFAULT_SETTINGS = {
     'API_KEYS_ENABLED': {'description': 'Enable API key management and API key authentication. When OFF, keys cannot be used and management endpoints are hidden.', 'type': 'bool'},
     'AUTOMATION_ENABLED': {'description': 'Enable workflow automations. When OFF, automation UI and API endpoints are hidden.', 'type': 'bool'},
     'SWAGGER_ENABLED': {'description': 'Enable OpenAPI schema and Swagger/ReDoc documentation URLs. When OFF, those URLs return 404.', 'type': 'bool'},
+    'COLLABORATORS_OWN_DELETE_ONLY': {
+        'description': 'Collaborators can only delete their own files. When ON, dataroom collaborators may remove only items they uploaded or created; owners and admins are unaffected.',
+        'type': 'bool',
+    },
 }
 
 VALID_BOOL_TRUE_VALUES = {'true', '1', 'yes', 'on', 't'}

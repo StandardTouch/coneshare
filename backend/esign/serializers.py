@@ -25,6 +25,13 @@ class SignatureFieldSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'signer_id', 'filled_at']
 
 
+class SignerActionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SignerAction
+        fields = ['id', 'action', 'timestamp', 'ip_address', 'user_agent', 'metadata']
+        read_only_fields = fields
+
+
 class SignerSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     user_id = serializers.PrimaryKeyRelatedField(
@@ -33,6 +40,7 @@ class SignerSerializer(serializers.ModelSerializer):
         write_only=True
     )
     fields = SignatureFieldSerializer(many=True, read_only=True)
+    actions = SignerActionSerializer(many=True, read_only=True)
     can_sign = serializers.SerializerMethodField()
     can_sign_reason = serializers.SerializerMethodField()
     
@@ -41,12 +49,13 @@ class SignerSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'user', 'user_id', 'signing_order', 'status',
             'email_sent_at', 'viewed_at', 'signed_at', 'declined_at',
-            'decline_reason', 'otp_verified_at', 'fields',
-            'can_sign', 'can_sign_reason', 'token'
+            'decline_reason', 'otp_verified_at', 'ip_address', 'user_agent',
+            'fields', 'actions', 'can_sign', 'can_sign_reason', 'token'
         ]
         read_only_fields = [
             'id', 'status', 'email_sent_at', 'viewed_at', 'signed_at',
-            'declined_at', 'otp_verified_at', 'token'
+            'declined_at', 'otp_verified_at', 'ip_address', 'user_agent',
+            'actions', 'token'
         ]
         extra_kwargs = {
             'token': {'write_only': False}  # Expose for signing links
@@ -59,13 +68,6 @@ class SignerSerializer(serializers.ModelSerializer):
     def get_can_sign_reason(self, obj):
         _, reason = obj.can_sign()
         return reason
-
-
-class SignerActionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = SignerAction
-        fields = ['id', 'action', 'timestamp', 'ip_address', 'user_agent', 'metadata']
-        read_only_fields = fields
 
 
 class SignatureRequestListSerializer(serializers.ModelSerializer):
@@ -129,6 +131,7 @@ class SignatureRequestDetailSerializer(serializers.ModelSerializer):
     created_by = UserSerializer(read_only=True)
     document = DocumentSerializer(read_only=True)
     signers = SignerSerializer(many=True, read_only=True)
+    signed_document_hash = serializers.SerializerMethodField()
     
     class Meta:
         model = SignatureRequest
@@ -136,13 +139,17 @@ class SignatureRequestDetailSerializer(serializers.ModelSerializer):
             'id', 'title', 'message', 'document', 'created_by', 'status',
             'signing_order', 'expires_at', 'created_at', 'updated_at',
             'completed_at', 'signed_document_version', 'certificate_storage_key',
-            'original_document_hash', 'signers', 'metadata'
+            'original_document_hash', 'signed_document_hash', 'signers', 'metadata'
         ]
         read_only_fields = [
             'id', 'created_by', 'status', 'created_at', 'updated_at',
             'completed_at', 'signed_document_version', 'certificate_storage_key',
-            'original_document_hash'
+            'original_document_hash', 'signed_document_hash'
         ]
+
+    def get_signed_document_hash(self, obj):
+        metadata = obj.metadata or {}
+        return metadata.get('signed_document_hash') or ''
 
 
 class SignatureRequestCreateSerializer(serializers.ModelSerializer):

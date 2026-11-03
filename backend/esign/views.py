@@ -63,10 +63,18 @@ class SignatureRequestViewSet(viewsets.ModelViewSet):
         view_type = self.request.query_params.get('view', 'created')
 
         if self.action in ('retrieve', 'download_signed', 'download_certificate'):
+            signer_qs = Signer.objects.select_related('user').prefetch_related(
+                Prefetch(
+                    'actions',
+                    queryset=SignerAction.objects.order_by('timestamp'),
+                )
+            )
             return SignatureRequest.objects.filter(
                 Q(organization=user.organization, created_by=user)
                 | Q(signers__user=user)
-            ).distinct().select_related('document', 'created_by')
+            ).distinct().select_related('document', 'created_by').prefetch_related(
+                Prefetch('signers', queryset=signer_qs),
+            )
         
         if view_type == 'awaiting':
             # Requests where user is a signer and hasn't signed yet

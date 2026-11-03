@@ -17,6 +17,7 @@ export function BrandingProvider({ children }) {
     mcpEnabled: true,
     apiKeysEnabled: true,
     automationEnabled: true,
+    collaboratorsOwnDeleteOnly: true,
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -38,6 +39,7 @@ export function BrandingProvider({ children }) {
         mcpEnabled: data?.mcp_enabled !== false,
         apiKeysEnabled: data?.api_keys_enabled !== false,
         automationEnabled: data?.automation_enabled !== false,
+        collaboratorsOwnDeleteOnly: data?.collaborators_own_delete_only !== false,
       });
     } catch (error) {
       console.error("Failed to fetch public settings/branding:", error);
