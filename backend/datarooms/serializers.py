@@ -23,7 +23,7 @@ from .models import (
     BANNER_MODE_CHOICES,
     LOGO_MODE_CHOICES,
 )
-from .collaborator_delete_permissions import user_can_delete_dataroom_item, user_can_modify_dataroom_item
+from .collaborator_delete_permissions import user_can_modify_dataroom_item
 from .utils import build_ordered_dataroom_items, is_dataroom_owner_or_admin
 from .services import get_dataroom_storage_used_bytes
 
@@ -328,6 +328,21 @@ class DataroomSerializer(serializers.ModelSerializer):
         return data
 
 
+def _cached_item_permission(serializer, obj, item_type: str) -> bool:
+    cache_attr = '_coneshare_can_modify_cache'
+    cached = getattr(obj, cache_attr, None)
+    if cached is not None:
+        return cached
+    request = serializer.context.get('request')
+    user = getattr(request, 'user', None)
+    if not user or not user.is_authenticated:
+        result = False
+    else:
+        result = user_can_modify_dataroom_item(user, obj.dataroom, item_type, obj)
+    setattr(obj, cache_attr, result)
+    return result
+
+
 class DataroomFolderSerializer(serializers.ModelSerializer):
     ancestors = serializers.SerializerMethodField()
     created_by = serializers.SerializerMethodField()
@@ -344,19 +359,11 @@ class DataroomFolderSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(serializers.BooleanField())
     def get_can_modify(self, obj) -> bool:
-        request = self.context.get('request')
-        user = getattr(request, 'user', None)
-        if not user or not user.is_authenticated:
-            return False
-        return user_can_modify_dataroom_item(user, obj.dataroom, 'folder', obj)
+        return _cached_item_permission(self, obj, 'folder')
 
     @extend_schema_field(serializers.BooleanField())
     def get_can_delete(self, obj) -> bool:
-        request = self.context.get('request')
-        user = getattr(request, 'user', None)
-        if not user or not user.is_authenticated:
-            return False
-        return user_can_delete_dataroom_item(user, obj.dataroom, 'folder', obj)
+        return _cached_item_permission(self, obj, 'folder')
 
     @extend_schema_field(DataroomCollaboratorUserSerializer(allow_null=True))
     def get_created_by(self, obj):
@@ -415,19 +422,11 @@ class DataroomDocumentSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(serializers.BooleanField())
     def get_can_modify(self, obj) -> bool:
-        request = self.context.get('request')
-        user = getattr(request, 'user', None)
-        if not user or not user.is_authenticated:
-            return False
-        return user_can_modify_dataroom_item(user, obj.dataroom, 'document', obj)
+        return _cached_item_permission(self, obj, 'document')
 
     @extend_schema_field(serializers.BooleanField())
     def get_can_delete(self, obj) -> bool:
-        request = self.context.get('request')
-        user = getattr(request, 'user', None)
-        if not user or not user.is_authenticated:
-            return False
-        return user_can_delete_dataroom_item(user, obj.dataroom, 'document', obj)
+        return _cached_item_permission(self, obj, 'document')
 
     @extend_schema_field(serializers.CharField())
     def get_name(self, obj) -> str:
