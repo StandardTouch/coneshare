@@ -2,7 +2,7 @@ import logging
 from celery import shared_task
 from django.conf import settings
 from django.core.mail import send_mail
-from django.db import models
+from django.db import models, transaction
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.translation import activate, gettext as _
@@ -232,6 +232,18 @@ def send_completion_email_task(self, signature_request_id):
         raise self.retry(exc=exc, countdown=60)
 
 
+def _find_signed_version_for_request(signature_request, document):
+    """Reuse FK or orphaned version from a partial signed-PDF task run."""
+    if signature_request.signed_document_version_id:
+        return signature_request.signed_document_version
+    request_id = str(signature_request.id)
+    return (
+        document.versions.filter(metadata__signature_request_id=request_id)
+        .order_by('-version_number')
+        .first()
+    )
+
+
 @shared_task(bind=True, max_retries=3)
 def generate_signed_pdf_task(self, signature_request_id, send_completion_emails=True):
     """
@@ -252,8 +264,6 @@ def generate_signed_pdf_task(self, signature_request_id, send_completion_emails=
         ) = process_signature_completion(signature_request)
 
         file_size = len(final_pdf_bytes)
-        document = signature_request.document
-        existing_signed = signature_request.signed_document_version
         signed_at = (
             signature_request.completed_at.isoformat()
             if signature_request.completed_at
@@ -266,59 +276,83 @@ def generate_signed_pdf_task(self, signature_request_id, send_completion_emails=
             'signed_at': signed_at,
         }
 
-        if existing_signed:
-            signed_version = existing_signed
-            signed_version.storage_key = signed_storage_key
-            signed_version.original_storage_key = signed_storage_key
-            signed_version.file_size = file_size
-            signed_version.has_pages = False
-            signed_version.render_status = DocumentVersion.RENDER_NOT_GENERATED
-            signed_version.render_error = ''
-            signed_version.metadata = {**(signed_version.metadata or {}), **version_metadata}
-            signed_version.save()
-            signed_version.pages.all().delete()
-            logger.info(
-                "Regenerated signed PDF for signature request %s (version %s)",
-                signature_request_id,
-                signed_version.id,
-            )
-        else:
-            original_version = document.versions.filter(is_primary=True).first()
-            max_version = document.versions.aggregate(max_ver=models.Max('version_number'))['max_ver'] or 0
+        signed_version_id = None
+        with transaction.atomic():
+            signature_request = SignatureRequest.objects.select_for_update().select_related(
+                'document'
+            ).get(id=signature_request_id)
+            document = signature_request.document
+            existing_signed = _find_signed_version_for_request(signature_request, document)
 
-            signed_version = DocumentVersion.objects.create(
-                document=document,
-                version_number=max_version + 1,
-                storage_key=signed_storage_key,
-                original_storage_key=signed_storage_key,
-                content_type='application/pdf',
-                type='pdf',
-                file_size=file_size,
-                is_primary=True,
-                has_pages=False,
-                render_status=DocumentVersion.RENDER_NOT_GENERATED,
-                metadata=version_metadata,
-            )
+            if existing_signed:
+                signed_version = existing_signed
+                signed_version.storage_key = signed_storage_key
+                signed_version.original_storage_key = signed_storage_key
+                signed_version.file_size = file_size
+                signed_version.has_pages = False
+                signed_version.render_status = DocumentVersion.RENDER_NOT_GENERATED
+                signed_version.render_error = ''
+                signed_version.metadata = {**(signed_version.metadata or {}), **version_metadata}
+                signed_version.is_primary = True
+                signed_version.save()
+                signed_version.pages.all().delete()
+                logger.info(
+                    "Regenerated signed PDF for signature request %s (version %s)",
+                    signature_request_id,
+                    signed_version.id,
+                )
+            else:
+                original_version = document.versions.filter(is_primary=True).first()
+                max_version = document.versions.aggregate(max_ver=models.Max('version_number'))[
+                    'max_ver'
+                ] or 0
 
-            if original_version and original_version.pk != signed_version.pk:
-                original_version.is_primary = False
-                original_version.save(update_fields=['is_primary', 'updated_at'])
+                signed_version = DocumentVersion.objects.create(
+                    document=document,
+                    version_number=max_version + 1,
+                    storage_key=signed_storage_key,
+                    original_storage_key=signed_storage_key,
+                    content_type='application/pdf',
+                    type='pdf',
+                    file_size=file_size,
+                    is_primary=True,
+                    has_pages=False,
+                    render_status=DocumentVersion.RENDER_NOT_GENERATED,
+                    metadata=version_metadata,
+                )
+
+                if original_version and original_version.pk != signed_version.pk:
+                    DocumentVersion.objects.filter(pk=original_version.pk).update(is_primary=False)
+
+                logger.info(
+                    "Created signed PDF version for signature request %s (version %s)",
+                    signature_request_id,
+                    signed_version.id,
+                )
 
             signature_request.signed_document_version = signed_version
-            logger.info(
-                "Created signed PDF version for signature request %s (version %s)",
-                signature_request_id,
-                signed_version.id,
+            signature_request.certificate_storage_key = cert_storage_key
+            signature_request.original_document_hash = original_hash
+            metadata = signature_request.metadata or {}
+            metadata['signed_document_hash'] = final_hash
+            signature_request.metadata = metadata
+            signature_request.save(
+                update_fields=[
+                    'signed_document_version',
+                    'certificate_storage_key',
+                    'original_document_hash',
+                    'metadata',
+                    'updated_at',
+                ]
             )
+            signed_version_id = signed_version.id
 
-        signature_request.certificate_storage_key = cert_storage_key
-        signature_request.original_document_hash = original_hash
-        signature_request.metadata['signed_document_hash'] = final_hash
-        signature_request.save()
+        def enqueue_followups():
+            generate_pdf_pages_task.delay(signed_version_id)
+            if send_completion_emails:
+                send_completion_email_task.delay(signature_request_id)
 
-        generate_pdf_pages_task.delay(signed_version.id)
-        if send_completion_emails:
-            send_completion_email_task.delay(signature_request_id)
+        transaction.on_commit(enqueue_followups)
 
         logger.info("Generated signed PDF for signature request %s", signature_request_id)
 

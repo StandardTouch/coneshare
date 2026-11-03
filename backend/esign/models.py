@@ -45,7 +45,7 @@ class SignatureRequest(BaseModel):
     certificate_storage_key = models.CharField(max_length=1024, blank=True)
     
     # Original document hash for audit trail
-    original_document_hash = models.CharField(max_length=64, blank=True)
+    original_document_hash = models.CharField(max_length=128, blank=True)
     
     # Metadata for audit and tracking
     metadata = models.JSONField(default=dict, blank=True)
