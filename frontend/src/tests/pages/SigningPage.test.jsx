@@ -5,6 +5,14 @@ import { I18nextProvider } from 'react-i18next';
 import i18n from '../../i18n';
 import SigningPage from '../../pages/SigningPage';
 import * as esign from '../../services/esign';
+import { toast } from 'sonner';
+
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}));
 
 vi.mock('../../services/esign', async (importOriginal) => {
   const actual = await importOriginal();
@@ -81,6 +89,8 @@ describe('SigningPage submit after OTP', () => {
     esign.verifyOTP.mockResolvedValue({ verified: true });
     esign.requestOTP.mockResolvedValue({});
     esign.submitSignature.mockResolvedValue({ status: 'signed' });
+    toast.error.mockClear();
+    toast.success.mockClear();
   });
 
   it('enables Submit after OTP verify refetch and required fields filled', async () => {
@@ -135,6 +145,32 @@ describe('SigningPage submit after OTP', () => {
           expect.objectContaining({ field_id: FIELD_DATE }),
         ])
       );
+    });
+  });
+
+  it('shows backend detail once when OTP verify fails', async () => {
+    esign.getSigningData.mockResolvedValue(
+      signingPayload({
+        can_sign: false,
+        can_sign_reason: 'OTP verification required',
+      })
+    );
+    esign.verifyOTP.mockRejectedValue({
+      response: { data: { detail: 'Invalid verification code.' } },
+    });
+
+    renderPage();
+
+    await screen.findByText('Test Doc');
+    fireEvent.click(screen.getByRole('button', { name: /Request Verification Code/i }));
+    fireEvent.change(await screen.findByPlaceholderText(/6-digit/i), {
+      target: { value: '123456' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Verify$/i }));
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledTimes(1);
+      expect(toast.error).toHaveBeenCalledWith('Invalid verification code.');
     });
   });
 });

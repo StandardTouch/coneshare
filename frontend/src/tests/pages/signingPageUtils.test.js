@@ -2,13 +2,38 @@ import { describe, it, expect } from 'vitest';
 import {
   areAllRequiredSignerFieldsFilled,
   buildSubmitFieldsPayload,
+  getApiErrorDetail,
   isSubmitDisabled,
+  signingActionErrorMessage,
 } from '../../pages/signingPageUtils';
 
 const FIELD_A = '01M6BBPMBM7QFDG413TWMECWQH';
 const FIELD_B = '01M6BBPMBM7QFDG413TWMECWQI';
 
 describe('signingPageUtils', () => {
+  it('extracts backend detail from axios errors', () => {
+    const error = {
+      response: { data: { detail: 'Verification code has expired. Please request a new one.' } },
+    };
+    expect(getApiErrorDetail(error)).toBe(
+      'Verification code has expired. Please request a new one.'
+    );
+  });
+
+  it('falls back to i18n key when detail is missing', () => {
+    const t = (key) => (key === 'esign.otp.verifyFailed' ? 'Invalid verification code' : key);
+    expect(signingActionErrorMessage(new Error('network'), 'esign.otp.verifyFailed', t)).toBe(
+      'Invalid verification code'
+    );
+  });
+
+  it('prefers backend detail over fallback', () => {
+    const t = () => 'generic';
+    const error = { response: { data: { detail: 'Too many failed attempts. Please request a new code.' } } };
+    expect(signingActionErrorMessage(error, 'esign.otp.verifyFailed', t)).toBe(
+      'Too many failed attempts. Please request a new code.'
+    );
+  });
   const signerFields = [
     { id: FIELD_A, required: true, field_type: 'signature' },
     { id: FIELD_B, required: true, field_type: 'date_signed' },

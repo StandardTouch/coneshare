@@ -117,8 +117,14 @@ export const getSigningData = async (token) => {
 /**
  * Request OTP for signing
  */
+const signingActionConfig = { skipGlobalErrorToast: true };
+
 export const requestOTP = async (token) => {
-  const response = await api.post(`/esign/sign/${token}/request_otp/`);
+  const response = await api.post(
+    `/esign/sign/${token}/request_otp/`,
+    {},
+    signingActionConfig
+  );
   return response.data;
 };
 
@@ -126,7 +132,11 @@ export const requestOTP = async (token) => {
  * Verify OTP code
  */
 export const verifyOTP = async (token, code) => {
-  const response = await api.post(`/esign/sign/${token}/verify_otp/`, { code });
+  const response = await api.post(
+    `/esign/sign/${token}/verify_otp/`,
+    { code },
+    signingActionConfig
+  );
   return response.data;
 };
 
@@ -136,7 +146,11 @@ export const verifyOTP = async (token, code) => {
  * @param {Array} fields - Array of { field_id, value } where value is signature data or text
  */
 export const submitSignature = async (token, fields) => {
-  const response = await api.post(`/esign/sign/${token}/submit/`, { fields });
+  const response = await api.post(
+    `/esign/sign/${token}/submit/`,
+    { fields },
+    signingActionConfig
+  );
   return response.data;
 };
 

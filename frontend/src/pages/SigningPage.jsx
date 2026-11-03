@@ -20,6 +20,7 @@ import {
   areAllRequiredSignerFieldsFilled,
   buildSubmitFieldsPayload,
   isSubmitDisabled,
+  signingActionErrorMessage,
 } from './signingPageUtils';
 
 export default function SigningPage() {
@@ -73,7 +74,7 @@ export default function SigningPage() {
       setOtpSent(true);
       toast.success(t('esign.otp.sent'));
     } catch (error) {
-      toast.error(t('esign.otp.sendFailed'));
+      toast.error(signingActionErrorMessage(error, 'esign.otp.sendFailed', t));
     }
   };
 
@@ -84,7 +85,7 @@ export default function SigningPage() {
       await loadSigningData({ silent: true });
       toast.success(t('esign.otp.verified'));
     } catch (error) {
-      toast.error(t('esign.otp.verifyFailed'));
+      toast.error(signingActionErrorMessage(error, 'esign.otp.verifyFailed', t));
     }
   };
 
@@ -127,7 +128,7 @@ export default function SigningPage() {
       toast.success(t('esign.success.signed'));
       navigate('/signatures');
     } catch (error) {
-      toast.error(t('esign.error.submitFailed'));
+      toast.error(signingActionErrorMessage(error, 'esign.error.submitFailed', t));
     }
   };
 
