@@ -63,7 +63,7 @@ export function PublicUploadPage() {
   const { slug } = useParams();
   const [searchParams] = useSearchParams();
   const isEmbedMode = searchParams.get('embed') === '1';
-  const { brandName, brandLogoUrl, brandWebsiteUrl, termsUrl, privacyPolicyUrl } = useBranding();
+  const { brandName, brandLogoUrl, brandWebsiteUrl, termsUrl, privacyPolicyUrl, fileRequestsEnabled, isLoading: brandingLoading } = useBranding();
   const [fileRequest, setFileRequest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -80,6 +80,14 @@ export function PublicUploadPage() {
   const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
+    if (brandingLoading) {
+      return;
+    }
+    if (!fileRequestsEnabled) {
+      setError('This file request is not available.');
+      setLoading(false);
+      return;
+    }
     const fetchRequestDetails = async () => {
       try {
         const response = await getPublicFileRequest(slug);
@@ -91,7 +99,7 @@ export function PublicUploadPage() {
       }
     };
     fetchRequestDetails();
-  }, [slug]);
+  }, [slug, brandingLoading, fileRequestsEnabled]);
 
   useEffect(() => {
     if (fileRequest) {

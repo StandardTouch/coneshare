@@ -15,6 +15,9 @@ export function BrandingProvider({ children }) {
     esignEnabled: false,
     roleLabelsEnabled: false,
     swaggerEnabled: true,
+    automationEnabled: true,
+    apiKeysEnabled: true,
+    fileRequestsEnabled: true,
     collaboratorsOwnDeleteOnly: true,
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -35,6 +38,9 @@ export function BrandingProvider({ children }) {
         esignEnabled: data?.esign_enabled || false,
         roleLabelsEnabled: data?.role_labels_enabled || false,
         swaggerEnabled: data?.swagger_enabled !== false,
+        automationEnabled: data?.automation_enabled !== false,
+        apiKeysEnabled: data?.api_keys_enabled !== false,
+        fileRequestsEnabled: data?.file_requests_enabled !== false,
         collaboratorsOwnDeleteOnly: data?.collaborators_own_delete_only !== false,
       });
     } catch (error) {
@@ -80,6 +86,10 @@ export function useBranding() {
       esignEnabled: false,
       roleLabelsEnabled: false,
       swaggerEnabled: true,
+      automationEnabled: true,
+      apiKeysEnabled: true,
+      fileRequestsEnabled: true,
+      collaboratorsOwnDeleteOnly: true,
       isLoading: false,
       refetchBranding: async () => {},
     };

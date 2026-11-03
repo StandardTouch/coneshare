@@ -4,7 +4,7 @@ import { Toaster } from 'sonner';
 import './App.css';
 import MainLayout from './components/layout/MainLayout';
 import RequireAuth from './components/auth/RequireAuth';
-import RequireAdminFeature from './featuregates/RequireAdminFeature';
+import RequireAdminFeature, { RequireFileRequestsFeature } from './featuregates/RequireAdminFeature';
 import { UploadProvider } from './contexts/UploadProvider';
 import { UserProvider } from './contexts/UserProvider';
 import { BrandingProvider } from './contexts/BrandingProvider';
@@ -103,8 +103,22 @@ function App() {
                   <Route path="/trash" element={<TrashPage />} />
                   <Route path="/datarooms" element={<DataroomsPage />} />
                   <Route path="/datarooms/:dataroomId" element={<DataroomPage />} />
-                  <Route path="/file-requests" element={<FileRequestsPage />} />
-                  <Route path="/file-requests/:requestId" element={<FileRequestDetailPage />} />
+                  <Route
+                    path="/file-requests"
+                    element={
+                      <RequireFileRequestsFeature>
+                        <FileRequestsPage />
+                      </RequireFileRequestsFeature>
+                    }
+                  />
+                  <Route
+                    path="/file-requests/:requestId"
+                    element={
+                      <RequireFileRequestsFeature>
+                        <FileRequestDetailPage />
+                      </RequireFileRequestsFeature>
+                    }
+                  />
                   <Route path="/analytics/links" element={<AllLinksPage />} />
                   <Route path="/analytics/view-sessions" element={<AllViewSessionsPage />} />
                   <Route
