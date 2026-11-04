@@ -32,7 +32,8 @@ This document tracks the key architectural decisions and implementation steps ma
 
 ### 6. Development Workflow Improvements
 - **Makefile**: The project's `Makefile` was updated with two new commands to streamline development:
-  - `make clean`: Removes Python cache files (`.pyc`), old migration files, and the SQLite database.
+  - `make clean`: Removes Python cache only (`.pyc`, `__pycache__`).
+  - `make reset.dev CONFIRM=1`: Wipes local SQLite DB, upload storage (`~/.coneshare-data`), Redis volume, then `up` + `migrate` (migrations are never deleted).
   - `make test`: Executes the `pytest` test suite within the backend Docker container.
 
 ---

@@ -24,7 +24,10 @@ help:
 	@echo "  front.sh        - Attach a shell to the frontend container"
 	@echo "  portal.sh       - Attach a shell to the portal container"
 	@echo "  mcp.sh          - Attach a shell to the mcp_server container"
-	@echo "  clean           - Remove migrations, .pyc files, and database"
+	@echo "  clean           - Remove Python cache only (see reset.dev for empty app data)"
+	@echo "  clean.cache     - Same as clean: .pyc and __pycache__ only"
+	@echo "  reset.data      - Wipe local DB, uploads, Redis volume (needs CONFIRM=1)"
+	@echo "  reset.dev       - reset.data + up + migrate (needs CONFIRM=1; then make superuser)"
 	@echo "  test            - Run backend tests with pytest"
 	@echo "  test.bdd        - Run backend BDD tests with pytest"
 	@echo "  test.front      - Run whitelisted frontend tests with vitest"
@@ -114,13 +117,59 @@ mcp.sh:
 # DEVELOPMENT COMMANDS
 # ====================================================================================
 
-.PHONY: clean
-clean:
-	@echo "Cleaning Python cache, migrations, and database..."
+CONESHARE_DATA_DIR ?= $(HOME)/.coneshare-data
+COMPOSE := COMPOSE_PROJECT_NAME=coneshare docker-compose
+
+.PHONY: clean clean.cache reset.data reset.dev
+
+# Safe default: bytecode/cache only. Never deletes Django migrations.
+clean: clean.cache
+	@echo "Tip: empty database and uploads without touching migrations → make reset.dev CONFIRM=1"
+
+.PHONY: clean.cache
+clean.cache:
+	@echo "Cleaning Python cache..."
 	find . -type f -name "*.py[co]" -delete
-	find . -type d -name "__pycache__" -exec rm -rf {} +
-	find ./backend -path "*/migrations/*.py" -not -name "__init__.py" -delete
+	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+
+# Wipe local dev application data (not source code, not migrations).
+# Default .env uses SQLite at backend/db.sqlite3; uploads live in ~/.coneshare-data (core /storage).
+# If DATABASE_URL points at external Postgres, drop/recreate that database separately.
+reset.data:
+ifndef CONFIRM
+	@echo "Refusing to wipe data without confirmation."
+	@echo ""
+	@echo "This will remove:"
+	@echo "  - backend/db.sqlite3 (default SQLite dev DB)"
+	@echo "  - uploaded files under $(CONESHARE_DATA_DIR)"
+	@echo "  - Docker volume coneshare_redis_data"
+	@echo ""
+	@echo "Django migration files under backend/*/migrations/ are kept."
+	@echo ""
+	@echo "Run:  make reset.dev CONFIRM=1"
+	@echo "Then: make superuser"
+	@exit 1
+endif
+	@echo "Stopping Coneshare stack..."
+	$(COMPOSE) down --remove-orphans
+	@echo "Removing Redis data volume (if present)..."
+	-docker volume rm coneshare_redis_data 2>/dev/null
+	@echo "Removing local SQLite database file..."
 	rm -f backend/db.sqlite3
+	@echo "Clearing file storage mount $(CONESHARE_DATA_DIR) ..."
+	@mkdir -p "$(CONESHARE_DATA_DIR)"
+	@find "$(CONESHARE_DATA_DIR)" -mindepth 1 -delete 2>/dev/null || true
+	@echo "Local app data wiped. Migrations unchanged."
+
+reset.dev: reset.data
+	@echo "Starting stack..."
+	$(COMPOSE) up -d
+	@$(COMPOSE) exec -T backend python compile_po.py 2>/dev/null || true
+	@echo "Running migrations..."
+	$(COMPOSE) exec -T backend python manage.py migrate
+	@echo ""
+	@echo "Dev environment reset complete."
+	@echo "Create an admin login:  make superuser"
 
 .PHONY: test
 test:
