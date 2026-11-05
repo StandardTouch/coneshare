@@ -11,10 +11,6 @@ export function resolveItemCreatorId(item) {
   return null;
 }
 
-/**
- * Whether the current user may remove this dataroom list item from the room.
- * Prefer API-provided can_delete when present; otherwise derive from policy flags.
- */
 export function canRemoveDataroomItem({
   item,
   user,
@@ -23,6 +19,9 @@ export function canRemoveDataroomItem({
 }) {
   if (!item || !user || !dataroom) {
     return false;
+  }
+  if (item.permissions && typeof item.permissions.can_delete === 'boolean') {
+    return item.permissions.can_delete;
   }
   if (typeof item.can_delete === 'boolean') {
     return item.can_delete;

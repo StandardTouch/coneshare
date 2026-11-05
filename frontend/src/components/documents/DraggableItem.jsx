@@ -38,6 +38,8 @@ export function DraggableItem({
   deleteLabel,
   allowDelete,
   allowModify,
+  onAccessRules,
+  showAccessRules = false,
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -76,20 +78,26 @@ export function DraggableItem({
   const showDeleteAction =
     allowDelete !== undefined
       ? allowDelete
-      : item.can_delete !== undefined
-        ? item.can_delete
-        : item.can_modify !== undefined
-          ? item.can_modify
-          : true;
+      : item.permissions && typeof item.permissions.can_delete === 'boolean'
+        ? item.permissions.can_delete
+        : item.can_delete !== undefined
+          ? item.can_delete
+          : item.can_modify !== undefined
+            ? item.can_modify
+            : true;
 
   const showModifyAction =
     allowModify !== undefined
       ? allowModify
-      : item.can_modify !== undefined
-        ? item.can_modify
-        : item.can_delete !== undefined
-          ? item.can_delete
-          : true;
+      : item.permissions &&
+          (typeof item.permissions.can_modify === 'boolean' ||
+            typeof item.permissions.can_rename === 'boolean')
+        ? Boolean(item.permissions.can_modify ?? item.permissions.can_rename)
+        : item.can_modify !== undefined
+          ? item.can_modify
+          : item.can_delete !== undefined
+            ? item.can_delete
+            : true;
 
   const getOwnerDetails = () => {
     const resolvedOwner = (typeof item.created_by === 'object' && item.created_by) || item.created_by_user || item.owner;
@@ -254,6 +262,7 @@ export function DraggableItem({
               deleteLabel={deleteLabel}
               showDelete={showDeleteAction}
               showRename={showModifyAction}
+              onAccessRules={showAccessRules && type === 'folder' ? onAccessRules : undefined}
             />
           </div>
         )}

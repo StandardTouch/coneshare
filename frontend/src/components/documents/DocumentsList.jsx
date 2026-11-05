@@ -51,6 +51,8 @@ export function DocumentsList({
   viewsTooltip = "Views recorded for this item.",
   emptyState = null,
   deleteLabel,
+  onAccessRules,
+  showAccessRules = false,
 }) {
   const { t } = useTranslation();
   const [itemToDelete, setItemToDelete] = useState(null);
@@ -302,6 +304,8 @@ export function DocumentsList({
                   showIndex={showIndex}
                   itemIndex={showIndex ? indexMap.get(`${item.type}:${item.id}`) : null}
                   deleteLabel={deleteLabel}
+                  onAccessRules={onAccessRules}
+                  showAccessRules={showAccessRules}
                 />
               ))}
             </div>

@@ -10,6 +10,7 @@ export function CollaboratorsAvatarGroup({
   dataroom,
   onCollaboratorsUpdated,
   className = '',
+  canManageCollaborators = true,
 }) {
   const { t } = useTranslation();
   const [isManageOpen, setIsManageOpen] = useState(false);
@@ -34,9 +35,9 @@ export function CollaboratorsAvatarGroup({
   return (
     <div className={`flex items-center gap-2 ${className}`}>
       <div
-        className="flex items-center -space-x-2 overflow-hidden py-1 cursor-pointer"
-        onClick={() => setIsManageOpen(true)}
-        title={t('datarooms.manageCollaborators')}
+        className={`flex items-center -space-x-2 overflow-hidden py-1 ${canManageCollaborators ? 'cursor-pointer' : ''}`}
+        onClick={canManageCollaborators ? () => setIsManageOpen(true) : undefined}
+        title={canManageCollaborators ? t('datarooms.manageCollaborators') : undefined}
       >
         {visibleMembers.map((member, index) => {
           const initial = getAvatarInitial(member.name, member.email);
@@ -71,23 +72,27 @@ export function CollaboratorsAvatarGroup({
         )}
       </div>
 
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="h-8 gap-1.5 px-2.5 text-xs text-muted-foreground hover:text-foreground"
-        onClick={() => setIsManageOpen(true)}
-      >
-        <UserPlus className="h-3.5 w-3.5" />
-        <span>{t('datarooms.collaborators')}</span>
-      </Button>
+      {canManageCollaborators && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1.5 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => setIsManageOpen(true)}
+        >
+          <UserPlus className="h-3.5 w-3.5" />
+          <span>{t('datarooms.collaborators')}</span>
+        </Button>
+      )}
 
-      <ManageCollaboratorsDialog
-        isOpen={isManageOpen}
-        onOpenChange={setIsManageOpen}
-        dataroom={dataroom}
-        onCollaboratorsUpdated={onCollaboratorsUpdated}
-      />
+      {canManageCollaborators && (
+        <ManageCollaboratorsDialog
+          isOpen={isManageOpen}
+          onOpenChange={setIsManageOpen}
+          dataroom={dataroom}
+          onCollaboratorsUpdated={onCollaboratorsUpdated}
+        />
+      )}
     </div>
   );
 }
