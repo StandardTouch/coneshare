@@ -23,7 +23,9 @@ from .models import (
     BANNER_MODE_CHOICES,
     LOGO_MODE_CHOICES,
 )
-from .collaborator_delete_permissions import user_can_modify_dataroom_item
+from .collaborator_delete_permissions import user_can_delete_dataroom_item, user_can_modify_dataroom_item
+from permissions_rbac.services import item_permissions_for_user
+from permissions_rbac.models import DataroomRole
 from .utils import build_ordered_dataroom_items, is_dataroom_owner_or_admin
 from .services import get_dataroom_storage_used_bytes
 
@@ -109,11 +111,45 @@ class DataroomCollaboratorUserSerializer(serializers.ModelSerializer):
 class DataroomCollaboratorSerializer(serializers.ModelSerializer):
     user = DataroomCollaboratorUserSerializer(read_only=True)
     invited_by = DataroomCollaboratorUserSerializer(read_only=True)
+    dataroom_role = serializers.SerializerMethodField()
+    dataroom_role_id = serializers.PrimaryKeyRelatedField(
+        queryset=DataroomRole.objects.all(),
+        source='dataroom_role',
+        required=False,
+        allow_null=True,
+        write_only=True,
+    )
 
     class Meta:
         model = DataroomCollaborator
-        fields = ['id', 'dataroom', 'user', 'role', 'invited_by', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'dataroom', 'user', 'role', 'invited_by', 'created_at', 'updated_at']
+        fields = [
+            'id',
+            'dataroom',
+            'user',
+            'role',
+            'dataroom_role',
+            'dataroom_role_id',
+            'invited_by',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = [
+            'id',
+            'dataroom',
+            'user',
+            'role',
+            'dataroom_role',
+            'invited_by',
+            'created_at',
+            'updated_at',
+        ]
+
+    @extend_schema_field(serializers.DictField())
+    def get_dataroom_role(self, obj):
+        if not obj.dataroom_role_id:
+            return None
+        role = obj.dataroom_role
+        return {'id': str(role.id), 'slug': role.slug, 'name': role.name}
 
 
 class DataroomAddCollaboratorSerializer(serializers.Serializer):
@@ -129,6 +165,7 @@ class DataroomAddCollaboratorSerializer(serializers.Serializer):
         default="",
         help_text="Single user email to add as a collaborator."
     )
+    dataroom_role_id = serializers.CharField(required=False, allow_blank=True, default='')
 
     def validate(self, data):
         user_ids = data.get('user_ids', [])
@@ -239,7 +276,10 @@ class DataroomSerializer(serializers.ModelSerializer):
             return 'owner'
         if getattr(user, 'role', '') == 'admin' and obj.organization_id == user.organization_id:
             return 'admin'
-        if any(c.user_id == user.id for c in obj.collaborators.all()):
+        collab_match = next((c for c in obj.collaborators.all() if c.user_id == user.id), None)
+        if collab_match:
+            if collab_match.dataroom_role_id and collab_match.dataroom_role:
+                return collab_match.dataroom_role.slug
             return 'collaborator'
         return 'none'
 
@@ -328,8 +368,8 @@ class DataroomSerializer(serializers.ModelSerializer):
         return data
 
 
-def _cached_item_permission(serializer, obj, item_type: str) -> bool:
-    cache_attr = '_coneshare_can_modify_cache'
+def _cached_item_permission(serializer, obj, item_type: str, kind: str = 'modify') -> bool:
+    cache_attr = f'_coneshare_can_{kind}_cache'
     cached = getattr(obj, cache_attr, None)
     if cached is not None:
         return cached
@@ -337,10 +377,29 @@ def _cached_item_permission(serializer, obj, item_type: str) -> bool:
     user = getattr(request, 'user', None)
     if not user or not user.is_authenticated:
         result = False
+    elif kind == 'delete':
+        result = user_can_delete_dataroom_item(user, obj.dataroom, item_type, obj)
     else:
         result = user_can_modify_dataroom_item(user, obj.dataroom, item_type, obj)
     setattr(obj, cache_attr, result)
     return result
+
+
+def _item_permissions_payload(serializer, obj, item_type: str):
+    request = serializer.context.get('request')
+    user = getattr(request, 'user', None)
+    if not user or not user.is_authenticated:
+        return {
+            'can_view': False,
+            'can_download': False,
+            'can_modify': False,
+            'can_delete': False,
+            'can_rename': False,
+            'can_move': False,
+            'can_reorder': False,
+            'can_manage_share_settings': False,
+        }
+    return item_permissions_for_user(user, obj.dataroom, item_type, obj)
 
 
 class DataroomFolderSerializer(serializers.ModelSerializer):
@@ -348,14 +407,15 @@ class DataroomFolderSerializer(serializers.ModelSerializer):
     created_by = serializers.SerializerMethodField()
     can_delete = serializers.SerializerMethodField()
     can_modify = serializers.SerializerMethodField()
+    permissions = serializers.SerializerMethodField()
 
     class Meta:
         model = DataroomFolder
         fields = [
             'id', 'name', 'dataroom', 'parent', 'is_starred',
-            'created_at', 'updated_at', 'ancestors', 'created_by', 'can_delete', 'can_modify',
+            'created_at', 'updated_at', 'ancestors', 'created_by', 'can_delete', 'can_modify', 'permissions',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'ancestors', 'created_by', 'can_delete', 'can_modify']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'ancestors', 'created_by', 'can_delete', 'can_modify', 'permissions']
 
     @extend_schema_field(serializers.BooleanField())
     def get_can_modify(self, obj) -> bool:
@@ -363,7 +423,11 @@ class DataroomFolderSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(serializers.BooleanField())
     def get_can_delete(self, obj) -> bool:
-        return _cached_item_permission(self, obj, 'folder')
+        return _cached_item_permission(self, obj, 'folder', 'delete')
+
+    @extend_schema_field(serializers.DictField())
+    def get_permissions(self, obj):
+        return _item_permissions_payload(self, obj, 'folder')
 
     @extend_schema_field(DataroomCollaboratorUserSerializer(allow_null=True))
     def get_created_by(self, obj):
@@ -411,13 +475,14 @@ class DataroomDocumentSerializer(serializers.ModelSerializer):
     is_direct_upload = serializers.BooleanField(read_only=True)
     can_delete = serializers.SerializerMethodField()
     can_modify = serializers.SerializerMethodField()
+    permissions = serializers.SerializerMethodField()
 
     class Meta:
         model = DataroomDocument
         fields = [
             'id', 'name', 'document_id', 'document_type', 'created_at',
             'file_size', 'updated_at', 'created_by', 'folder', 'is_starred',
-            'dataroom_view_count', 'is_direct_upload', 'can_delete', 'can_modify',
+            'dataroom_view_count', 'is_direct_upload', 'can_delete', 'can_modify', 'permissions',
         ]
 
     @extend_schema_field(serializers.BooleanField())
@@ -426,7 +491,11 @@ class DataroomDocumentSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(serializers.BooleanField())
     def get_can_delete(self, obj) -> bool:
-        return _cached_item_permission(self, obj, 'document')
+        return _cached_item_permission(self, obj, 'document', 'delete')
+
+    @extend_schema_field(serializers.DictField())
+    def get_permissions(self, obj):
+        return _item_permissions_payload(self, obj, 'document')
 
     @extend_schema_field(serializers.CharField())
     def get_name(self, obj) -> str:
@@ -483,7 +552,10 @@ class DataroomDetailSerializer(serializers.ModelSerializer):
             return 'owner'
         if getattr(user, 'role', '') == 'admin' and obj.organization_id == user.organization_id:
             return 'admin'
-        if any(c.user_id == user.id for c in obj.collaborators.all()):
+        collab_match = next((c for c in obj.collaborators.all() if c.user_id == user.id), None)
+        if collab_match:
+            if collab_match.dataroom_role_id and collab_match.dataroom_role:
+                return collab_match.dataroom_role.slug
             return 'collaborator'
         return 'none'
 
@@ -541,6 +613,13 @@ class DataroomDetailSerializer(serializers.ModelSerializer):
             documents = obj.documents.filter(folder__isnull=True, document__deleted_at__isnull=True).select_related('document', 'document__created_by').annotate(
                 dataroom_view_count=Count('dataroomvisit', distinct=True)
             ).order_by('created_at', 'id')
+
+        user = getattr(request, 'user', None) if request else None
+        if user and user.is_authenticated:
+            from permissions_rbac.services import filter_dataroom_documents_for_user, filter_dataroom_folders_for_user
+
+            folders = filter_dataroom_folders_for_user(folders, user, obj)
+            documents = filter_dataroom_documents_for_user(documents, user, obj)
         folders_list = list(folders)
         documents_list = list(documents)
 

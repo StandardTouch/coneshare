@@ -57,6 +57,15 @@ from .collaborator_delete_permissions import (
     assert_user_may_reorder_dataroom_items,
 )
 from .dataroom_create_policy import assert_user_may_create_dataroom
+from permissions_rbac.catalogue import PERM_DELETE_DATAROOM, ROLE_SLUG_EDITOR
+from permissions_rbac.models import DataroomRole
+from permissions_rbac.seed import ensure_default_roles_for_organization
+from permissions_rbac.services import (
+    assert_dataroom_perm,
+    filter_dataroom_documents_for_user,
+    filter_dataroom_folders_for_user,
+    has_perm,
+)
 from .utils import (
     get_dataroom_storage_folder_name,
     build_ordered_dataroom_items,
@@ -138,7 +147,7 @@ class DataroomViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance):
-        if not is_dataroom_owner_or_admin(self.request.user, instance):
+        if not has_perm(self.request.user, PERM_DELETE_DATAROOM, instance):
             raise PermissionDenied("Only the dataroom owner or an organization admin can delete this dataroom.")
         delete_dataroom(instance)
 
@@ -877,6 +886,22 @@ class DataroomViewSet(viewsets.ModelViewSet):
 
         user_ids = serializer.validated_data.get('user_ids', [])
         email = serializer.validated_data.get('email', '').strip()
+        dataroom_role_id = (serializer.validated_data.get('dataroom_role_id') or '').strip()
+
+        ensure_default_roles_for_organization(request.user.organization)
+        dataroom_role = None
+        if dataroom_role_id:
+            dataroom_role = DataroomRole.objects.filter(
+                id=dataroom_role_id,
+                organization=request.user.organization,
+            ).first()
+            if not dataroom_role:
+                return Response({'detail': 'Invalid dataroom role.'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            dataroom_role = DataroomRole.objects.filter(
+                organization=request.user.organization,
+                slug=ROLE_SLUG_EDITOR,
+            ).first()
 
         users_to_add = []
         if email:
@@ -926,8 +951,15 @@ class DataroomViewSet(viewsets.ModelViewSet):
                 collab, created = DataroomCollaborator.objects.get_or_create(
                     dataroom=dataroom,
                     user=target_user,
-                    defaults={'invited_by': request.user, 'role': DataroomCollaborator.ROLE_COLLABORATOR}
+                    defaults={
+                        'invited_by': request.user,
+                        'role': DataroomCollaborator.ROLE_COLLABORATOR,
+                        'dataroom_role': dataroom_role,
+                    },
                 )
+                if not created and dataroom_role:
+                    collab.dataroom_role = dataroom_role
+                    collab.save(update_fields=['dataroom_role', 'updated_at'])
                 if created:
                     created_collaborators.append(collab)
 
@@ -1225,9 +1257,15 @@ class DataroomDocumentViewSet(mixins.RetrieveModelMixin,
 
     def get_queryset(self):
         accessible_datarooms = get_dataroom_queryset_for_user(self.request.user)
-        return self.queryset.filter(dataroom__in=accessible_datarooms).annotate(
+        qs = self.queryset.filter(dataroom__in=accessible_datarooms).annotate(
             dataroom_view_count=Count('dataroomvisit', distinct=True)
         )
+        dataroom_id = self.request.query_params.get('dataroom_id')
+        if dataroom_id:
+            dataroom = Dataroom.objects.filter(id=dataroom_id).first()
+            if dataroom:
+                qs = filter_dataroom_documents_for_user(qs, self.request.user, dataroom)
+        return qs
 
     def perform_update(self, serializer):
         instance = self.get_object()
@@ -1269,17 +1307,22 @@ class DataroomFolderViewSet(viewsets.ModelViewSet):
         dataroom_id = self.request.query_params.get('dataroom_id')
         if dataroom_id:
             queryset = queryset.filter(dataroom_id=dataroom_id)
+            dataroom = Dataroom.objects.filter(id=dataroom_id).first()
+            if dataroom:
+                queryset = filter_dataroom_folders_for_user(queryset, self.request.user, dataroom)
         return queryset
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         # Custom logic to include sub-folders and documents
         sub_folders = instance.children.all().select_related('created_by', 'dataroom', 'dataroom__created_by').order_by('created_at', 'id')
+        sub_folders = filter_dataroom_folders_for_user(sub_folders, request.user, instance.dataroom)
         documents = DataroomDocument.objects.filter(
             folder=instance, document__deleted_at__isnull=True
         ).select_related('document', 'document__created_by').annotate(
             dataroom_view_count=Count('dataroomvisit', distinct=True)
         ).order_by('created_at', 'id')
+        documents = filter_dataroom_documents_for_user(documents, request.user, instance.dataroom)
 
         data = self.get_serializer(instance).data
         sub_folder_data = DataroomFolderSerializer(sub_folders, many=True).data

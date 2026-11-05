@@ -35,6 +35,7 @@ import {
   addAdminDataroomCollaborators,
   removeAdminDataroomCollaborator,
   getAdminEligibleCollaborators,
+  getDataroomRoleOptions,
 } from '../../services/api';
 import { getAvatarInitial, isDataroomOwner } from '../../utils/formatters';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -63,6 +64,8 @@ export function ManageCollaboratorsDialog({
   const [collabToRemove, setCollabToRemove] = useState(null);
   const [isRemoving, setIsRemoving] = useState(false);
   const [isLeavingDataroom, setIsLeavingDataroom] = useState(false);
+  const [roleOptions, setRoleOptions] = useState([]);
+  const [selectedRoleId, setSelectedRoleId] = useState('');
 
   const isOwner = isDataroomOwner(dataroom, currentUser);
   const isOrgAdmin = currentUser?.role === 'admin';
@@ -101,6 +104,14 @@ export function ManageCollaboratorsDialog({
       fetchCollaborators();
       if (canManage) {
         fetchEligibleUsers(debouncedSearch);
+        getDataroomRoleOptions(dataroom.id)
+          .then((res) => {
+            const roles = res.data || [];
+            setRoleOptions(roles);
+            const editor = roles.find((r) => r.slug === 'editor');
+            setSelectedRoleId(editor?.id || roles[0]?.id || '');
+          })
+          .catch(() => {});
       }
     }
   }, [isOpen, dataroom?.id, canManage, debouncedSearch, fetchCollaborators, fetchEligibleUsers]);
@@ -127,7 +138,7 @@ export function ManageCollaboratorsDialog({
     if (selectedUserIds.length === 0) return;
     setIsAdding(true);
     try {
-      const payload = { user_ids: selectedUserIds };
+      const payload = { user_ids: selectedUserIds, dataroom_role_id: selectedRoleId || undefined };
       if (isAdmin) {
         await addAdminDataroomCollaborators(dataroom.id, payload);
       } else {
@@ -230,6 +241,24 @@ export function ManageCollaboratorsDialog({
                 <label className="text-sm font-medium text-foreground">
                   {t('datarooms.addCollaborator')}
                 </label>
+                {roleOptions.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {t('datarooms.collaboratorRole', { defaultValue: 'Dataroom role' })}
+                    </span>
+                    <select
+                      className="flex-1 rounded-md border bg-background px-2 py-1.5 text-sm"
+                      value={selectedRoleId}
+                      onChange={(e) => setSelectedRoleId(e.target.value)}
+                    >
+                      {roleOptions.map((role) => (
+                        <option key={role.id} value={role.id}>
+                          {role.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="relative">
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -406,7 +435,7 @@ export function ManageCollaboratorsDialog({
 
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className="text-xs font-normal">
-                            {t('datarooms.collaboratorRole')}
+                            {collab.dataroom_role?.name || t('datarooms.collaboratorRole')}
                           </Badge>
 
                           {/* Action buttons */}
