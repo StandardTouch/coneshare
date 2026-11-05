@@ -57,6 +57,8 @@ urlpatterns = [
     path('api/v1/onboarding/', include('onboarding.urls')),
     path('api/v1/admin/', include('rolelabels.urls')),
     path('api/v1/admin/', include('core.admin_urls')),
+    path('api/v1/', include('permissions_rbac.dataroom_urls')),
+    path('api/v1/admin/', include('permissions_rbac.urls')),
     path('api/v1/admin/datarooms/', include('datarooms.admin_urls')),
 ]
 
