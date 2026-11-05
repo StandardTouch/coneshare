@@ -172,9 +172,9 @@ class TestDataroomViewSet:
 
         # The number of queries should remain constant regardless of document count.
         # Current expected queries:
-        # 1 (get folder + dataroom via select_related) + 2 (ancestor chain) + 1 (AppConfiguration for modify policy)
-        # + 1 (get children) + 1 (get documents) + 1 (check item-order rows for this scope) = 7
-        with django_assert_num_queries(7):
+        # 1 (get folder + dataroom via select_related) + 2 (ancestor chain) + 1 (RBAC role grants cache)
+        # + 1 (get children) + 1 (get documents) + 1 (check item-order rows for this scope) = 6
+        with django_assert_num_queries(6):
             url = f'/api/v1/dataroom-folders/{target_folder.id}/'
             response = api_client.get(url)
             print(response.json()['ancestors'])
