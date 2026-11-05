@@ -239,6 +239,7 @@ INSTALLED_APPS = [
     'onboarding.apps.OnboardingConfig',
     'rolelabels',
     'featuregates.apps.FeaturegatesConfig',
+    'permissions_rbac.apps.PermissionsRbacConfig',
 ]
 
 MIDDLEWARE = [
