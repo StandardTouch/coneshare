@@ -16,7 +16,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../com
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/Tabs';
 import { getDatarooms, deleteDataroom, removeDataroomCollaborator } from '../services/api';
 import { useUser } from '../contexts/UserProvider';
-import { useBranding } from '../contexts/BrandingProvider';
 import { formatDate, getAvatarInitial, isDataroomOwner, isDataroomCollaborator } from '../utils/formatters';
 
 function DataroomCardIcon({ dataroom }) {
@@ -118,9 +117,8 @@ export function DataroomsPage() {
     }
   };
 
+  const canCreateDataroom = Boolean(currentUser?.can_create_dataroom);
   const isOrgAdmin = currentUser?.role === 'admin';
-  const { dataroomCreateAdminOnly } = useBranding();
-  const canCreateDataroom = isOrgAdmin || !dataroomCreateAdminOnly;
 
   return (
     <TooltipProvider>

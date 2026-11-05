@@ -64,7 +64,7 @@ def _ensure_site_role_grants(organization) -> None:
                 site_role=site_role,
                 permission=permission,
             )
-    # Member create_dataroom is controlled via legacy toggle + optional grant row
+    # Members do not receive create_dataroom unless granted in Roles & Permissions.
     SiteRolePermission.objects.filter(
         organization=organization,
         site_role='member',

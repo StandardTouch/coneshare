@@ -609,10 +609,6 @@ FILE_REQUESTS_ENABLED = os.environ.get('FILE_REQUESTS_ENABLED', 'True').lower() 
 
 # OpenAPI / Swagger documentation toggle (default ON).
 SWAGGER_ENABLED = os.environ.get('SWAGGER_ENABLED', 'True').lower() in ('true', '1', 'yes')
-# Dataroom collaborator content policy (default ON).
-COLLABORATORS_OWN_DELETE_ONLY = True
-# Dataroom creation policy (default ON — admins only).
-DATAROOM_CREATE_ADMIN_ONLY = True
 
 
 # Path to the TTF/OTF font file to be used for watermarking.

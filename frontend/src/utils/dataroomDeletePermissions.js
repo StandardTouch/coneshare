@@ -11,12 +11,7 @@ export function resolveItemCreatorId(item) {
   return null;
 }
 
-export function canRemoveDataroomItem({
-  item,
-  user,
-  dataroom,
-  collaboratorsOwnDeleteOnly = true,
-}) {
+export function canRemoveDataroomItem({ item, user, dataroom }) {
   if (!item || !user || !dataroom) {
     return false;
   }
@@ -35,9 +30,6 @@ export function canRemoveDataroomItem({
   if (!isDataroomCollaborator(dataroom, user)) {
     return false;
   }
-  if (!collaboratorsOwnDeleteOnly) {
-    return true;
-  }
   return resolveItemCreatorId(item) === user.id;
 }
 
@@ -47,7 +39,6 @@ export function selectionIncludesNonDeletableItems({
   selectedFolders,
   user,
   dataroom,
-  collaboratorsOwnDeleteOnly,
 }) {
   const selectedKeys = new Set([
     ...selectedDocuments.map((id) => `document:${id}`),
@@ -60,7 +51,6 @@ export function selectionIncludesNonDeletableItems({
       item,
       user,
       dataroom,
-      collaboratorsOwnDeleteOnly,
     });
   });
 }

@@ -14,7 +14,6 @@ import {
   scopeIncludesNonModifiableItems,
 } from '../utils/dataroomItemPermissions';
 import { FolderAccessRulesDialog } from '../components/datarooms/FolderAccessRulesDialog';
-import { useBranding } from '../contexts/BrandingProvider';
 import { getDataroom, addContentToDataroom, createDataroomFolder, moveDataroomContent, getDataroomFolderContents, getShareLinksForDataroom, deleteShareLink, getDataroomViewSessions, getDataroomStats, removeContentFromDataroom, updateDataroomFolder, updateDataroomDocument, updateDataroomBranding, reorderDataroomItems, deleteDataroom, ensureDataroomFolderPaths, uploadDataroomDocument, upgradeDataroomStorage, getDataroomBannerImages } from '../services/api';
 import { useBreadcrumb } from '../components/layout/BreadcrumbProvider';
 import { useUpload } from '../contexts/UploadProvider';
@@ -148,7 +147,6 @@ export function DataroomPage() {
   const folderInputRef = useRef(null);
   const { addUploads, updateUpload } = useUpload();
   const { user } = useUser();
-  const { collaboratorsOwnDeleteOnly } = useBranding();
 
   const handleFileSelect = () => {
     fileInputRef.current.click();
@@ -991,7 +989,6 @@ export function DataroomPage() {
     selectedFolders: selection.folders,
     user,
     dataroom,
-    collaboratorsOwnDeleteOnly,
   });
   const bulkModifyBlocked = selectionIncludesNonModifiableItems({
     allItems,
@@ -999,13 +996,11 @@ export function DataroomPage() {
     selectedFolders: selection.folders,
     user,
     dataroom,
-    collaboratorsOwnDeleteOnly,
   });
   const reorderBlocked = scopeIncludesNonModifiableItems({
     allItems,
     user,
     dataroom,
-    collaboratorsOwnDeleteOnly,
   });
 
   // Derived storage quota calculations with live preview support

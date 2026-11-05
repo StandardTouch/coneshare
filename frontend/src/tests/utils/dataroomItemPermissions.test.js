@@ -31,13 +31,12 @@ describe('dataroomItemPermissions', () => {
     ).toBe(true);
   });
 
-  it('blocks collaborator from modifying others items when policy is on', () => {
+  it('blocks collaborator from modifying others items via RBAC fallback', () => {
     expect(
       canModifyDataroomItem({
         item: { id: '1', type: 'document', created_by: { id: 'owner1' } },
         user: collab,
         dataroom: { ...dataroom, collaborators: [{ user: collab }] },
-        collaboratorsOwnDeleteOnly: true,
       })
     ).toBe(false);
   });
@@ -48,7 +47,6 @@ describe('dataroomItemPermissions', () => {
         item: { id: '1', type: 'document', created_by: { id: 'collab1' } },
         user: collab,
         dataroom: { ...dataroom, collaborators: [{ user: collab }] },
-        collaboratorsOwnDeleteOnly: true,
       })
     ).toBe(true);
   });
@@ -75,7 +73,6 @@ describe('dataroomItemPermissions', () => {
         selectedFolders: [],
         user: collab,
         dataroom,
-        collaboratorsOwnDeleteOnly: true,
       })
     ).toBe(true);
   });
@@ -90,7 +87,6 @@ describe('dataroomItemPermissions', () => {
         allItems,
         user: collab,
         dataroom,
-        collaboratorsOwnDeleteOnly: true,
       })
     ).toBe(true);
   });

@@ -23,12 +23,7 @@ function perm(item, key) {
   return undefined;
 }
 
-export function canModifyDataroomItem({
-  item,
-  user,
-  dataroom,
-  collaboratorsOwnDeleteOnly = true,
-}) {
+export function canModifyDataroomItem({ item, user, dataroom }) {
   if (!item || !user || !dataroom) {
     return false;
   }
@@ -47,9 +42,6 @@ export function canModifyDataroomItem({
   }
   if (!isDataroomCollaborator(dataroom, user)) {
     return false;
-  }
-  if (!collaboratorsOwnDeleteOnly) {
-    return true;
   }
   return resolveItemCreatorId(item) === user.id;
 }
@@ -71,7 +63,6 @@ export function selectionIncludesNonModifiableItems({
   selectedFolders,
   user,
   dataroom,
-  collaboratorsOwnDeleteOnly,
 }) {
   const selectedKeys = new Set([
     ...selectedDocuments.map((id) => `document:${id}`),
@@ -84,24 +75,17 @@ export function selectionIncludesNonModifiableItems({
       item,
       user,
       dataroom,
-      collaboratorsOwnDeleteOnly,
     });
   });
 }
 
-export function scopeIncludesNonModifiableItems({
-  allItems,
-  user,
-  dataroom,
-  collaboratorsOwnDeleteOnly,
-}) {
+export function scopeIncludesNonModifiableItems({ allItems, user, dataroom }) {
   return allItems.some(
     (item) =>
       !canModifyDataroomItem({
         item,
         user,
         dataroom,
-        collaboratorsOwnDeleteOnly,
       })
   );
 }

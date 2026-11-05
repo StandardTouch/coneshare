@@ -271,12 +271,6 @@ export function AdminRbacPage() {
                 </Button>
               </div>
             ))}
-            <p className="text-xs text-muted-foreground">
-              {t('admin.rbac.legacyToggleNote', {
-                defaultValue:
-                  'Legacy toggles in Settings still apply: Collaborators own-only and Admin-only dataroom creation override defaults when enabled.',
-              })}
-            </p>
           </div>
 
           <div className="rounded-lg border p-4 space-y-3">

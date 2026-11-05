@@ -127,6 +127,8 @@ def default_grants_for_role_slug(slug: str) -> Dict[str, Optional[str]]:
     if slug == ROLE_SLUG_CONTRIBUTOR:
         base = default_grants_for_role_slug(ROLE_SLUG_VIEWER)
         base.update({PERM_UPLOAD: None, PERM_CREATE_FOLDER: None})
+        for perm in MODIFY_PERMISSIONS:
+            base[perm] = SCOPE_OWN
         return base
     if slug == ROLE_SLUG_EDITOR:
         base = default_grants_for_role_slug(ROLE_SLUG_CONTRIBUTOR)

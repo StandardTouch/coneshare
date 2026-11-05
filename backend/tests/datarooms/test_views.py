@@ -72,12 +72,11 @@ class TestDataroomViewSet:
         names = [item['name'] for item in response.data]
         assert names == ["Third Room", "Second Room", "First Room"]
 
-    @patch('datarooms.dataroom_create_policy.get_dynamic_setting', return_value=False)
-    def test_create_dataroom(self, _mock_setting, api_client, user, organization):
-        """Test creating a new dataroom when admin-only creation is disabled."""
+    def test_create_dataroom(self, admin_api_client, admin_user, organization):
+        """Organization admins may create datarooms under default RBAC site grants."""
         assert Dataroom.objects.count() == 0
         data = {'name': 'New API Dataroom'}
-        response = api_client.post('/api/v1/datarooms/', data)
+        response = admin_api_client.post('/api/v1/datarooms/', data)
 
         assert response.status_code == status.HTTP_201_CREATED
         assert response.data['name'] == 'New API Dataroom'
@@ -85,7 +84,7 @@ class TestDataroomViewSet:
 
         dataroom = Dataroom.objects.first()
         assert dataroom.organization == organization
-        assert dataroom.created_by == user
+        assert dataroom.created_by == admin_user
 
     def test_update_dataroom_branding_fields(self, api_client, dataroom):
         url = f'/api/v1/datarooms/{dataroom.id}/'
@@ -2202,11 +2201,9 @@ class TestDataroomFolderMtimeUpdates:
             })
             assert res.status_code == status.HTTP_200_OK
 
-    @patch('datarooms.dataroom_create_policy.get_dynamic_setting', return_value=False)
-    def test_dataroom_storage_version_defaults_and_vault_hierarchy(self, _mock_setting, api_client, user, organization):
+    def test_dataroom_storage_version_defaults_and_vault_hierarchy(self, admin_api_client, admin_user, organization):
         """Test newly created dataroom defaults to storage_version=2 and uses __datarooms__ vault."""
-        api_client.force_authenticate(user=user)
-        res = api_client.post('/api/v1/datarooms/', {'name': 'Modern Vault Dataroom'})
+        res = admin_api_client.post('/api/v1/datarooms/', {'name': 'Modern Vault Dataroom'})
         assert res.status_code == status.HTTP_201_CREATED
         assert res.data['storage_version'] == 2
 
@@ -2216,7 +2213,7 @@ class TestDataroomFolderMtimeUpdates:
         # Finalize direct upload into v2 dataroom
         from datarooms.views import DataroomViewSet
         view = DataroomViewSet()
-        vault_folder = view._ensure_library_folder_path(user, dataroom, relative_path="Subfolder/file.pdf")
+        vault_folder = view._ensure_library_folder_path(admin_user, dataroom, relative_path="Subfolder/file.pdf")
         assert vault_folder.parent.name == str(dataroom.id)
         assert vault_folder.parent.parent.name == "__datarooms__"
         assert vault_folder.parent.created_by is None

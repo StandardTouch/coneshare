@@ -62,18 +62,6 @@ def invalidate_role_cache(role: DataroomRole) -> None:
     cache.delete(_role_cache_key(str(role.organization_id), str(role.id)))
 
 
-def _legacy_own_only_relaxed() -> bool:
-    from datarooms.collaborator_delete_permissions import collaborators_own_delete_only_enabled
-
-    return not collaborators_own_delete_only_enabled()
-
-
-def _legacy_member_can_create_dataroom() -> bool:
-    from datarooms.dataroom_create_policy import dataroom_create_admin_only_enabled
-
-    return not dataroom_create_admin_only_enabled()
-
-
 def _load_role_grants(role: DataroomRole) -> Dict[str, str]:
     cache_key = _role_cache_key(str(role.organization_id), str(role.id))
     cached = cache.get(cache_key)
@@ -165,8 +153,6 @@ def _expand_dataroom_folder_ids(dataroom: Dataroom, dataroom_folder_ids: list) -
 
 
 def _effective_scope(stored_scope: str, permission: str) -> str:
-    if permission in MODIFY_PERMISSIONS and _legacy_own_only_relaxed():
-        return SCOPE_ANY
     return stored_scope or SCOPE_ANY
 
 
@@ -176,11 +162,7 @@ def has_site_perm(user, permission: str) -> bool:
     site_role = getattr(user, 'role', '') or 'member'
     org_id = str(user.organization_id)
     grants = _load_site_grants(org_id, site_role)
-    if permission in grants:
-        return True
-    if permission == PERM_CREATE_DATAROOM and site_role == 'member' and _legacy_member_can_create_dataroom():
-        return True
-    return False
+    return permission in grants
 
 
 def has_perm(

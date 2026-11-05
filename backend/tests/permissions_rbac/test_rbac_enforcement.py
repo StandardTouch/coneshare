@@ -77,11 +77,9 @@ def contributor_user(db, organization):
 
 
 @pytest.mark.django_db
-class TestLegacyEditorParity:
-    @patch('datarooms.collaborator_delete_permissions.get_dynamic_setting', return_value=True)
-    @patch('datarooms.dataroom_create_policy.get_dynamic_setting', return_value=True)
-    def test_editor_role_matches_legacy_collaborator_modify_rules(
-        self, _own, _create, user, viewer_user, organization, rbac_room, rbac_roles
+class TestDefaultEditorScopes:
+    def test_editor_role_defaults_to_own_scope_modify_rules(
+        self, user, viewer_user, organization, rbac_room, rbac_roles
     ):
         editor = User.objects.create_user(
             username='legacy_editor@test.com',
@@ -185,6 +183,14 @@ class TestHiddenFolderPaths:
             organization=organization,
         )
         _assign(rbac_room, contributor, ROLE_SLUG_CONTRIBUTOR, user)
+        contributor_role = DataroomRole.objects.get(
+            organization=organization, slug=ROLE_SLUG_CONTRIBUTOR
+        )
+        DataroomFolderRoleRule.objects.create(
+            dataroom_folder=hidden_setup['hidden'],
+            dataroom_role=contributor_role,
+            rule=DataroomFolderRoleRule.RULE_HIDDEN,
+        )
         own_doc = _doc('move_me.pdf', contributor, organization)
         dd = DataroomDocument.objects.create(
             dataroom=rbac_room, document=own_doc, name=own_doc.name, folder=hidden_setup['visible']

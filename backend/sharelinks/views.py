@@ -781,15 +781,10 @@ class ShareLinkViewSet(viewsets.ModelViewSet):
             COLLABORATOR_MODIFY_DENIED_DETAIL,
             assert_user_may_modify_dataroom_document,
             assert_user_may_modify_dataroom_folder,
-            collaborators_own_delete_only_enabled,
         )
         from datarooms.utils import is_dataroom_owner_or_admin
 
-        if (
-            collaborators_own_delete_only_enabled()
-            and share_link.dataroom
-            and not is_dataroom_owner_or_admin(request.user, share_link.dataroom)
-        ):
+        if share_link.dataroom and not is_dataroom_owner_or_admin(request.user, share_link.dataroom):
             settings_qs = ShareLinkDataroomSetting.objects.filter(
                 id__in=setting_ids, share_link=share_link
             ).select_related('dataroom_document', 'dataroom_folder')

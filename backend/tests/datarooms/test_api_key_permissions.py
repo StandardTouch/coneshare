@@ -1,11 +1,13 @@
 import pytest
-from unittest.mock import patch
 from rest_framework import status
 from rest_framework.test import APIClient
 from django.urls import reverse
 from core.models import APIKey
 from core.authentication import generate_raw_api_key
 from datarooms.models import Dataroom
+from permissions_rbac.catalogue import PERM_CREATE_DATAROOM
+from permissions_rbac.models import SiteRolePermission
+from permissions_rbac.services import invalidate_organization_rbac_cache
 
 
 def _create_client_with_api_key(user, tier):
@@ -43,8 +45,14 @@ def test_read_only_api_key_perm_on_datarooms(user):
 
 
 @pytest.mark.django_db
-@patch('datarooms.dataroom_create_policy.get_dynamic_setting', return_value=False)
-def test_read_write_api_key_perm_on_datarooms(_mock_setting, user):
+def test_read_write_api_key_perm_on_datarooms(user):
+    SiteRolePermission.objects.get_or_create(
+        organization=user.organization,
+        site_role='member',
+        permission=PERM_CREATE_DATAROOM,
+    )
+    invalidate_organization_rbac_cache(str(user.organization_id))
+
     client = _create_client_with_api_key(user, 'read_write')
     dataroom = Dataroom.objects.create(name='Test Room', created_by=user, organization=user.organization)
 
