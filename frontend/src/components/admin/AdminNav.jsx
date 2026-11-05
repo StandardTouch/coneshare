@@ -11,6 +11,7 @@ export function AdminNav() {
     { to: '/admin/settings', label: t('admin.settingsNav') },
     { to: '/admin/branding', label: t('admin.branding') },
     { to: '/admin/users', label: t('admin.users') },
+    { to: '/admin/rbac', label: t('admin.rbac.nav', { defaultValue: 'Roles & Permissions' }) },
     ...(roleLabelsEnabled
       ? [{ to: '/admin/roles', label: t('admin.roles.nav', { defaultValue: 'Roles' }) }]
       : []),

@@ -12,6 +12,8 @@ from drf_spectacular.utils import extend_schema_field
 
 from core.models import APIKey, AppConfiguration, LoginActivity, Organization, UserGroup
 from core.services import blacklist_all_user_tokens, get_dynamic_setting
+from permissions_rbac.catalogue import PERM_CREATE_DATAROOM
+from permissions_rbac.services import has_site_perm
 from rolelabels.serializers import RoleLabelAdminUserMixin
 
 logger = logging.getLogger(__name__)
@@ -77,6 +79,7 @@ class UserSerializer(serializers.ModelSerializer):
     avatar_url = serializers.SerializerMethodField()
     file_size_quota_mb = serializers.SerializerMethodField()
     max_files_per_upload = serializers.SerializerMethodField()
+    can_create_dataroom = serializers.SerializerMethodField()
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -89,12 +92,12 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 'email', 'name', 'role', 'organization',
             'avatar', 'avatar_url', 'language', 'date_joined', 'updated_at',
             'total_document_size', 'file_size_quota_mb', 'custom_file_size_quota_mb', 'max_files_per_upload',
-            'is_superuser', 'is_active'
+            'is_superuser', 'is_active', 'can_create_dataroom',
         ]
         read_only_fields = [
             'id', 'email', 'role', 'organization', 'date_joined', 'updated_at', 'avatar_url',
             'total_document_size', 'file_size_quota_mb', 'custom_file_size_quota_mb', 'max_files_per_upload',
-            'is_superuser', 'is_active'
+            'is_superuser', 'is_active', 'can_create_dataroom',
         ]
         extra_kwargs = {
             'avatar': {'write_only': True, 'required': False}
@@ -120,6 +123,10 @@ class UserSerializer(serializers.ModelSerializer):
         if self._max_files_per_upload is None:
             self._max_files_per_upload = get_dynamic_setting('MAX_FILES_PER_UPLOAD')
         return self._max_files_per_upload
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_can_create_dataroom(self, obj) -> bool:
+        return has_site_perm(obj, PERM_CREATE_DATAROOM)
 
     def create(self, validated_data):
         """

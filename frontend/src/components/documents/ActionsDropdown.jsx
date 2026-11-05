@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { Edit, MoreHorizontal, Share2, Trash2, UploadCloud, Download, Copy } from 'lucide-react';
+import { Edit, MoreHorizontal, Share2, Trash2, UploadCloud, Download, Copy, Shield } from 'lucide-react';
 import { Button } from '../ui/Button';
 
 export function ActionsDropdown({
@@ -16,6 +16,7 @@ export function ActionsDropdown({
   deleteLabel,
   showDelete = true,
   showRename = true,
+  onAccessRules,
 }) {
   const { t } = useTranslation();
 
@@ -106,6 +107,19 @@ export function ActionsDropdown({
             >
               <UploadCloud className="h-4 w-4" aria-hidden="true" />
               <span>{t('documents.requestFiles')}</span>
+            </DropdownMenu.Item>
+          )}
+
+          {type === 'folder' && onAccessRules && (
+            <DropdownMenu.Item
+              onSelect={(e) => {
+                e.stopPropagation();
+                onAccessRules(item);
+              }}
+              className="flex w-full cursor-pointer items-center gap-x-2 rounded-sm px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none dark:text-gray-200 hover:dark:bg-gray-700 focus:dark:bg-gray-700"
+            >
+              <Shield className="h-4 w-4" aria-hidden="true" />
+              <span>{t('datarooms.folderAccessRules', { defaultValue: 'Access rules' })}</span>
             </DropdownMenu.Item>
           )}
 

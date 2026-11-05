@@ -239,6 +239,7 @@ INSTALLED_APPS = [
     'onboarding.apps.OnboardingConfig',
     'rolelabels',
     'featuregates.apps.FeaturegatesConfig',
+    'permissions_rbac.apps.PermissionsRbacConfig',
 ]
 
 MIDDLEWARE = [
@@ -248,6 +249,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'permissions_rbac.middleware.RbacRequestCacheMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -607,10 +609,6 @@ FILE_REQUESTS_ENABLED = os.environ.get('FILE_REQUESTS_ENABLED', 'True').lower() 
 
 # OpenAPI / Swagger documentation toggle (default ON).
 SWAGGER_ENABLED = os.environ.get('SWAGGER_ENABLED', 'True').lower() in ('true', '1', 'yes')
-# Dataroom collaborator content policy (default ON).
-COLLABORATORS_OWN_DELETE_ONLY = True
-# Dataroom creation policy (default ON — admins only).
-DATAROOM_CREATE_ADMIN_ONLY = True
 
 
 # Path to the TTF/OTF font file to be used for watermarking.

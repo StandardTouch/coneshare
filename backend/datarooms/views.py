@@ -4,7 +4,7 @@ from pathlib import Path
 
 from django.utils.translation import gettext_lazy as _
 from django.db import transaction
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Prefetch, Q, Sum
 from django.shortcuts import get_object_or_404
 from rest_framework import mixins, permissions, serializers, status, viewsets
 from rest_framework.decorators import action
@@ -57,6 +57,22 @@ from .collaborator_delete_permissions import (
     assert_user_may_reorder_dataroom_items,
 )
 from .dataroom_create_policy import assert_user_may_create_dataroom
+from permissions_rbac.catalogue import PERM_DELETE_DATAROOM, ROLE_SLUG_EDITOR
+from permissions_rbac.models import DataroomRole
+from permissions_rbac.seed import ensure_default_roles_for_organization
+from permissions_rbac.services import (
+    assert_dataroom_perm,
+    filter_dataroom_documents_for_user,
+    filter_dataroom_folders_for_user,
+    has_perm,
+)
+from permissions_rbac.dataroom_access import (
+    apply_document_hidden_exclusions,
+    apply_folder_hidden_exclusions,
+    assert_destination_folder_allowed,
+    get_visible_dataroom_document_or_404,
+    get_visible_dataroom_folder_or_404,
+)
 from .utils import (
     get_dataroom_storage_folder_name,
     build_ordered_dataroom_items,
@@ -138,7 +154,7 @@ class DataroomViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance):
-        if not is_dataroom_owner_or_admin(self.request.user, instance):
+        if not has_perm(self.request.user, PERM_DELETE_DATAROOM, instance):
             raise PermissionDenied("Only the dataroom owner or an organization admin can delete this dataroom.")
         delete_dataroom(instance)
 
@@ -237,6 +253,9 @@ class DataroomViewSet(viewsets.ModelViewSet):
         destination_folder = None
         if dest_folder_id:
             destination_folder = get_object_or_404(DataroomFolder, id=dest_folder_id, dataroom=dataroom)
+        assert_destination_folder_allowed(
+            request.user, dataroom, destination_folder, for_upload=True
+        )
 
         try:
             with transaction.atomic():
@@ -433,6 +452,9 @@ class DataroomViewSet(viewsets.ModelViewSet):
                     destination_folder = get_object_or_404(
                         DataroomFolder, id=dest_folder_id, dataroom=dataroom
                     )
+                assert_destination_folder_allowed(
+                    request.user, dataroom, destination_folder, for_upload=False
+                )
 
                 # TODO: This loop executes a save() for each document being moved, which can cause performance issues
                 # (N+1 queries) when moving many documents. This should be converted to use bulk_update.
@@ -475,9 +497,18 @@ class DataroomViewSet(viewsets.ModelViewSet):
     def view_sessions(self, request, pk=None):
 
         dataroom = self.get_object()
+        from permissions_rbac.dataroom_access import filter_dataroom_visits_queryset
+        from sharelinks.models import DataroomVisit
+
         view_queryset = ViewSession.objects.filter(
             share_link__dataroom=dataroom
-        ).order_by('-viewed_at').select_related('share_link').prefetch_related('dataroom_visits__page_views')
+        ).order_by('-viewed_at').select_related('share_link')
+        visits_qs = filter_dataroom_visits_queryset(
+            DataroomVisit.objects.all(), request.user, dataroom
+        ).prefetch_related('page_views')
+        view_queryset = view_queryset.prefetch_related(
+            Prefetch('dataroom_visits', queryset=visits_qs)
+        )
 
         paginator = StandardResultsSetPagination()
         page = paginator.paginate_queryset(view_queryset, request, view=self)
@@ -514,9 +545,16 @@ class DataroomViewSet(viewsets.ModelViewSet):
         unique_viewers = unique_emails + unique_anon_ips
 
         # Combine direct session downloads with downloads of specific documents/folders within dataroom visits
-        visit_downloads = DataroomVisit.objects.filter(
-            view_session__share_link__dataroom=dataroom,
-            downloaded_at__isnull=False
+        from permissions_rbac.dataroom_access import filter_dataroom_visits_queryset
+        from sharelinks.models import DataroomVisit
+
+        visit_downloads = filter_dataroom_visits_queryset(
+            DataroomVisit.objects.filter(
+                view_session__share_link__dataroom=dataroom,
+                downloaded_at__isnull=False,
+            ),
+            request.user,
+            dataroom,
         ).count()
         total_downloads = (aggregates['session_downloads'] or 0) + visit_downloads
 
@@ -553,6 +591,12 @@ class DataroomViewSet(viewsets.ModelViewSet):
                 {"detail": "Parent folder does not belong to this dataroom."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        try:
+            assert_destination_folder_allowed(
+                request.user, dataroom, parent_folder, for_upload=True
+            )
+        except PermissionDenied as exc:
+            return Response({"detail": str(exc.detail)}, status=status.HTTP_403_FORBIDDEN)
 
         try:
             with transaction.atomic():
@@ -692,6 +736,13 @@ class DataroomViewSet(viewsets.ModelViewSet):
             if file_name_from_path:
                 file_name = file_name_from_path
 
+        try:
+            assert_destination_folder_allowed(
+                request.user, dataroom, destination_folder, for_upload=True
+            )
+        except PermissionDenied as exc:
+            return Response({"detail": str(exc.detail)}, status=status.HTTP_403_FORBIDDEN)
+
         unique_name = self._get_unique_dataroom_document_name(
             dataroom=dataroom,
             parent_folder=destination_folder,
@@ -775,6 +826,13 @@ class DataroomViewSet(viewsets.ModelViewSet):
                         {"detail": f"Folder path '{folder_path}' does not exist in this dataroom."},
                         status=status.HTTP_400_BAD_REQUEST
                     )
+
+        try:
+            assert_destination_folder_allowed(
+                request.user, dataroom, destination_folder, for_upload=True
+            )
+        except PermissionDenied as exc:
+            return Response({"detail": str(exc.detail)}, status=status.HTTP_403_FORBIDDEN)
 
         library_folder = self._ensure_library_folder_path(
             requesting_user=request.user,
@@ -877,6 +935,22 @@ class DataroomViewSet(viewsets.ModelViewSet):
 
         user_ids = serializer.validated_data.get('user_ids', [])
         email = serializer.validated_data.get('email', '').strip()
+        dataroom_role_id = (serializer.validated_data.get('dataroom_role_id') or '').strip()
+
+        ensure_default_roles_for_organization(request.user.organization)
+        dataroom_role = None
+        if dataroom_role_id:
+            dataroom_role = DataroomRole.objects.filter(
+                id=dataroom_role_id,
+                organization=request.user.organization,
+            ).first()
+            if not dataroom_role:
+                return Response({'detail': 'Invalid dataroom role.'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            dataroom_role = DataroomRole.objects.filter(
+                organization=request.user.organization,
+                slug=ROLE_SLUG_EDITOR,
+            ).first()
 
         users_to_add = []
         if email:
@@ -926,8 +1000,15 @@ class DataroomViewSet(viewsets.ModelViewSet):
                 collab, created = DataroomCollaborator.objects.get_or_create(
                     dataroom=dataroom,
                     user=target_user,
-                    defaults={'invited_by': request.user, 'role': DataroomCollaborator.ROLE_COLLABORATOR}
+                    defaults={
+                        'invited_by': request.user,
+                        'role': DataroomCollaborator.ROLE_COLLABORATOR,
+                        'dataroom_role': dataroom_role,
+                    },
                 )
+                if not created and dataroom_role:
+                    collab.dataroom_role = dataroom_role
+                    collab.save(update_fields=['dataroom_role', 'updated_at'])
                 if created:
                     created_collaborators.append(collab)
 
@@ -1225,9 +1306,10 @@ class DataroomDocumentViewSet(mixins.RetrieveModelMixin,
 
     def get_queryset(self):
         accessible_datarooms = get_dataroom_queryset_for_user(self.request.user)
-        return self.queryset.filter(dataroom__in=accessible_datarooms).annotate(
+        qs = self.queryset.filter(dataroom__in=accessible_datarooms).annotate(
             dataroom_view_count=Count('dataroomvisit', distinct=True)
         )
+        return apply_document_hidden_exclusions(qs, self.request.user)
 
     def perform_update(self, serializer):
         instance = self.get_object()
@@ -1265,25 +1347,47 @@ class DataroomFolderViewSet(viewsets.ModelViewSet):
         The dataroom must belong to the user's organization.
         """
         accessible_datarooms = get_dataroom_queryset_for_user(self.request.user)
-        queryset = self.queryset.filter(dataroom__in=accessible_datarooms).select_related('created_by', 'dataroom', 'dataroom__created_by')
+        queryset = self.queryset.filter(dataroom__in=accessible_datarooms).select_related(
+            'created_by',
+            'dataroom',
+            'dataroom__created_by',
+            'parent__parent__parent__parent__parent',
+        )
         dataroom_id = self.request.query_params.get('dataroom_id')
         if dataroom_id:
             queryset = queryset.filter(dataroom_id=dataroom_id)
-        return queryset
+        return apply_folder_hidden_exclusions(queryset, self.request.user)
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         # Custom logic to include sub-folders and documents
         sub_folders = instance.children.all().select_related('created_by', 'dataroom', 'dataroom__created_by').order_by('created_at', 'id')
+        sub_folders = filter_dataroom_folders_for_user(sub_folders, request.user, instance.dataroom)
         documents = DataroomDocument.objects.filter(
             folder=instance, document__deleted_at__isnull=True
-        ).select_related('document', 'document__created_by').annotate(
+        ).select_related(
+            'document', 'document__created_by', 'dataroom', 'dataroom__created_by', 'folder'
+        ).annotate(
             dataroom_view_count=Count('dataroomvisit', distinct=True)
         ).order_by('created_at', 'id')
+        documents = filter_dataroom_documents_for_user(documents, request.user, instance.dataroom)
 
-        data = self.get_serializer(instance).data
-        sub_folder_data = DataroomFolderSerializer(sub_folders, many=True).data
-        document_data = DataroomDocumentSerializer(documents, many=True).data
+        folder_parent_map = {
+            str(row['id']): {
+                'id': row['id'],
+                'name': row['name'],
+                'parent_id': row['parent_id'],
+            }
+            for row in DataroomFolder.objects.filter(dataroom=instance.dataroom).values('id', 'name', 'parent_id')
+        }
+        serializer_context = {
+            **self.get_serializer_context(),
+            'dataroom_folder_parent_map': folder_parent_map,
+        }
+
+        data = DataroomFolderSerializer(instance, context=serializer_context).data
+        sub_folder_data = DataroomFolderSerializer(sub_folders, many=True, context=serializer_context).data
+        document_data = DataroomDocumentSerializer(documents, many=True, context=serializer_context).data
         data['sub_folders'] = sub_folder_data
         data['documents'] = document_data
 
@@ -1301,6 +1405,9 @@ class DataroomFolderViewSet(viewsets.ModelViewSet):
 
         name = serializer.validated_data['name']
         parent = serializer.validated_data.get('parent')
+        assert_destination_folder_allowed(
+            self.request.user, dataroom, parent, for_upload=False
+        )
 
         if DataroomFolder.objects.filter(dataroom=dataroom, parent=parent, name=name).exists():
             raise serializers.ValidationError({'name': _('A folder with this name already exists in this location.')})

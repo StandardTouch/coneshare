@@ -244,6 +244,13 @@ class DataroomCollaborator(BaseModel):
         choices=ROLE_CHOICES,
         default=ROLE_COLLABORATOR
     )
+    dataroom_role = models.ForeignKey(
+        'permissions_rbac.DataroomRole',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='collaborators',
+    )
     invited_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,

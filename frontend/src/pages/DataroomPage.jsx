@@ -9,10 +9,11 @@ import { formatBytes } from '../lib/formatters';
 import { isDataroomOwner, isDataroomCollaborator } from '../utils/formatters';
 import { selectionIncludesNonDeletableItems } from '../utils/dataroomDeletePermissions';
 import {
+  canUploadToDataroom,
   selectionIncludesNonModifiableItems,
   scopeIncludesNonModifiableItems,
 } from '../utils/dataroomItemPermissions';
-import { useBranding } from '../contexts/BrandingProvider';
+import { FolderAccessRulesDialog } from '../components/datarooms/FolderAccessRulesDialog';
 import { getDataroom, addContentToDataroom, createDataroomFolder, moveDataroomContent, getDataroomFolderContents, getShareLinksForDataroom, deleteShareLink, getDataroomViewSessions, getDataroomStats, removeContentFromDataroom, updateDataroomFolder, updateDataroomDocument, updateDataroomBranding, reorderDataroomItems, deleteDataroom, ensureDataroomFolderPaths, uploadDataroomDocument, upgradeDataroomStorage, getDataroomBannerImages } from '../services/api';
 import { useBreadcrumb } from '../components/layout/BreadcrumbProvider';
 import { useUpload } from '../contexts/UploadProvider';
@@ -107,6 +108,8 @@ export function DataroomPage() {
   const [itemToRemove, setItemToRemove] = useState(null);
   const [isTransferOwnershipOpen, setIsTransferOwnershipOpen] = useState(false);
   const [showStarredOnly, setShowStarredOnly] = useState(false);
+  const [accessRulesFolder, setAccessRulesFolder] = useState(null);
+  const [isAccessRulesOpen, setIsAccessRulesOpen] = useState(false);
   const [brandingForm, setBrandingForm] = useState({
     brandPrimaryColor: '',
     brandSecondaryColor: '',
@@ -144,7 +147,6 @@ export function DataroomPage() {
   const folderInputRef = useRef(null);
   const { addUploads, updateUpload } = useUpload();
   const { user } = useUser();
-  const { collaboratorsOwnDeleteOnly } = useBranding();
 
   const handleFileSelect = () => {
     fileInputRef.current.click();
@@ -156,6 +158,11 @@ export function DataroomPage() {
 
   const handleFileUploads = async (files) => {
     if (!files || files.length === 0) return;
+
+    if (!canUploadToDataroom({ dataroom, user, folderItem: currentDataroomFolder })) {
+      toast.error(t('datarooms.uploadNotAllowed', { defaultValue: 'You cannot upload in this folder.' }));
+      return;
+    }
 
     if (!user) {
       toast.error("User information is still loading. Please wait a moment and try again.");
@@ -966,13 +973,22 @@ export function DataroomPage() {
   const isCollaborator = isDataroomCollaborator(dataroom, user);
   const isOrgAdmin = user?.role === 'admin';
   const canManage = isOwner || isOrgAdmin;
+  const userDataroomRole = dataroom?.current_user_role;
+  const canManageFolderRules =
+    canManage || userDataroomRole === 'manager';
+  const canManageCollaborators =
+    dataroom?.current_user_permissions?.can_manage_collaborators ?? canManage;
+  const canUploadInCurrentFolder = canUploadToDataroom({
+    dataroom,
+    user,
+    folderItem: currentDataroomFolder,
+  });
   const bulkRemoveBlocked = selectionIncludesNonDeletableItems({
     allItems,
     selectedDocuments: selection.documents,
     selectedFolders: selection.folders,
     user,
     dataroom,
-    collaboratorsOwnDeleteOnly,
   });
   const bulkModifyBlocked = selectionIncludesNonModifiableItems({
     allItems,
@@ -980,13 +996,11 @@ export function DataroomPage() {
     selectedFolders: selection.folders,
     user,
     dataroom,
-    collaboratorsOwnDeleteOnly,
   });
   const reorderBlocked = scopeIncludesNonModifiableItems({
     allItems,
     user,
     dataroom,
-    collaboratorsOwnDeleteOnly,
   });
 
   // Derived storage quota calculations with live preview support
@@ -1048,10 +1062,11 @@ export function DataroomPage() {
           <CollaboratorsAvatarGroup
             dataroom={dataroom}
             onCollaboratorsUpdated={fetchContent}
+            canManageCollaborators={canManageCollaborators}
           />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {activeTab === 'documents' && (
+          {activeTab === 'documents' && canUploadInCurrentFolder && (
             <>
               <input
                 type="file"
@@ -1210,6 +1225,11 @@ export function DataroomPage() {
               deleteLabel={t('common.remove')}
               onToggleStar={handleToggleStar}
               viewsTooltip={t('datarooms.viewsTooltip')}
+              showAccessRules={canManageFolderRules}
+              onAccessRules={(folderItem) => {
+                setAccessRulesFolder(folderItem);
+                setIsAccessRulesOpen(true);
+              }}
               emptyState={
                 <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted bg-muted/20 p-12 text-center my-4">
                   <h3 className="text-xl font-semibold tracking-tight">
@@ -1218,7 +1238,7 @@ export function DataroomPage() {
                   <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto">
                     {t('datarooms.emptyStateNotice')}
                   </p>
-                  <Button className="mt-4" variant="outline" onClick={() => setIsAddContentOpen(true)}>
+                  <Button className="mt-4" variant="outline" onClick={() => setIsAddContentOpen(true)} disabled={!canUploadInCurrentFolder}>
                     <DocumentPlusIcon className="mr-2 h-4 w-4" />
                     {t('datarooms.addContent')}
                   </Button>
@@ -1924,6 +1944,13 @@ export function DataroomPage() {
           setIsManagePermissionsOpen(false);
         }}
         link={selectedLinkForPermissions}
+      />
+      <FolderAccessRulesDialog
+        isOpen={isAccessRulesOpen}
+        onOpenChange={setIsAccessRulesOpen}
+        dataroomId={dataroomId}
+        folder={accessRulesFolder}
+        onSaved={fetchContent}
       />
       <TransferOwnershipDialog
         isOpen={isTransferOwnershipOpen}

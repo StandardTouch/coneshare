@@ -297,6 +297,23 @@ class AdminDataroomViewSet(viewsets.ModelViewSet):
 
         user_ids = serializer.validated_data.get('user_ids', [])
         email = serializer.validated_data.get('email', '').strip()
+        dataroom_role_id = (serializer.validated_data.get('dataroom_role_id') or '').strip()
+
+        from permissions_rbac.catalogue import ROLE_SLUG_EDITOR
+        from permissions_rbac.models import DataroomRole
+        from permissions_rbac.seed import ensure_default_roles_for_organization
+
+        ensure_default_roles_for_organization(request.user.organization)
+        if dataroom_role_id:
+            dataroom_role = DataroomRole.objects.filter(
+                id=dataroom_role_id,
+                organization=request.user.organization,
+            ).first()
+        else:
+            dataroom_role = DataroomRole.objects.filter(
+                organization=request.user.organization,
+                slug=ROLE_SLUG_EDITOR,
+            ).first()
 
         users_to_add = []
         if email:
@@ -345,8 +362,15 @@ class AdminDataroomViewSet(viewsets.ModelViewSet):
                 collab, created = DataroomCollaborator.objects.get_or_create(
                     dataroom=dataroom,
                     user=target_user,
-                    defaults={'invited_by': request.user, 'role': DataroomCollaborator.ROLE_COLLABORATOR},
+                    defaults={
+                        'invited_by': request.user,
+                        'role': DataroomCollaborator.ROLE_COLLABORATOR,
+                        'dataroom_role': dataroom_role,
+                    },
                 )
+                if not created and dataroom_role:
+                    collab.dataroom_role = dataroom_role
+                    collab.save(update_fields=['dataroom_role', 'updated_at'])
                 if created:
                     created_collaborators.append(collab)
 

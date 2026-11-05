@@ -11,18 +11,12 @@ export function resolveItemCreatorId(item) {
   return null;
 }
 
-/**
- * Whether the current user may remove this dataroom list item from the room.
- * Prefer API-provided can_delete when present; otherwise derive from policy flags.
- */
-export function canRemoveDataroomItem({
-  item,
-  user,
-  dataroom,
-  collaboratorsOwnDeleteOnly = true,
-}) {
+export function canRemoveDataroomItem({ item, user, dataroom }) {
   if (!item || !user || !dataroom) {
     return false;
+  }
+  if (item.permissions && typeof item.permissions.can_delete === 'boolean') {
+    return item.permissions.can_delete;
   }
   if (typeof item.can_delete === 'boolean') {
     return item.can_delete;
@@ -36,9 +30,6 @@ export function canRemoveDataroomItem({
   if (!isDataroomCollaborator(dataroom, user)) {
     return false;
   }
-  if (!collaboratorsOwnDeleteOnly) {
-    return true;
-  }
   return resolveItemCreatorId(item) === user.id;
 }
 
@@ -48,7 +39,6 @@ export function selectionIncludesNonDeletableItems({
   selectedFolders,
   user,
   dataroom,
-  collaboratorsOwnDeleteOnly,
 }) {
   const selectedKeys = new Set([
     ...selectedDocuments.map((id) => `document:${id}`),
@@ -61,7 +51,6 @@ export function selectionIncludesNonDeletableItems({
       item,
       user,
       dataroom,
-      collaboratorsOwnDeleteOnly,
     });
   });
 }

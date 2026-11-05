@@ -8,19 +8,12 @@ import '../../i18n';
 
 vi.mock('../../services/api');
 
-let mockCurrentUser = { id: 'u1', email: 'test@example.com', role: 'admin' };
+let mockCurrentUser = { id: 'u1', email: 'test@example.com', role: 'admin', can_create_dataroom: true };
 
 vi.mock('../../contexts/UserProvider', () => ({
     useUser: () => ({
         user: mockCurrentUser,
         refreshUser: vi.fn(),
-    }),
-}));
-
-vi.mock('../../contexts/BrandingProvider', () => ({
-    useBranding: () => ({
-        dataroomCreateAdminOnly: true,
-        collaboratorsOwnDeleteOnly: true,
     }),
 }));
 
@@ -41,7 +34,7 @@ describe('DataroomsPage', () => {
 
     beforeEach(() => {
         vi.resetAllMocks();
-        mockCurrentUser = { id: 'u1', email: 'test@example.com', role: 'admin' };
+        mockCurrentUser = { id: 'u1', email: 'test@example.com', role: 'admin', can_create_dataroom: true };
         api.getDatarooms.mockResolvedValue({ data: mockDatarooms });
         api.createDataroom.mockResolvedValue({ data: {} });
         api.updateDataroom.mockResolvedValue({ data: {} });
@@ -122,8 +115,8 @@ describe('DataroomsPage', () => {
     });
 
     describe('Dataroom Actions', () => {
-        it('hides create dataroom entry for non-admin members when admin-only policy is on', async () => {
-            mockCurrentUser = { id: 'u2', email: 'member@example.com', role: 'member' };
+        it('hides create dataroom entry for members without site create grant', async () => {
+            mockCurrentUser = { id: 'u2', email: 'member@example.com', role: 'member', can_create_dataroom: false };
             renderComponent();
             await screen.findByText('Dataroom One');
             expect(screen.queryByRole('button', { name: /Add Dataroom/i })).not.toBeInTheDocument();

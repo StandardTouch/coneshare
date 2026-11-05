@@ -10,7 +10,7 @@ from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import permissions, serializers, status, viewsets, throttling
 from rest_framework.decorators import action
-from rest_framework.exceptions import APIException, PermissionDenied
+from rest_framework.exceptions import APIException, NotFound, PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiParameter
@@ -65,11 +65,14 @@ def get_document_queryset_for_user(user):
     if getattr(user, 'role', '') == 'admin':
         return base_qs
 
-    return base_qs.filter(
+    qs = base_qs.filter(
         Q(created_by=user) |
         Q(dataroomdocument__dataroom__organization=user.organization, dataroomdocument__dataroom__collaborators__user=user) |
         Q(dataroomdocument__dataroom__organization=user.organization, dataroomdocument__dataroom__created_by=user)
     ).distinct()
+    from permissions_rbac.dataroom_access import exclude_vault_documents_in_hidden_folders
+
+    return exclude_vault_documents_in_hidden_folders(qs, user)
 
 
 def _get_folder_from_path(requesting_user, folder_path: str) -> Folder | None:
@@ -631,6 +634,8 @@ class DocumentDownloadView(APIView):
         responses={200: DocumentDownloadResponseSerializer, 404: dict},
     )
     def get(self, request, document_id, *args, **kwargs):
+        from permissions_rbac.dataroom_access import assert_document_download_allowed
+
         try:
             document = get_document_queryset_for_user(request.user).get(id=document_id)
         except Document.DoesNotExist:
@@ -638,6 +643,15 @@ class DocumentDownloadView(APIView):
                 {"detail": "Access denied or document not found."},
                 status=status.HTTP_404_NOT_FOUND
             )
+        try:
+            assert_document_download_allowed(request.user, document)
+        except NotFound:
+            return Response(
+                {"detail": "Access denied or document not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except PermissionDenied as exc:
+            return Response({"detail": str(exc.detail)}, status=status.HTTP_403_FORBIDDEN)
 
         primary_version = document.versions.filter(is_primary=True).first()
         if not primary_version:
@@ -682,6 +696,8 @@ class DocumentPreviewDataView(APIView):
         responses={200: DocumentPreviewResponseSerializer, 400: dict, 404: dict},
     )
     def get(self, request, document_id, *args, **kwargs):
+        from permissions_rbac.dataroom_access import assert_document_download_allowed
+
         # Authentication & Authorization is handled by DRF + this query
         try:
             document = get_document_queryset_for_user(request.user).get(id=document_id)
@@ -690,6 +706,15 @@ class DocumentPreviewDataView(APIView):
                 {"detail": "Access denied or document not found."},
                 status=status.HTTP_404_NOT_FOUND
             )
+        try:
+            assert_document_download_allowed(request.user, document)
+        except NotFound:
+            return Response(
+                {"detail": "Access denied or document not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except PermissionDenied as exc:
+            return Response({"detail": str(exc.detail)}, status=status.HTTP_403_FORBIDDEN)
 
         version_id = request.query_params.get('version_id')
         if version_id:

@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema
 
 from core.pagination import StandardResultsSetPagination
+from permissions_rbac.dataroom_access import filter_dashboard_view_sessions_queryset
 from sharelinks.models import ShareLink, ViewSession
 from sharelinks.serializers import ShareLinkSerializer, ViewSessionSerializer
 from .serializers import (DashboardRecentLinkSerializer,
@@ -31,11 +32,14 @@ class DashboardSummaryView(APIView):
     @extend_schema(responses={200: DashboardSummaryResponseSerializer})
     def get(self, request, *args, **kwargs):
         # 1. Get the 10 most recent view sessions
-        recent_views = ViewSession.objects.filter(
-            share_link__created_by=request.user
-        ).select_related(
-            'share_link', 'share_link__document', 'share_link__dataroom', 'viewer'
-        ).order_by('-viewed_at')[:10]
+        recent_views = filter_dashboard_view_sessions_queryset(
+            ViewSession.objects.filter(
+                share_link__created_by=request.user
+            ).select_related(
+                'share_link', 'share_link__document', 'share_link__dataroom', 'viewer'
+            ).order_by('-viewed_at'),
+            request.user,
+        )[:10]
         recent_views_serializer = DashboardRecentViewSessionSerializer(
             recent_views, many=True, context={'request': request}
         )
@@ -170,6 +174,7 @@ class AllViewSessionsView(generics.ListAPIView):
         if viewer_email:
             qs = qs.filter(viewer_email__icontains=viewer_email)
 
+        qs = filter_dashboard_view_sessions_queryset(qs, self.request.user)
         return qs.order_by('-viewed_at')
 
 
@@ -183,7 +188,10 @@ class ViewSessionDetailView(generics.RetrieveAPIView):
     lookup_field = 'pk'
 
     def get_queryset(self):
-        return ViewSession.objects.filter(
-            share_link__created_by=self.request.user
-        ).select_related('share_link', 'share_link__document', 'share_link__dataroom')
+        return filter_dashboard_view_sessions_queryset(
+            ViewSession.objects.filter(
+                share_link__created_by=self.request.user
+            ).select_related('share_link', 'share_link__document', 'share_link__dataroom'),
+            self.request.user,
+        )
 

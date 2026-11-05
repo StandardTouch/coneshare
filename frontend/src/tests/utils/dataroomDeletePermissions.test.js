@@ -20,35 +20,32 @@ describe('dataroomDeletePermissions', () => {
     ).toBe(false);
   });
 
-  it('allows owner to remove any item when policy is on', () => {
+  it('allows owner to remove any item', () => {
     expect(
       canRemoveDataroomItem({
         item: { id: '1', type: 'document', created_by: { id: 'collab1' } },
         user: owner,
         dataroom,
-        collaboratorsOwnDeleteOnly: true,
       })
     ).toBe(true);
   });
 
-  it('blocks collaborator from removing owner item when policy is on', () => {
+  it('blocks collaborator from removing owner item', () => {
     expect(
       canRemoveDataroomItem({
         item: { id: '1', type: 'document', created_by: { id: 'owner1' } },
         user: collab,
         dataroom: { ...dataroom, collaborators: [{ user: { id: 'collab1' } }] },
-        collaboratorsOwnDeleteOnly: true,
       })
     ).toBe(false);
   });
 
-  it('allows collaborator to remove own item when policy is on', () => {
+  it('allows collaborator to remove own item', () => {
     expect(
       canRemoveDataroomItem({
         item: { id: '1', type: 'document', created_by: { id: 'collab1' } },
         user: collab,
         dataroom: { ...dataroom, collaborators: [{ user: { id: 'collab1' } }] },
-        collaboratorsOwnDeleteOnly: true,
       })
     ).toBe(true);
   });
@@ -59,18 +56,6 @@ describe('dataroomDeletePermissions', () => {
         item: { id: '1', type: 'document', created_by: { id: 'owner1' } },
         user: admin,
         dataroom,
-        collaboratorsOwnDeleteOnly: true,
-      })
-    ).toBe(true);
-  });
-
-  it('restores permissive behaviour for collaborators when policy is off', () => {
-    expect(
-      canRemoveDataroomItem({
-        item: { id: '1', type: 'document', created_by: { id: 'owner1' } },
-        user: collab,
-        dataroom: { ...dataroom, collaborators: [{ user: { id: 'collab1' } }] },
-        collaboratorsOwnDeleteOnly: false,
       })
     ).toBe(true);
   });
@@ -87,7 +72,6 @@ describe('dataroomDeletePermissions', () => {
         selectedFolders: [],
         user: collab,
         dataroom,
-        collaboratorsOwnDeleteOnly: true,
       })
     ).toBe(true);
   });

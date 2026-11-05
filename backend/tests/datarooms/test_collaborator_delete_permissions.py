@@ -1,246 +1,92 @@
-import pytest
-from unittest.mock import patch
+"""RBAC default and enforcement for dataroom delete permissions (legacy toggles removed)."""
+
+from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APIClient
+from rest_framework.test import APITestCase
 
-from core.models import User
-from datarooms.collaborator_delete_permissions import COLLABORATOR_DELETE_DENIED_DETAIL
-from datarooms.models import Dataroom, DataroomCollaborator, DataroomDocument, DataroomFolder
-from documents.models import Document, DocumentVersion
+from datarooms.models import Dataroom
+from permissions_rbac.catalogue import PERM_DELETE
+from permissions_rbac.models import DataroomRolePermission
+from permissions_rbac.services import invalidate_organization_rbac_cache
+from permissions_rbac.catalogue import SCOPE_ANY
+from django.contrib.auth import get_user_model
+from tests.datarooms.rbac_test_helpers import editor_role, make_shared_dataroom
 
-
-@pytest.fixture
-def collab_user(db, organization):
-    return User.objects.create_user(
-        username="collab_del@test.com",
-        email="collab_del@test.com",
-        password="password123",
-        organization=organization,
-    )
+User = get_user_model()
 
 
-@pytest.fixture
-def other_collab(db, organization):
-    return User.objects.create_user(
-        username="collab2_del@test.com",
-        email="collab2_del@test.com",
-        password="password123",
-        organization=organization,
-    )
-
-
-@pytest.fixture
-def shared_dataroom(user, collab_user, organization):
-    room = Dataroom.objects.create(
-        name="Delete Policy Room",
-        organization=organization,
-        created_by=user,
-    )
-    DataroomCollaborator.objects.create(dataroom=room, user=collab_user, invited_by=user)
-    return room
-
-
-def _make_document(name, creator, organization):
-    doc = Document.objects.create(
-        name=name,
-        created_by=creator,
-        organization=organization,
-        status="ready",
-        file_size=512,
-    )
-    DocumentVersion.objects.create(
-        document=doc,
-        version_number=1,
-        is_primary=True,
-        original_storage_key=f"org/{name}.pdf",
-        file_size=512,
-    )
-    return doc
-
-
-@pytest.mark.django_db
-class TestCollaboratorDeletePermissions:
-    @patch('datarooms.collaborator_delete_permissions.get_dynamic_setting', return_value=True)
-    def test_owner_can_remove_any_content(self, _mock_setting, api_client, user, shared_dataroom, collab_user, organization):
-        owner_doc = _make_document("owner.pdf", user, organization)
-        dd = DataroomDocument.objects.create(
-            dataroom=shared_dataroom, document=owner_doc, name=owner_doc.name
+class CollaboratorDeletePermissionsTests(APITestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="owner@example.com",
+            email="owner@example.com",
+            password="password",
         )
-        url = f'/api/v1/datarooms/{shared_dataroom.id}/remove-content/'
-        response = api_client.post(url, {'dataroom_document_ids': [str(dd.id)]})
-        assert response.status_code == status.HTTP_204_NO_CONTENT
-        assert not DataroomDocument.objects.filter(id=dd.id).exists()
+        self.editor = User.objects.create_user(
+            username="editor@example.com",
+            email="editor@example.com",
+            password="password",
+        )
+        self.other = User.objects.create_user(
+            username="other@example.com",
+            email="other@example.com",
+            password="password",
+        )
+        self.dataroom, self.owner_dd, self.editor_dd, _ = make_shared_dataroom(
+            self.owner,
+            self.editor,
+            self.other,
+        )
 
-    @patch('datarooms.collaborator_delete_permissions.get_dynamic_setting', return_value=True)
-    def test_collaborator_can_remove_own_document(
-        self, _mock_setting, shared_dataroom, collab_user, organization
-    ):
-        own_doc = _make_document("collab.pdf", collab_user, organization)
-        dd = DataroomDocument.objects.create(
-            dataroom=shared_dataroom, document=own_doc, name=own_doc.name, is_direct_upload=True
-        )
-        client = APIClient()
-        client.force_authenticate(user=collab_user)
-        url = f'/api/v1/datarooms/{shared_dataroom.id}/remove-content/'
-        response = client.post(url, {'dataroom_document_ids': [str(dd.id)]})
-        assert response.status_code == status.HTTP_204_NO_CONTENT
+    def _remove_content_url(self):
+        return reverse('dataroom-remove-content', kwargs={'pk': self.dataroom.pk})
 
-    @patch('datarooms.collaborator_delete_permissions.get_dynamic_setting', return_value=True)
-    def test_collaborator_blocked_on_owner_document(
-        self, _mock_setting, shared_dataroom, user, collab_user, organization
-    ):
-        owner_doc = _make_document("owner_only.pdf", user, organization)
-        dd = DataroomDocument.objects.create(
-            dataroom=shared_dataroom, document=owner_doc, name=owner_doc.name
+    def test_editor_can_delete_own_document_not_others(self):
+        self.client.force_authenticate(user=self.editor)
+        response = self.client.post(
+            self._remove_content_url(),
+            {'dataroom_document_ids': [str(self.editor_dd.pk)]},
+            format='json',
         )
-        client = APIClient()
-        client.force_authenticate(user=collab_user)
-        url = f'/api/v1/datarooms/{shared_dataroom.id}/remove-content/'
-        response = client.post(url, {'dataroom_document_ids': [str(dd.id)]})
-        assert response.status_code == status.HTTP_403_FORBIDDEN
-        assert COLLABORATOR_DELETE_DENIED_DETAIL in response.data['detail']
-        assert DataroomDocument.objects.filter(id=dd.id).exists()
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(self.editor_dd.__class__.objects.filter(pk=self.editor_dd.pk).exists())
 
-    @patch('datarooms.collaborator_delete_permissions.get_dynamic_setting', return_value=True)
-    def test_collaborator_blocked_on_peer_document(
-        self, _mock_setting, shared_dataroom, collab_user, other_collab, organization
-    ):
-        DataroomCollaborator.objects.create(
-            dataroom=shared_dataroom, user=other_collab, invited_by=shared_dataroom.created_by
+        response = self.client.post(
+            self._remove_content_url(),
+            {'dataroom_document_ids': [str(self.owner_dd.pk)]},
+            format='json',
         )
-        peer_doc = _make_document("peer.pdf", other_collab, organization)
-        dd = DataroomDocument.objects.create(
-            dataroom=shared_dataroom, document=peer_doc, name=peer_doc.name
-        )
-        client = APIClient()
-        client.force_authenticate(user=collab_user)
-        url = f'/api/v1/datarooms/{shared_dataroom.id}/remove-content/'
-        response = client.post(url, {'dataroom_document_ids': [str(dd.id)]})
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    @patch('datarooms.collaborator_delete_permissions.get_dynamic_setting', return_value=True)
-    def test_bulk_remove_blocked_when_selection_includes_foreign_document(
-        self, _mock_setting, shared_dataroom, user, collab_user, organization
-    ):
-        own_doc = _make_document("mine.pdf", collab_user, organization)
-        owner_doc = _make_document("theirs.pdf", user, organization)
-        dd_own = DataroomDocument.objects.create(
-            dataroom=shared_dataroom, document=own_doc, name=own_doc.name
+    def test_editor_cannot_delete_dataroom(self):
+        self.client.force_authenticate(user=self.editor)
+        response = self.client.delete(
+            reverse("dataroom-detail", kwargs={"pk": self.dataroom.pk})
         )
-        dd_owner = DataroomDocument.objects.create(
-            dataroom=shared_dataroom, document=owner_doc, name=owner_doc.name
-        )
-        client = APIClient()
-        client.force_authenticate(user=collab_user)
-        url = f'/api/v1/datarooms/{shared_dataroom.id}/remove-content/'
-        response = client.post(
-            url,
-            {'dataroom_document_ids': [str(dd_own.id), str(dd_owner.id)]},
-        )
-        assert response.status_code == status.HTTP_403_FORBIDDEN
-        assert DataroomDocument.objects.filter(id__in=[dd_own.id, dd_owner.id]).count() == 2
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    @patch('datarooms.collaborator_delete_permissions.get_dynamic_setting', return_value=True)
-    def test_folder_delete_blocked_when_folder_contains_others_files(
-        self, _mock_setting, shared_dataroom, user, collab_user, organization
-    ):
-        folder = DataroomFolder.objects.create(
-            dataroom=shared_dataroom,
-            name="Collab Folder",
-            created_by=collab_user,
+    def test_owner_can_delete_dataroom(self):
+        dr = Dataroom.objects.create(
+            name="Owner Delete",
+            created_by=self.owner,
+            organization=self.owner.organization,
         )
-        owner_doc = _make_document("inside.pdf", user, organization)
-        DataroomDocument.objects.create(
-            dataroom=shared_dataroom,
-            document=owner_doc,
-            name=owner_doc.name,
-            folder=folder,
-        )
-        client = APIClient()
-        client.force_authenticate(user=collab_user)
-        response = client.delete(f'/api/v1/dataroom-folders/{folder.id}/')
-        assert response.status_code == status.HTTP_403_FORBIDDEN
-        assert DataroomFolder.objects.filter(id=folder.id).exists()
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.delete(reverse("dataroom-detail", kwargs={"pk": dr.pk}))
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
-    @patch('datarooms.collaborator_delete_permissions.get_dynamic_setting', return_value=True)
-    def test_folder_delete_blocked_for_owner_created_folder(
-        self, _mock_setting, shared_dataroom, user, collab_user
-    ):
-        folder = DataroomFolder.objects.create(
-            dataroom=shared_dataroom,
-            name="Owner Folder",
-            created_by=user,
-        )
-        client = APIClient()
-        client.force_authenticate(user=collab_user)
-        response = client.delete(f'/api/v1/dataroom-folders/{folder.id}/')
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+    def test_widening_delete_grant_allows_cross_user_delete(self):
+        editor_rbac = editor_role(self.owner.organization)
+        DataroomRolePermission.objects.filter(
+            role=editor_rbac,
+            permission=PERM_DELETE,
+        ).update(scope=SCOPE_ANY)
+        invalidate_organization_rbac_cache(str(self.owner.organization_id))
 
-    @patch('datarooms.collaborator_delete_permissions.get_dynamic_setting', return_value=True)
-    def test_org_admin_can_remove_any_content(
-        self, _mock_setting, shared_dataroom, user, organization
-    ):
-        admin = User.objects.create_user(
-            username="admin_del@test.com",
-            email="admin_del@test.com",
-            password="password123",
-            organization=organization,
-            role='admin',
+        self.client.force_authenticate(user=self.editor)
+        response = self.client.post(
+            self._remove_content_url(),
+            {'dataroom_document_ids': [str(self.owner_dd.pk)]},
+            format='json',
         )
-        owner_doc = _make_document("admin_target.pdf", user, organization)
-        dd = DataroomDocument.objects.create(
-            dataroom=shared_dataroom, document=owner_doc, name=owner_doc.name
-        )
-        client = APIClient()
-        client.force_authenticate(user=admin)
-        url = f'/api/v1/datarooms/{shared_dataroom.id}/remove-content/'
-        response = client.post(url, {'dataroom_document_ids': [str(dd.id)]})
-        assert response.status_code == status.HTTP_204_NO_CONTENT
-
-    @patch('datarooms.collaborator_delete_permissions.get_dynamic_setting', return_value=False)
-    def test_toggle_off_allows_collaborator_to_remove_owner_document(
-        self, _mock_setting, shared_dataroom, user, collab_user, organization
-    ):
-        owner_doc = _make_document("legacy.pdf", user, organization)
-        dd = DataroomDocument.objects.create(
-            dataroom=shared_dataroom, document=owner_doc, name=owner_doc.name
-        )
-        client = APIClient()
-        client.force_authenticate(user=collab_user)
-        url = f'/api/v1/datarooms/{shared_dataroom.id}/remove-content/'
-        response = client.post(url, {'dataroom_document_ids': [str(dd.id)]})
-        assert response.status_code == status.HTTP_204_NO_CONTENT
-
-    @patch('datarooms.collaborator_delete_permissions.get_dynamic_setting', return_value=True)
-    def test_collaborator_can_soft_delete_own_document_via_documents_api(
-        self, _mock_setting, shared_dataroom, collab_user, organization
-    ):
-        own_doc = _make_document("soft_own.pdf", collab_user, organization)
-        DataroomDocument.objects.create(
-            dataroom=shared_dataroom, document=own_doc, name=own_doc.name
-        )
-        client = APIClient()
-        client.force_authenticate(user=collab_user)
-        response = client.delete(f'/api/v1/documents/{own_doc.id}/')
-        assert response.status_code == status.HTTP_204_NO_CONTENT
-        own_doc.refresh_from_db()
-        assert own_doc.deleted_at is not None
-
-    @patch('datarooms.collaborator_delete_permissions.get_dynamic_setting', return_value=True)
-    def test_serializer_exposes_can_delete_flags(
-        self, _mock_setting, api_client, shared_dataroom, user, collab_user, organization
-    ):
-        owner_doc = _make_document("flag_owner.pdf", user, organization)
-        own_doc = _make_document("flag_own.pdf", collab_user, organization)
-        dd_owner = DataroomDocument.objects.create(
-            dataroom=shared_dataroom, document=owner_doc, name=owner_doc.name
-        )
-        dd_own = DataroomDocument.objects.create(
-            dataroom=shared_dataroom, document=own_doc, name=own_doc.name
-        )
-        client = APIClient()
-        client.force_authenticate(user=collab_user)
-        owner_resp = client.get(f'/api/v1/dataroom-documents/{dd_owner.id}/')
-        own_resp = client.get(f'/api/v1/dataroom-documents/{dd_own.id}/')
-        assert owner_resp.data['can_delete'] is False
-        assert own_resp.data['can_delete'] is True
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)

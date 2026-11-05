@@ -16,18 +16,20 @@ export function resolveItemCreatorId(item) {
   return null;
 }
 
-/**
- * Whether the current user may modify this dataroom list item (rename, move, star, link settings, etc.).
- * Prefer API-provided can_modify when present; otherwise derive from policy flags.
- */
-export function canModifyDataroomItem({
-  item,
-  user,
-  dataroom,
-  collaboratorsOwnDeleteOnly = true,
-}) {
+function perm(item, key) {
+  if (item?.permissions && typeof item.permissions[key] === 'boolean') {
+    return item.permissions[key];
+  }
+  return undefined;
+}
+
+export function canModifyDataroomItem({ item, user, dataroom }) {
   if (!item || !user || !dataroom) {
     return false;
+  }
+  const fromPermissions = perm(item, 'can_modify') ?? perm(item, 'can_rename');
+  if (typeof fromPermissions === 'boolean') {
+    return fromPermissions;
   }
   if (typeof item.can_modify === 'boolean') {
     return item.can_modify;
@@ -41,10 +43,18 @@ export function canModifyDataroomItem({
   if (!isDataroomCollaborator(dataroom, user)) {
     return false;
   }
-  if (!collaboratorsOwnDeleteOnly) {
-    return true;
-  }
   return resolveItemCreatorId(item) === user.id;
+}
+
+export function canUploadToDataroom({ dataroom, user, folderItem }) {
+  if (!user || !dataroom) return false;
+  if (folderItem?.permissions && typeof folderItem.permissions.can_upload === 'boolean') {
+    return folderItem.permissions.can_upload;
+  }
+  if (dataroom.current_user_permissions && typeof dataroom.current_user_permissions.can_upload === 'boolean') {
+    return dataroom.current_user_permissions.can_upload;
+  }
+  return isDataroomOwner(dataroom, user) || user.role === 'admin' || isDataroomCollaborator(dataroom, user);
 }
 
 export function selectionIncludesNonModifiableItems({
@@ -53,7 +63,6 @@ export function selectionIncludesNonModifiableItems({
   selectedFolders,
   user,
   dataroom,
-  collaboratorsOwnDeleteOnly,
 }) {
   const selectedKeys = new Set([
     ...selectedDocuments.map((id) => `document:${id}`),
@@ -66,24 +75,17 @@ export function selectionIncludesNonModifiableItems({
       item,
       user,
       dataroom,
-      collaboratorsOwnDeleteOnly,
     });
   });
 }
 
-export function scopeIncludesNonModifiableItems({
-  allItems,
-  user,
-  dataroom,
-  collaboratorsOwnDeleteOnly,
-}) {
+export function scopeIncludesNonModifiableItems({ allItems, user, dataroom }) {
   return allItems.some(
     (item) =>
       !canModifyDataroomItem({
         item,
         user,
         dataroom,
-        collaboratorsOwnDeleteOnly,
       })
   );
 }
