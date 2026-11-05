@@ -53,5 +53,6 @@ describe('AdminRbacPage', () => {
     expect(screen.getByRole('heading', { name: 'Roles & Permissions' })).toBeInTheDocument();
     expect(screen.getByText('Editor')).toBeInTheDocument();
     expect(screen.getByText('View content')).toBeInTheDocument();
+    expect(screen.getByText('Audit log')).toBeInTheDocument();
   });
 });

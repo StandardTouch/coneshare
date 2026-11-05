@@ -115,6 +115,25 @@ describe("DraggableItem", () => {
     expect(screen.queryByRole("menuitem", { name: /rename/i })).not.toBeInTheDocument();
   });
 
+  it("should hide rename and delete when item.permissions deny actions", async () => {
+    const user = userEvent.setup();
+    renderDraggableItem({
+      item: {
+        ...mockDocument,
+        permissions: {
+          can_modify: false,
+          can_delete: false,
+          can_rename: false,
+        },
+      },
+    });
+
+    await user.click(screen.getByLabelText(`Actions for ${mockDocument.name}`));
+
+    expect(screen.queryByRole("menuitem", { name: /rename/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /delete/i })).not.toBeInTheDocument();
+  });
+
   it("should not navigate and should close dropdown when delete menu item is clicked", async () => {
     const user = userEvent.setup();
     const onDelete = vi.fn();
