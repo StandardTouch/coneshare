@@ -194,3 +194,23 @@ def filter_ancestor_chain_for_user(user, dataroom: Dataroom, ancestors: list) ->
     if not hidden:
         return ancestors
     return [a for a in ancestors if str(a.get('id')) not in hidden]
+
+
+def filter_dataroom_visits_queryset(qs: QuerySet, user, dataroom: Dataroom) -> QuerySet:
+    if is_dataroom_owner_or_admin(user, dataroom):
+        return qs
+    hidden = hidden_folder_ids_for_user(user, dataroom)
+    if not hidden:
+        return qs
+    return qs.exclude(
+        Q(dataroom_folder_id__in=hidden) | Q(dataroom_document__folder_id__in=hidden)
+    )
+
+
+def filter_dashboard_view_sessions_queryset(qs: QuerySet, user) -> QuerySet:
+    from documents.views import get_document_queryset_for_user
+
+    if getattr(user, 'role', '') == 'admin':
+        return qs
+    accessible = get_document_queryset_for_user(user).values('id')
+    return qs.filter(Q(share_link__document__isnull=True) | Q(share_link__document_id__in=accessible))

@@ -4,7 +4,7 @@ from pathlib import Path
 
 from django.utils.translation import gettext_lazy as _
 from django.db import transaction
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Prefetch, Q, Sum
 from django.shortcuts import get_object_or_404
 from rest_framework import mixins, permissions, serializers, status, viewsets
 from rest_framework.decorators import action
@@ -497,9 +497,18 @@ class DataroomViewSet(viewsets.ModelViewSet):
     def view_sessions(self, request, pk=None):
 
         dataroom = self.get_object()
+        from permissions_rbac.dataroom_access import filter_dataroom_visits_queryset
+        from sharelinks.models import DataroomVisit
+
         view_queryset = ViewSession.objects.filter(
             share_link__dataroom=dataroom
-        ).order_by('-viewed_at').select_related('share_link').prefetch_related('dataroom_visits__page_views')
+        ).order_by('-viewed_at').select_related('share_link')
+        visits_qs = filter_dataroom_visits_queryset(
+            DataroomVisit.objects.all(), request.user, dataroom
+        ).prefetch_related('page_views')
+        view_queryset = view_queryset.prefetch_related(
+            Prefetch('dataroom_visits', queryset=visits_qs)
+        )
 
         paginator = StandardResultsSetPagination()
         page = paginator.paginate_queryset(view_queryset, request, view=self)
@@ -536,9 +545,16 @@ class DataroomViewSet(viewsets.ModelViewSet):
         unique_viewers = unique_emails + unique_anon_ips
 
         # Combine direct session downloads with downloads of specific documents/folders within dataroom visits
-        visit_downloads = DataroomVisit.objects.filter(
-            view_session__share_link__dataroom=dataroom,
-            downloaded_at__isnull=False
+        from permissions_rbac.dataroom_access import filter_dataroom_visits_queryset
+        from sharelinks.models import DataroomVisit
+
+        visit_downloads = filter_dataroom_visits_queryset(
+            DataroomVisit.objects.filter(
+                view_session__share_link__dataroom=dataroom,
+                downloaded_at__isnull=False,
+            ),
+            request.user,
+            dataroom,
         ).count()
         total_downloads = (aggregates['session_downloads'] or 0) + visit_downloads
 
@@ -1331,7 +1347,12 @@ class DataroomFolderViewSet(viewsets.ModelViewSet):
         The dataroom must belong to the user's organization.
         """
         accessible_datarooms = get_dataroom_queryset_for_user(self.request.user)
-        queryset = self.queryset.filter(dataroom__in=accessible_datarooms).select_related('created_by', 'dataroom', 'dataroom__created_by')
+        queryset = self.queryset.filter(dataroom__in=accessible_datarooms).select_related(
+            'created_by',
+            'dataroom',
+            'dataroom__created_by',
+            'parent__parent__parent__parent__parent',
+        )
         dataroom_id = self.request.query_params.get('dataroom_id')
         if dataroom_id:
             queryset = queryset.filter(dataroom_id=dataroom_id)
@@ -1344,14 +1365,29 @@ class DataroomFolderViewSet(viewsets.ModelViewSet):
         sub_folders = filter_dataroom_folders_for_user(sub_folders, request.user, instance.dataroom)
         documents = DataroomDocument.objects.filter(
             folder=instance, document__deleted_at__isnull=True
-        ).select_related('document', 'document__created_by').annotate(
+        ).select_related(
+            'document', 'document__created_by', 'dataroom', 'dataroom__created_by', 'folder'
+        ).annotate(
             dataroom_view_count=Count('dataroomvisit', distinct=True)
         ).order_by('created_at', 'id')
         documents = filter_dataroom_documents_for_user(documents, request.user, instance.dataroom)
 
-        data = self.get_serializer(instance).data
-        sub_folder_data = DataroomFolderSerializer(sub_folders, many=True).data
-        document_data = DataroomDocumentSerializer(documents, many=True).data
+        folder_parent_map = {
+            str(row['id']): {
+                'id': row['id'],
+                'name': row['name'],
+                'parent_id': row['parent_id'],
+            }
+            for row in DataroomFolder.objects.filter(dataroom=instance.dataroom).values('id', 'name', 'parent_id')
+        }
+        serializer_context = {
+            **self.get_serializer_context(),
+            'dataroom_folder_parent_map': folder_parent_map,
+        }
+
+        data = DataroomFolderSerializer(instance, context=serializer_context).data
+        sub_folder_data = DataroomFolderSerializer(sub_folders, many=True, context=serializer_context).data
+        document_data = DataroomDocumentSerializer(documents, many=True, context=serializer_context).data
         data['sub_folders'] = sub_folder_data
         data['documents'] = document_data
 

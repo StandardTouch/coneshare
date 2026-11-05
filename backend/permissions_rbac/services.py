@@ -36,6 +36,7 @@ from permissions_rbac.models import (
     DataroomRolePermission,
     SiteRolePermission,
 )
+from permissions_rbac.request_context import rbac_request_state
 
 CACHE_TIMEOUT = 3600
 
@@ -267,17 +268,65 @@ def invalidate_folder_rule_cache(role: DataroomRole) -> None:
     cache.delete(f'rbac:folder_rules:{role.organization_id}:{role.id}')
 
 
-def _effective_folder_rule(folder: DataroomFolder, role: DataroomRole) -> str:
-    rules = _folder_rule_map_for_role(role)
-    current = folder
+def _effective_folder_rule_from_maps(
+    folder_id: str,
+    rule_map: Dict[str, str],
+    parent_by_id: Dict[str, Optional[str]],
+) -> str:
+    current = folder_id
     visited = set()
-    while current and current.id not in visited:
-        visited.add(current.id)
-        rule = rules.get(str(current.id))
+    while current and current not in visited:
+        visited.add(current)
+        rule = rule_map.get(current)
         if rule and rule != DataroomFolderRoleRule.RULE_INHERIT:
             return rule
-        current = current.parent
+        current = parent_by_id.get(current)
     return DataroomFolderRoleRule.RULE_INHERIT
+
+
+def _effective_folder_rule(folder: DataroomFolder, role: DataroomRole) -> str:
+    rules = _folder_rule_map_for_role(role)
+    parent_by_id = rbac_request_state().get(f'folder_parents:{folder.dataroom_id}')
+    if parent_by_id is None:
+        parent_by_id = {
+            str(row['id']): str(row['parent_id']) if row['parent_id'] else None
+            for row in DataroomFolder.objects.filter(dataroom_id=folder.dataroom_id).values('id', 'parent_id')
+        }
+        rbac_request_state()[f'folder_parents:{folder.dataroom_id}'] = parent_by_id
+    return _effective_folder_rule_from_maps(str(folder.id), rules, parent_by_id)
+
+
+def _compute_hidden_folder_ids(user, dataroom: Dataroom) -> Set[str]:
+    if is_dataroom_owner_or_admin(user, dataroom):
+        return set()
+    role = get_collaborator_dataroom_role(user, dataroom)
+    if role is None:
+        return set()
+    state = rbac_request_state()
+    parent_key = f'folder_parents:{dataroom.id}'
+    parent_by_id = state.get(parent_key)
+    if parent_by_id is None:
+        parent_by_id = {
+            str(row['id']): str(row['parent_id']) if row['parent_id'] else None
+            for row in DataroomFolder.objects.filter(dataroom=dataroom).values('id', 'parent_id')
+        }
+        state[parent_key] = parent_by_id
+    rule_map = _folder_rule_map_for_role(role)
+    hidden = set()
+    for folder_id in parent_by_id.keys():
+        if _effective_folder_rule_from_maps(folder_id, rule_map, parent_by_id) == DataroomFolderRoleRule.RULE_HIDDEN:
+            hidden.add(folder_id)
+    return hidden
+
+
+def hidden_folder_ids_for_user(user, dataroom: Dataroom) -> Set[str]:
+    cache_key = f'hidden_folder_ids:{user.id}:{dataroom.id}'
+    state = rbac_request_state()
+    if cache_key in state:
+        return state[cache_key]
+    hidden = _compute_hidden_folder_ids(user, dataroom)
+    state[cache_key] = hidden
+    return hidden
 
 
 def is_folder_hidden_for_role(folder: DataroomFolder, role: DataroomRole) -> bool:
@@ -286,21 +335,6 @@ def is_folder_hidden_for_role(folder: DataroomFolder, role: DataroomRole) -> boo
 
 def is_folder_view_only_for_role(folder: DataroomFolder, role: DataroomRole) -> bool:
     return _effective_folder_rule(folder, role) == DataroomFolderRoleRule.RULE_VIEW_ONLY
-
-
-def hidden_folder_ids_for_user(user, dataroom: Dataroom) -> Set[str]:
-    if is_dataroom_owner_or_admin(user, dataroom):
-        return set()
-    role = get_collaborator_dataroom_role(user, dataroom)
-    if role is None:
-        return set()
-    hidden = set()
-    for folder in DataroomFolder.objects.filter(dataroom=dataroom):
-        if is_folder_hidden_for_role(folder, role):
-            hidden.add(str(folder.id))
-            for child_id in _expand_dataroom_folder_ids(dataroom, [folder.id]):
-                hidden.add(str(child_id))
-    return hidden
 
 
 def filter_dataroom_documents_for_user(qs, user, dataroom: Dataroom):
@@ -330,6 +364,18 @@ def assert_dataroom_perm(user, action: str, dataroom: Dataroom, item=None, item_
 
 
 def item_permissions_for_user(user, dataroom: Dataroom, item_type: str, item) -> Dict[str, bool]:
+    if is_dataroom_owner_or_admin(user, dataroom):
+        return {
+            'can_view': True,
+            'can_download': True,
+            'can_modify': True,
+            'can_delete': True,
+            'can_rename': True,
+            'can_move': True,
+            'can_reorder': True,
+            'can_manage_share_settings': True,
+            'can_upload': True,
+        }
     return {
         'can_view': has_perm(user, PERM_VIEW, dataroom, item, item_type),
         'can_download': has_perm(user, PERM_DOWNLOAD, dataroom, item, item_type),

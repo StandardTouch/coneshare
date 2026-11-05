@@ -170,10 +170,8 @@ class TestDataroomViewSet:
             doc = Document.objects.create(name=f"Doc {i}", organization=organization, created_by=user)
             DataroomDocument.objects.create(dataroom=dataroom, document=doc, folder=target_folder, name=doc.name)
 
-        # The number of queries should remain constant regardless of document count.
-        # Current expected queries:
-        # 1 (get folder + dataroom via select_related) + 2 (ancestor chain) + 1 (RBAC role grants cache)
-        # + 1 (get children) + 1 (get documents) + 1 (check item-order rows for this scope) = 6
+        # 1 (get folder + dataroom via select_related) + 1 (folder parent map for serializers)
+        # + 1 (get children) + 1 (get documents) + 1 (check item-order rows) + RBAC role grants cache
         with django_assert_num_queries(6):
             url = f'/api/v1/dataroom-folders/{target_folder.id}/'
             response = api_client.get(url)

@@ -358,3 +358,56 @@ class TestRolePermissionMatrix:
         doc = _doc('other.pdf', other, organization)
         dd = DataroomDocument.objects.create(dataroom=rbac_room, document=doc, name=doc.name)
         assert has_perm(user, 'delete', rbac_room, dd, 'document') is True
+
+
+@pytest.mark.django_db
+class TestExtendedHiddenEnforcement:
+    @pytest.fixture
+    def hidden_doc_setup(self, user, viewer_user, organization, rbac_room, rbac_roles):
+        _assign(rbac_room, viewer_user, ROLE_SLUG_VIEWER, user)
+        viewer_role = DataroomRole.objects.get(organization=organization, slug=ROLE_SLUG_VIEWER)
+        hidden = DataroomFolder.objects.create(dataroom=rbac_room, name='Secret', created_by=user)
+        secret_doc = _doc('secret.pdf', user, organization)
+        dd = DataroomDocument.objects.create(
+            dataroom=rbac_room, document=secret_doc, name=secret_doc.name, folder=hidden, is_starred=True
+        )
+        DataroomFolderRoleRule.objects.create(
+            dataroom_folder=hidden,
+            dataroom_role=viewer_role,
+            rule=DataroomFolderRoleRule.RULE_HIDDEN,
+        )
+        return {'hidden': hidden, 'dd': dd, 'doc': secret_doc, 'viewer': viewer_user, 'room': rbac_room}
+
+    def test_vault_document_retrieve_404(self, hidden_doc_setup):
+        client = APIClient()
+        client.force_authenticate(user=hidden_doc_setup['viewer'])
+        resp = client.get(f'/api/v1/documents/{hidden_doc_setup["doc"].id}/')
+        assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_vault_document_versions_404(self, hidden_doc_setup):
+        client = APIClient()
+        client.force_authenticate(user=hidden_doc_setup['viewer'])
+        resp = client.get(f'/api/v1/documents/{hidden_doc_setup["doc"].id}/versions/')
+        assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_vault_document_stats_404(self, hidden_doc_setup):
+        client = APIClient()
+        client.force_authenticate(user=hidden_doc_setup['viewer'])
+        resp = client.get(f'/api/v1/documents/{hidden_doc_setup["doc"].id}/stats/')
+        assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_dataroom_folder_list_search_scope_omits_hidden(self, hidden_doc_setup):
+        client = APIClient()
+        client.force_authenticate(user=hidden_doc_setup['viewer'])
+        resp = client.get(f'/api/v1/dataroom-folders/?dataroom_id={hidden_doc_setup["room"].id}')
+        assert resp.status_code == status.HTTP_200_OK
+        ids = {row['id'] for row in resp.data}
+        assert str(hidden_doc_setup['hidden'].id) not in ids
+
+    def test_dataroom_full_content_omits_starred_hidden(self, hidden_doc_setup):
+        client = APIClient()
+        client.force_authenticate(user=hidden_doc_setup['viewer'])
+        resp = client.get(f'/api/v1/datarooms/{hidden_doc_setup["room"].id}/?content=full')
+        assert resp.status_code == status.HTTP_200_OK
+        doc_ids = {item['id'] for item in resp.data['items'] if item.get('type') == 'document'}
+        assert str(hidden_doc_setup['dd'].id) not in doc_ids
