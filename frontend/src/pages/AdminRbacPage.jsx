@@ -30,6 +30,20 @@ export function AdminRbacPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [savingRoleId, setSavingRoleId] = useState(null);
   const [isResetting, setIsResetting] = useState(false);
+  const [auditLog, setAuditLog] = useState([]);
+  const [auditLoading, setAuditLoading] = useState(true);
+
+  const loadAuditLog = useCallback(async () => {
+    setAuditLoading(true);
+    try {
+      const res = await api.getAdminRbacAuditLog();
+      setAuditLog(res.data || []);
+    } catch {
+      setAuditLog([]);
+    } finally {
+      setAuditLoading(false);
+    }
+  }, []);
 
   const loadMatrix = useCallback(async () => {
     setIsLoading(true);
@@ -54,7 +68,8 @@ export function AdminRbacPage() {
 
   useEffect(() => {
     loadMatrix();
-  }, [loadMatrix]);
+    loadAuditLog();
+  }, [loadMatrix, loadAuditLog]);
 
   const permissions = matrix?.permissions || [];
 
@@ -87,6 +102,7 @@ export function AdminRbacPage() {
       await api.updateAdminRbacRolePermissions(role.id, { grants });
       toast.success(t('admin.rbac.saved', { defaultValue: 'Role permissions updated.' }));
       await loadMatrix();
+      await loadAuditLog();
     } catch {
       // interceptor
     } finally {
@@ -103,6 +119,7 @@ export function AdminRbacPage() {
       });
       toast.success(t('admin.rbac.siteSaved', { defaultValue: 'Site permissions updated.' }));
       await loadMatrix();
+      await loadAuditLog();
     } catch {
       // interceptor
     } finally {
@@ -116,6 +133,7 @@ export function AdminRbacPage() {
       await api.resetAdminRbacDefaults();
       toast.success(t('admin.rbac.resetDone', { defaultValue: 'System roles reset to defaults.' }));
       await loadMatrix();
+      await loadAuditLog();
     } catch {
       // interceptor
     } finally {
@@ -259,6 +277,45 @@ export function AdminRbacPage() {
                   'Legacy toggles in Settings still apply: Collaborators own-only and Admin-only dataroom creation override defaults when enabled.',
               })}
             </p>
+          </div>
+
+          <div className="rounded-lg border p-4 space-y-3">
+            <h2 className="font-semibold">{t('admin.rbac.auditTitle', { defaultValue: 'Audit log' })}</h2>
+            <p className="text-xs text-muted-foreground">
+              {t('admin.rbac.auditSubtitle', {
+                defaultValue: 'Recent permission and role changes in your organization.',
+              })}
+            </p>
+            {auditLoading ? (
+              <Skeleton className="h-32 w-full" />
+            ) : auditLog.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t('admin.rbac.auditEmpty', { defaultValue: 'No entries yet.' })}</p>
+            ) : (
+              <div className="overflow-x-auto max-h-80 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-background border-b">
+                    <tr className="text-left text-muted-foreground">
+                      <th className="py-2 pr-3">{t('admin.rbac.auditWhen', { defaultValue: 'When' })}</th>
+                      <th className="py-2 pr-3">{t('admin.rbac.auditWho', { defaultValue: 'Who' })}</th>
+                      <th className="py-2 pr-3">{t('admin.rbac.auditWhat', { defaultValue: 'What' })}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditLog.map((entry) => (
+                      <tr key={entry.id} className="border-b align-top">
+                        <td className="py-2 pr-3 whitespace-nowrap text-xs">
+                          {entry.created_at ? new Date(entry.created_at).toLocaleString() : '—'}
+                        </td>
+                        <td className="py-2 pr-3 text-xs">
+                          {entry.actor_email || t('admin.rbac.systemActor', { defaultValue: 'System' })}
+                        </td>
+                        <td className="py-2 pr-3">{entry.summary}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}

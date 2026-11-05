@@ -10,6 +10,7 @@ vi.mock('../../services/api', () => ({
   getAdminRbacMatrix: vi.fn(),
   updateAdminRbacRolePermissions: vi.fn(),
   resetAdminRbacDefaults: vi.fn(),
+  getAdminRbacAuditLog: vi.fn(),
   updateAdminSitePermissions: vi.fn(),
 }));
 
@@ -19,6 +20,7 @@ vi.mock('../../contexts/BrandingProvider', () => ({
 
 describe('AdminRbacPage', () => {
   beforeEach(() => {
+    api.getAdminRbacAuditLog.mockResolvedValue({ data: [] });
     api.getAdminRbacMatrix.mockResolvedValue({
       data: {
         permissions: [{ codename: 'view', label: 'View content', supports_scope: false, category: 'content' }],

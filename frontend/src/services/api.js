@@ -762,6 +762,10 @@ export const updateAdminRbacRolePermissions = (roleId, data) =>
 export const resetAdminRbacDefaults = () => api.post('/admin/rbac/roles/reset-defaults/');
 export const updateAdminSitePermissions = (data) => api.put('/admin/rbac/roles/site-permissions/', data);
 export const getDataroomRoleOptions = (dataroomId) => api.get(`/datarooms/${dataroomId}/role-options/`);
+export const getFolderAccessRules = (folderId) =>
+  api.get('/folder-access-rules/', { params: { folder_id: folderId } });
+export const setFolderAccessRule = (data) => api.post('/folder-access-rules/', data);
+export const getAdminRbacAuditLog = () => api.get('/admin/rbac/audit-log/');
 export const getAdminLoginActivities = (page = 1) => api.get(`/admin/login-activities/?page=${page}`);
 export const getAdminSecurityThreatEvents = ({ page = 1, status = '', severity = '', eventType = '' } = {}) => {
   const params = { page };
