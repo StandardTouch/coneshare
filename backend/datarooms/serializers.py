@@ -24,8 +24,15 @@ from .models import (
     LOGO_MODE_CHOICES,
 )
 from .collaborator_delete_permissions import user_can_delete_dataroom_item, user_can_modify_dataroom_item
-from permissions_rbac.services import item_permissions_for_user
+from permissions_rbac.catalogue import (
+    PERM_EDIT_DATAROOM_SETTINGS,
+    PERM_INVITE_COLLABORATORS,
+    PERM_MANAGE_COLLABORATORS,
+    PERM_UPLOAD,
+)
+from permissions_rbac.services import has_perm, item_permissions_for_user
 from permissions_rbac.models import DataroomRole
+from permissions_rbac.dataroom_access import filter_ancestor_chain_for_user
 from .utils import build_ordered_dataroom_items, is_dataroom_owner_or_admin
 from .services import get_dataroom_storage_used_bytes
 
@@ -460,7 +467,11 @@ class DataroomFolderSerializer(serializers.ModelSerializer):
         while parent:
             ancestors.append({'id': parent.id, 'name': parent.name})
             parent = parent.parent
-        return list(reversed(ancestors))
+        result = list(reversed(ancestors))
+        request = self.context.get('request')
+        if request and getattr(request.user, 'is_authenticated', False):
+            result = filter_ancestor_chain_for_user(request.user, obj.dataroom, result)
+        return result
 
 
 class DataroomDocumentSerializer(serializers.ModelSerializer):
@@ -513,6 +524,7 @@ class DataroomDetailSerializer(serializers.ModelSerializer):
     banner_images = serializers.SerializerMethodField()
     owner = serializers.SerializerMethodField()
     current_user_role = serializers.SerializerMethodField()
+    current_user_permissions = serializers.SerializerMethodField()
     collaborator_count = serializers.SerializerMethodField()
     collaborators = serializers.SerializerMethodField()
     storage_used_bytes = serializers.SerializerMethodField()
@@ -525,7 +537,7 @@ class DataroomDetailSerializer(serializers.ModelSerializer):
         model = Dataroom
         fields = [
             'id', 'name', 'organization', 'created_at', 'updated_at', 'created_by',
-            'owner', 'current_user_role', 'collaborator_count', 'collaborators',
+            'owner', 'current_user_role', 'current_user_permissions', 'collaborator_count', 'collaborators',
             'storage_quota_mb', 'storage_used_bytes', 'storage_version',
             'show_file_index',
             'enable_qna',
@@ -559,8 +571,21 @@ class DataroomDetailSerializer(serializers.ModelSerializer):
             return 'collaborator'
         return 'none'
 
+    @extend_schema_field(serializers.DictField())
+    def get_current_user_permissions(self, obj):
+        request = self.context.get('request')
+        if not request or not getattr(request.user, 'is_authenticated', False):
+            return {}
+        user = request.user
+        return {
+            'can_upload': has_perm(user, PERM_UPLOAD, obj),
+            'can_invite_collaborators': has_perm(user, PERM_INVITE_COLLABORATORS, obj),
+            'can_manage_collaborators': has_perm(user, PERM_MANAGE_COLLABORATORS, obj),
+            'can_edit_dataroom_settings': has_perm(user, PERM_EDIT_DATAROOM_SETTINGS, obj),
+        }
+
     @extend_schema_field(serializers.IntegerField())
-    def get_collaborator_count(self, obj) -> int:
+    def get_collaborator_count(self, obj):
         return len(obj.collaborators.all())
 
     @extend_schema_field(serializers.ListField(child=serializers.DictField()))

@@ -125,6 +125,19 @@ class DataroomFolderRoleRule(BaseModel):
             ),
         ]
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        from permissions_rbac.services import invalidate_folder_rule_cache
+
+        invalidate_folder_rule_cache(self.dataroom_role)
+
+    def delete(self, *args, **kwargs):
+        role = self.dataroom_role
+        super().delete(*args, **kwargs)
+        from permissions_rbac.services import invalidate_folder_rule_cache
+
+        invalidate_folder_rule_cache(role)
+
 
 class PermissionAuditLog(BaseModel):
     TARGET_ROLE = 'dataroom_role'

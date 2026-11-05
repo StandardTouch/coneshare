@@ -66,6 +66,13 @@ from permissions_rbac.services import (
     filter_dataroom_folders_for_user,
     has_perm,
 )
+from permissions_rbac.dataroom_access import (
+    apply_document_hidden_exclusions,
+    apply_folder_hidden_exclusions,
+    assert_destination_folder_allowed,
+    get_visible_dataroom_document_or_404,
+    get_visible_dataroom_folder_or_404,
+)
 from .utils import (
     get_dataroom_storage_folder_name,
     build_ordered_dataroom_items,
@@ -246,6 +253,9 @@ class DataroomViewSet(viewsets.ModelViewSet):
         destination_folder = None
         if dest_folder_id:
             destination_folder = get_object_or_404(DataroomFolder, id=dest_folder_id, dataroom=dataroom)
+        assert_destination_folder_allowed(
+            request.user, dataroom, destination_folder, for_upload=True
+        )
 
         try:
             with transaction.atomic():
@@ -442,6 +452,9 @@ class DataroomViewSet(viewsets.ModelViewSet):
                     destination_folder = get_object_or_404(
                         DataroomFolder, id=dest_folder_id, dataroom=dataroom
                     )
+                assert_destination_folder_allowed(
+                    request.user, dataroom, destination_folder, for_upload=False
+                )
 
                 # TODO: This loop executes a save() for each document being moved, which can cause performance issues
                 # (N+1 queries) when moving many documents. This should be converted to use bulk_update.
@@ -562,6 +575,12 @@ class DataroomViewSet(viewsets.ModelViewSet):
                 {"detail": "Parent folder does not belong to this dataroom."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        try:
+            assert_destination_folder_allowed(
+                request.user, dataroom, parent_folder, for_upload=True
+            )
+        except PermissionDenied as exc:
+            return Response({"detail": str(exc.detail)}, status=status.HTTP_403_FORBIDDEN)
 
         try:
             with transaction.atomic():
@@ -701,6 +720,13 @@ class DataroomViewSet(viewsets.ModelViewSet):
             if file_name_from_path:
                 file_name = file_name_from_path
 
+        try:
+            assert_destination_folder_allowed(
+                request.user, dataroom, destination_folder, for_upload=True
+            )
+        except PermissionDenied as exc:
+            return Response({"detail": str(exc.detail)}, status=status.HTTP_403_FORBIDDEN)
+
         unique_name = self._get_unique_dataroom_document_name(
             dataroom=dataroom,
             parent_folder=destination_folder,
@@ -784,6 +810,13 @@ class DataroomViewSet(viewsets.ModelViewSet):
                         {"detail": f"Folder path '{folder_path}' does not exist in this dataroom."},
                         status=status.HTTP_400_BAD_REQUEST
                     )
+
+        try:
+            assert_destination_folder_allowed(
+                request.user, dataroom, destination_folder, for_upload=True
+            )
+        except PermissionDenied as exc:
+            return Response({"detail": str(exc.detail)}, status=status.HTTP_403_FORBIDDEN)
 
         library_folder = self._ensure_library_folder_path(
             requesting_user=request.user,
@@ -1260,12 +1293,7 @@ class DataroomDocumentViewSet(mixins.RetrieveModelMixin,
         qs = self.queryset.filter(dataroom__in=accessible_datarooms).annotate(
             dataroom_view_count=Count('dataroomvisit', distinct=True)
         )
-        dataroom_id = self.request.query_params.get('dataroom_id')
-        if dataroom_id:
-            dataroom = Dataroom.objects.filter(id=dataroom_id).first()
-            if dataroom:
-                qs = filter_dataroom_documents_for_user(qs, self.request.user, dataroom)
-        return qs
+        return apply_document_hidden_exclusions(qs, self.request.user)
 
     def perform_update(self, serializer):
         instance = self.get_object()
@@ -1307,10 +1335,7 @@ class DataroomFolderViewSet(viewsets.ModelViewSet):
         dataroom_id = self.request.query_params.get('dataroom_id')
         if dataroom_id:
             queryset = queryset.filter(dataroom_id=dataroom_id)
-            dataroom = Dataroom.objects.filter(id=dataroom_id).first()
-            if dataroom:
-                queryset = filter_dataroom_folders_for_user(queryset, self.request.user, dataroom)
-        return queryset
+        return apply_folder_hidden_exclusions(queryset, self.request.user)
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -1344,6 +1369,9 @@ class DataroomFolderViewSet(viewsets.ModelViewSet):
 
         name = serializer.validated_data['name']
         parent = serializer.validated_data.get('parent')
+        assert_destination_folder_allowed(
+            self.request.user, dataroom, parent, for_upload=False
+        )
 
         if DataroomFolder.objects.filter(dataroom=dataroom, parent=parent, name=name).exists():
             raise serializers.ValidationError({'name': _('A folder with this name already exists in this location.')})

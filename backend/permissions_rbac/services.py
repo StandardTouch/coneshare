@@ -341,6 +341,7 @@ def item_permissions_for_user(user, dataroom: Dataroom, item_type: str, item) ->
         'can_manage_share_settings': has_perm(
             user, PERM_MANAGE_SHARE_SETTINGS, dataroom, item, item_type
         ),
+        'can_upload': has_perm(user, PERM_UPLOAD, dataroom, item, item_type),
     }
 
 

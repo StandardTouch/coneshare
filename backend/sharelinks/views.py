@@ -71,7 +71,12 @@ DATAROOM_VIEWDATA_DEFAULT_LIMIT = 40
 DATAROOM_VIEWDATA_MAX_LIMIT = 200
 
 
-def _resolve_dataroom_document_setting(link: ShareLink, requested_dataroom_document_id: str, visible_only: bool = True):
+def _resolve_dataroom_document_setting(
+    link: ShareLink,
+    requested_dataroom_document_id: str,
+    visible_only: bool = True,
+    user=None,
+):
     """
     Resolve the per-link setting row for one dataroom item.
 
@@ -89,7 +94,12 @@ def _resolve_dataroom_document_setting(link: ShareLink, requested_dataroom_docum
 
     # Use .get() intentionally: this should be unique per (share_link, dataroom_document).
     # DoesNotExist is handled by callers as a permission failure.
-    return base_qs.get(dataroom_document_id=requested_dataroom_document_id)
+    setting = base_qs.get(dataroom_document_id=requested_dataroom_document_id)
+    if user and getattr(user, 'is_authenticated', False):
+        from permissions_rbac.dataroom_access import assert_share_link_dataroom_document_visible
+
+        assert_share_link_dataroom_document_visible(user, setting.dataroom_document)
+    return setting
 
 
 def _to_iso_datetime(value):
@@ -924,7 +934,7 @@ class ShareLinkViewDataView(APIView):
                 # Security check: ensure the requested document is part of this dataroom
                 # and is visible according to the link's settings.
                 setting = _resolve_dataroom_document_setting(
-                    link, dataroom_document_id, visible_only=True
+                    link, dataroom_document_id, visible_only=True, user=request.user
                 )
                 document_to_return = setting.dataroom_document.document
                 dataroom_setting = setting
@@ -1250,6 +1260,18 @@ class ShareLinkViewDataView(APIView):
                 doc for doc in scoped_docs
                 if doc_settings.get(str(doc.id), {}).get('is_visible', False)
             ]
+
+            from permissions_rbac.dataroom_access import (
+                filter_public_dataroom_documents_for_user,
+                filter_public_dataroom_folders_for_user,
+            )
+
+            scope_folders = filter_public_dataroom_folders_for_user(
+                request.user, dataroom, scope_folders
+            )
+            scope_docs = filter_public_dataroom_documents_for_user(
+                request.user, dataroom, scope_docs
+            )
 
             # Create a map for quick lookup of settings in serializers
             settings_map = {
@@ -2245,7 +2267,7 @@ class ShareLinkPageView(APIView):
             if not dataroom_document_id:
                 return Response({"message": "dataroom_document_id is required."}, status=status.HTTP_400_BAD_REQUEST)
             try:
-                setting = _resolve_dataroom_document_setting(link, dataroom_document_id, visible_only=True)
+                setting = _resolve_dataroom_document_setting(link, dataroom_document_id, visible_only=True, user=request.user)
                 document = setting.dataroom_document.document
                 watermark_enabled = setting.enable_watermark
             except serializers.ValidationError as e:
@@ -2326,7 +2348,7 @@ class WatermarkedPageRenderView(APIView):
             try:
                 # Security check: ensure the requested document is part of this dataroom
                 # and is visible according to the link's settings.
-                setting = _resolve_dataroom_document_setting(link, dataroom_document_id, visible_only=True)
+                setting = _resolve_dataroom_document_setting(link, dataroom_document_id, visible_only=True, user=request.user)
                 document = setting.dataroom_document.document
                 watermark_enabled_for_item = setting.enable_watermark
             except serializers.ValidationError as e:
@@ -2681,7 +2703,7 @@ class ShareLinkFileDownloadView(APIView):
                 return Response({"message": "dataroom_document_id is required for dataroom downloads."}, status=status.HTTP_400_BAD_REQUEST)
 
             try:
-                setting = _resolve_dataroom_document_setting(link, dataroom_document_id, visible_only=True)
+                setting = _resolve_dataroom_document_setting(link, dataroom_document_id, visible_only=True, user=request.user)
                 document = setting.dataroom_document.document
                 allow_download = setting.allow_download
                 enable_watermark = setting.enable_watermark
@@ -2845,6 +2867,18 @@ class DataroomFolderDownloadView(APIView):
             folder=folder, document__deleted_at__isnull=True
         ).select_related('document').prefetch_related('document__versions')
 
+        from permissions_rbac.dataroom_access import (
+            filter_public_dataroom_documents_for_user,
+            filter_public_dataroom_folders_for_user,
+        )
+
+        child_folders = filter_public_dataroom_folders_for_user(
+            request.user, link.dataroom, child_folders
+        )
+        child_docs = filter_public_dataroom_documents_for_user(
+            request.user, link.dataroom, child_docs
+        )
+
         settings_qs = ShareLinkDataroomSetting.objects.filter(share_link=link)
         folder_settings = {s.dataroom_folder_id: s for s in settings_qs.filter(dataroom_folder__in=child_folders)}
         doc_settings = {s.dataroom_document_id: s for s in settings_qs.filter(dataroom_document__in=child_docs)}
@@ -2934,6 +2968,14 @@ class DataroomFolderDownloadView(APIView):
             root_folder = DataroomFolder.objects.select_related('parent__parent__parent__parent').get(id=folder_id, dataroom=link.dataroom)
         except DataroomFolder.DoesNotExist:
             return Response({"message": "Folder not found in this dataroom."}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.user and request.user.is_authenticated:
+            from permissions_rbac.dataroom_access import get_visible_dataroom_folder_or_404
+
+            try:
+                get_visible_dataroom_folder_or_404(request.user, str(root_folder.id))
+            except NotFound:
+                return Response({"message": "Folder not found in this dataroom."}, status=status.HTTP_404_NOT_FOUND)
 
         try:
             root_setting = link.dataroom_settings.get(dataroom_folder=root_folder)
