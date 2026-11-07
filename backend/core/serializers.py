@@ -12,9 +12,9 @@ from drf_spectacular.utils import extend_schema_field
 
 from core.models import APIKey, AppConfiguration, LoginActivity, Organization, UserGroup
 from core.services import blacklist_all_user_tokens, get_dynamic_setting
+from permissions_rbac.admin_user_role import OrganizationRoleAdminUserMixin
 from permissions_rbac.catalogue import PERM_CREATE_DATAROOM
 from permissions_rbac.services import has_site_perm
-from rolelabels.serializers import RoleLabelAdminUserMixin
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -153,7 +153,7 @@ class UserSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
-class AdminUserSerializer(RoleLabelAdminUserMixin, UserSerializer):
+class AdminUserSerializer(OrganizationRoleAdminUserMixin, UserSerializer):
     """Serializer for admin management of organization users."""
     password = serializers.CharField(write_only=True, required=False, allow_blank=True)
     send_invite = serializers.BooleanField(write_only=True, required=False, default=False)
@@ -161,6 +161,7 @@ class AdminUserSerializer(RoleLabelAdminUserMixin, UserSerializer):
     class Meta(UserSerializer.Meta):
         fields = [
             'id', 'email', 'name', 'role', 'organization', 'password', 'send_invite',
+            'organization_role', 'organization_role_id', 'role_label', 'role_label_id',
             'avatar', 'avatar_url', 'language', 'date_joined', 'updated_at',
             'total_document_size', 'file_size_quota_mb', 'custom_file_size_quota_mb', 'max_files_per_upload',
             'is_superuser', 'is_active'
@@ -216,7 +217,7 @@ class AdminUserSerializer(RoleLabelAdminUserMixin, UserSerializer):
         return super().validate(attrs)
 
     def create(self, validated_data):
-        role_label_id, clear_label = RoleLabelAdminUserMixin.extract_role_label_side_effects(
+        organization_role_id, clear_role = OrganizationRoleAdminUserMixin.extract_organization_role_side_effects(
             validated_data
         )
         send_invite = validated_data.pop('send_invite', False)
@@ -231,9 +232,9 @@ class AdminUserSerializer(RoleLabelAdminUserMixin, UserSerializer):
                 password = validated_data.pop('password', None)
                 if password:
                     validated_data['password'] = password
-                user = super(RoleLabelAdminUserMixin, self).create(validated_data)
-            RoleLabelAdminUserMixin.apply_role_label_side_effects(
-                user, role_label_id, clear_label
+                user = super(UserSerializer, self).create(validated_data)
+            OrganizationRoleAdminUserMixin.apply_organization_role_side_effects(
+                user, organization_role_id, clear_role
             )
         return user
 
@@ -244,11 +245,13 @@ class AdminUserSerializer(RoleLabelAdminUserMixin, UserSerializer):
         validated_data.pop('email', None)
         validated_data.pop('password', None)
         validated_data.pop('send_invite', None)
-        role_label_id, clear_label = RoleLabelAdminUserMixin.extract_role_label_side_effects(
+        organization_role_id, clear_role = OrganizationRoleAdminUserMixin.extract_organization_role_side_effects(
             validated_data
         )
         user = super(UserSerializer, self).update(instance, validated_data)
-        RoleLabelAdminUserMixin.apply_role_label_side_effects(user, role_label_id, clear_label)
+        OrganizationRoleAdminUserMixin.apply_organization_role_side_effects(
+            user, organization_role_id, clear_role
+        )
         return user
 
 

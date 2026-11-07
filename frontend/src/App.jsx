@@ -53,6 +53,7 @@ const AdminUsersPage = lazyNamed(() => import('./pages/AdminUsersPage'), 'AdminU
 const AdminUserDetailPage = lazyNamed(() => import('./pages/AdminUserDetailPage'), 'AdminUserDetailPage');
 const AdminDataroomsPage = lazyNamed(() => import('./pages/AdminDataroomsPage'), 'AdminDataroomsPage');
 const AdminRolesPage = lazyNamed(() => import('./pages/AdminRolesPage'), 'AdminRolesPage');
+const AdminRoleEditPage = lazyNamed(() => import('./pages/AdminRoleEditPage'), 'AdminRoleEditPage');
 const AdminRbacPage = lazyNamed(() => import('./pages/AdminRbacPage'), 'AdminRbacPage');
 const AdminSecurityAlertsPage = lazyNamed(() => import('./pages/AdminSecurityAlertsPage'), 'AdminSecurityAlertsPage');
 
@@ -147,6 +148,7 @@ function App() {
                   <Route path="/admin/branding" element={<RequireAuth adminOnly><AdminBrandingPage /></RequireAuth>} />
                   <Route path="/admin/users" element={<RequireAuth adminOnly><AdminUsersPage /></RequireAuth>} />
                   <Route path="/admin/roles" element={<RequireAuth adminOnly><AdminRolesPage /></RequireAuth>} />
+                  <Route path="/admin/roles/:roleId" element={<RequireAuth adminOnly><AdminRoleEditPage /></RequireAuth>} />
                   <Route path="/admin/rbac" element={<RequireAuth adminOnly><AdminRbacPage /></RequireAuth>} />
                   <Route path="/admin/users/:userId" element={<RequireAuth adminOnly><AdminUserDetailPage /></RequireAuth>} />
                   <Route path="/admin/datarooms" element={<RequireAuth adminOnly><AdminDataroomsPage /></RequireAuth>} />

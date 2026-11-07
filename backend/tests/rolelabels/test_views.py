@@ -6,6 +6,8 @@ from django.core.cache import cache
 from rest_framework import status
 
 from core.models import AppConfiguration, Organization
+from permissions_rbac.models import DataroomRole
+from permissions_rbac.seed import ensure_default_roles_for_organization
 from rolelabels.models import RoleLabel, UserRoleLabel
 
 User = get_user_model()
@@ -129,29 +131,34 @@ class TestRoleLabelOrgScoping:
 
 
 class TestAdminUserRoleLabel:
-    def test_labeled_user_has_member_role(self, admin_api_client, user, custom_role):
+    def test_member_with_organization_role(self, admin_api_client, user, admin_user):
+        ensure_default_roles_for_organization(admin_user.organization)
+        viewer = DataroomRole.objects.get(organization=admin_user.organization, slug='viewer')
         response = admin_api_client.patch(
             f'/api/v1/admin/users/{user.id}/',
-            {'role': 'member', 'role_label_id': custom_role.id},
+            {'role': 'member', 'organization_role_id': str(viewer.id)},
             format='json',
         )
         assert response.status_code == status.HTTP_200_OK
         user.refresh_from_db()
         assert user.role == 'member'
-        assert response.data['role_label']['id'] == custom_role.id
-        assert response.data['role_label']['name'] == custom_role.name
+        assert user.organization_role_id == viewer.id
+        assert response.data['organization_role']['id'] == str(viewer.id)
 
-    def test_admin_role_clears_label(self, admin_api_client, user, custom_role):
-        UserRoleLabel.objects.create(user=user, role_label=custom_role)
+    def test_admin_role_clears_organization_role(self, admin_api_client, user, admin_user):
+        ensure_default_roles_for_organization(admin_user.organization)
+        viewer = DataroomRole.objects.get(organization=admin_user.organization, slug='viewer')
+        user.organization_role = viewer
+        user.save(update_fields=['organization_role'])
         response = admin_api_client.patch(
             f'/api/v1/admin/users/{user.id}/',
-            {'role': 'admin', 'role_label_id': None},
+            {'role': 'admin', 'organization_role_id': None},
             format='json',
         )
         assert response.status_code == status.HTTP_200_OK
         user.refresh_from_db()
         assert user.role == 'admin'
-        assert not UserRoleLabel.objects.filter(user=user).exists()
+        assert user.organization_role_id is None
 
 
 class TestAdminUserCreateRoleLabel:
@@ -165,19 +172,25 @@ class TestAdminUserCreateRoleLabel:
         payload.update(overrides)
         return payload
 
-    def test_create_member_with_role_label(self, admin_api_client, custom_role):
+    def test_create_member_with_organization_role(self, admin_api_client, admin_user):
+        ensure_default_roles_for_organization(admin_user.organization)
+        custom = DataroomRole.objects.create(
+            organization=admin_user.organization,
+            slug='custom-analyst',
+            name='Analyst',
+            is_system=False,
+        )
         payload = self._create_payload(
             email='labeled@example.com',
             role='member',
-            role_label_id=custom_role.id,
+            organization_role_id=str(custom.id),
         )
         response = admin_api_client.post('/api/v1/admin/users/', payload, format='json')
         assert response.status_code == status.HTTP_201_CREATED
         user = User.objects.get(email='labeled@example.com')
         assert user.role == 'member'
-        assignment = UserRoleLabel.objects.get(user=user)
-        assert assignment.role_label_id == custom_role.id
-        assert response.data['role_label']['id'] == custom_role.id
+        assert user.organization_role_id == custom.id
+        assert response.data['organization_role']['id'] == str(custom.id)
 
     def test_create_admin_without_label(self, admin_api_client):
         payload = self._create_payload(email='newadmin@example.com', role='admin')
@@ -195,26 +208,21 @@ class TestAdminUserCreateRoleLabel:
         assert user.role == 'member'
         assert not UserRoleLabel.objects.filter(user=user).exists()
 
-    def test_create_toggle_off_ignores_role_label_id(self, admin_api_client, custom_role):
-        _set_role_labels_enabled(False)
-        payload = self._create_payload(
-            email='toggleoff@example.com',
-            role_label_id=custom_role.id,
+    def test_create_rejects_foreign_org_role(self, admin_api_client, other_org, admin_user):
+        ensure_default_roles_for_organization(other_org)
+        foreign = DataroomRole.objects.create(
+            organization=other_org,
+            slug='foreign-role',
+            name='Foreign',
+            is_system=False,
         )
-        response = admin_api_client.post('/api/v1/admin/users/', payload, format='json')
-        assert response.status_code == status.HTTP_201_CREATED
-        user = User.objects.get(email='toggleoff@example.com')
-        assert not UserRoleLabel.objects.filter(user=user).exists()
-
-    def test_create_rejects_foreign_org_role_label(self, admin_api_client, other_org):
-        foreign = RoleLabel.objects.create(organization=other_org, name='Foreign')
         payload = self._create_payload(
             email='foreignlabel@example.com',
-            role_label_id=foreign.id,
+            organization_role_id=str(foreign.id),
         )
         response = admin_api_client.post('/api/v1/admin/users/', payload, format='json')
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert 'role_label_id' in response.data
+        assert 'organization_role_id' in response.data
 
 
 class TestAdminUserCreateInviteRoleLabel:
@@ -245,19 +253,25 @@ class TestAdminUserCreateInviteRoleLabel:
 
     @patch('django.db.transaction.on_commit', side_effect=lambda func: func())
     @patch('onboarding.services.send_user_invite_email_task.delay')
-    def test_create_with_invite_and_role_label(self, mock_delay, _on_commit, admin_api_client, custom_role):
+    def test_create_with_invite_and_organization_role(self, mock_delay, _on_commit, admin_api_client, admin_user):
+        ensure_default_roles_for_organization(admin_user.organization)
+        custom = DataroomRole.objects.create(
+            organization=admin_user.organization,
+            slug='invite-custom',
+            name='Invite Custom',
+            is_system=False,
+        )
         response = admin_api_client.post(
             '/api/v1/admin/users/',
-            self._invite_payload(role_label_id=custom_role.id),
+            self._invite_payload(organization_role_id=str(custom.id)),
             format='json',
         )
         assert response.status_code == status.HTTP_201_CREATED
         user = User.objects.get(email='invited-label@example.com')
         assert user.role == 'member'
         assert user.has_usable_password() is False
-        assignment = UserRoleLabel.objects.get(user=user)
-        assert assignment.role_label_id == custom_role.id
-        assert response.data['role_label']['id'] == custom_role.id
+        assert user.organization_role_id == custom.id
+        assert response.data['organization_role']['id'] == str(custom.id)
         mock_delay.assert_called_once()
 
     @patch('django.db.transaction.on_commit', side_effect=lambda func: func())

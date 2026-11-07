@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { Lock, Pencil, Plus, Trash2, X, Check, Loader2 } from 'lucide-react';
+import { Loader2, Lock, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
 
 import * as api from '../services/api';
 import { AdminNav } from '../components/admin/AdminNav';
@@ -12,61 +13,73 @@ import { ConfirmationDialog } from '../components/dialogs/ConfirmationDialog';
 
 export function AdminRolesPage() {
   const { t } = useTranslation();
-  const [systemRoles, setSystemRoles] = useState([]);
-  const [customRoles, setCustomRoles] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [pagination, setPagination] = useState({ count: 0, current_page: 1, total_pages: 1 });
+  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState({ name: '', description: '' });
   const [isSaving, setIsSaving] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({ name: '', description: '' });
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isResetting, setIsResetting] = useState(false);
+  const [auditLog, setAuditLog] = useState([]);
+  const [auditLoading, setAuditLoading] = useState(true);
 
-  const loadRoles = useCallback(async () => {
-    setIsLoading(true);
+  const loadRoles = useCallback(
+    async (page = 1) => {
+      setIsLoading(true);
+      try {
+        const res = await api.getAdminRbacRoles({ page, search: search || undefined, page_size: 20 });
+        setRoles(res.data.results || res.data || []);
+        if (res.data.count !== undefined) {
+          setPagination({
+            count: res.data.count,
+            current_page: res.data.current_page,
+            total_pages: res.data.total_pages,
+          });
+        }
+      } catch {
+        // interceptor
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [search]
+  );
+
+  const loadAuditLog = useCallback(async () => {
+    setAuditLoading(true);
     try {
-      const res = await api.getAdminRoleLabels();
-      setSystemRoles(res.data.system_roles || []);
-      setCustomRoles(res.data.custom_roles || []);
+      const res = await api.getAdminRbacAuditLog();
+      setAuditLog(res.data || []);
     } catch {
-      // handled by interceptor
+      setAuditLog([]);
     } finally {
-      setIsLoading(false);
+      setAuditLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadRoles();
-  }, [loadRoles]);
+    loadRoles(1);
+    loadAuditLog();
+  }, [loadRoles, loadAuditLog]);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    setSearch(searchInput.trim());
+  };
 
   const handleCreate = async (e) => {
     e.preventDefault();
     setIsSaving(true);
     try {
-      await api.createAdminRoleLabel(createForm);
+      await api.createAdminRbacRole(createForm);
       toast.success(t('admin.roles.createSuccess', { defaultValue: 'Role created.' }));
       setCreateForm({ name: '', description: '' });
       setShowCreate(false);
-      await loadRoles();
-    } catch {
-      // interceptor
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const startEdit = (role) => {
-    setEditingId(role.id);
-    setEditForm({ name: role.name, description: role.description || '' });
-  };
-
-  const handleSaveEdit = async (roleId) => {
-    setIsSaving(true);
-    try {
-      await api.updateAdminRoleLabel(roleId, editForm);
-      toast.success(t('admin.roles.updateSuccess', { defaultValue: 'Role updated.' }));
-      setEditingId(null);
-      await loadRoles();
+      await loadRoles(pagination.current_page);
+      await loadAuditLog();
     } catch {
       // interceptor
     } finally {
@@ -78,10 +91,11 @@ export function AdminRolesPage() {
     if (!deleteTarget) return;
     setIsSaving(true);
     try {
-      await api.deleteAdminRoleLabel(deleteTarget.id);
+      await api.deleteAdminRbacRole(deleteTarget.id);
       toast.success(t('admin.roles.deleteSuccess', { defaultValue: 'Role deleted.' }));
       setDeleteTarget(null);
-      await loadRoles();
+      await loadRoles(pagination.current_page);
+      await loadAuditLog();
     } catch {
       // interceptor
     } finally {
@@ -89,151 +103,207 @@ export function AdminRolesPage() {
     }
   };
 
-  const renderRoleRow = (role, { isSystem }) => (
-    <tr key={role.id} className="border-b">
-      <td className="p-4 font-medium">
-        {isSystem ? (
-          <span className="flex items-center gap-2">
-            {role.name}
-            <Lock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-          </span>
-        ) : editingId === role.id ? (
-          <Input
-            value={editForm.name}
-            onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))}
-            disabled={isSaving}
-          />
-        ) : (
-          role.name
-        )}
-      </td>
-      <td className="p-4 text-muted-foreground max-w-md">
-        {isSystem ? (
-          role.description
-        ) : editingId === role.id ? (
-          <Input
-            value={editForm.description}
-            onChange={(e) => setEditForm((p) => ({ ...p, description: e.target.value }))}
-            disabled={isSaving}
-          />
-        ) : (
-          role.description || '—'
-        )}
-      </td>
-      <td className="p-4 text-muted-foreground w-24">{role.user_count ?? '—'}</td>
-      <td className="p-4 text-right w-32">
-        {isSystem ? (
-          <span className="text-xs text-muted-foreground">{t('admin.roles.systemRole', { defaultValue: 'System' })}</span>
-        ) : editingId === role.id ? (
-          <div className="flex justify-end gap-2">
-            <Button size="sm" variant="ghost" onClick={() => setEditingId(null)} disabled={isSaving}>
-              <X className="h-4 w-4" />
-            </Button>
-            <Button size="sm" onClick={() => handleSaveEdit(role.id)} disabled={isSaving}>
-              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-            </Button>
-          </div>
-        ) : (
-          <div className="flex justify-end gap-2">
-            <Button size="sm" variant="ghost" onClick={() => startEdit(role)} disabled={isSaving}>
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(role)} disabled={isSaving}>
-              <Trash2 className="h-4 w-4 text-destructive" />
-            </Button>
-          </div>
-        )}
-      </td>
-    </tr>
-  );
+  const handleReset = async () => {
+    setIsResetting(true);
+    try {
+      await api.resetAdminRbacDefaults();
+      toast.success(t('admin.rbac.resetDone', { defaultValue: 'System roles reset to defaults.' }));
+      await loadRoles(pagination.current_page);
+      await loadAuditLog();
+    } catch {
+      // interceptor
+    } finally {
+      setIsResetting(false);
+    }
+  };
 
   return (
     <div className="container mx-auto py-6">
       <AdminNav />
 
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t('admin.roles.title', { defaultValue: 'Roles' })}</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="text-2xl font-bold tracking-tight">
+            {t('admin.roles.title', { defaultValue: 'Roles' })}
+          </h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
             {t('admin.roles.subtitle', {
-              defaultValue: 'Custom roles are display labels only; permissions follow the Member role.',
+              defaultValue:
+                'Manage organization roles and permissions. Roles apply to users and as defaults when inviting dataroom collaborators.',
             })}
           </p>
         </div>
-        <Button onClick={() => setShowCreate((v) => !v)} disabled={isLoading}>
-          <Plus className="mr-2 h-4 w-4" />
-          {t('admin.roles.addRole', { defaultValue: 'Add role' })}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={handleReset} disabled={isLoading || isResetting}>
+            {isResetting ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />}
+            {t('admin.rbac.resetDefaults', { defaultValue: 'Reset system roles' })}
+          </Button>
+          <Button onClick={() => setShowCreate(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            {t('admin.roles.create', { defaultValue: 'Create role' })}
+          </Button>
+        </div>
       </div>
 
-      {showCreate && (
-        <form onSubmit={handleCreate} className="mb-6 rounded-lg border bg-card p-4 space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium" htmlFor="new-role-name">
-                {t('admin.roles.name', { defaultValue: 'Name' })}
-              </label>
-              <Input
-                id="new-role-name"
-                value={createForm.name}
-                onChange={(e) => setCreateForm((p) => ({ ...p, name: e.target.value }))}
-                required
-                disabled={isSaving}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium" htmlFor="new-role-desc">
-                {t('admin.roles.description', { defaultValue: 'Description' })}
-              </label>
-              <Input
-                id="new-role-desc"
-                value={createForm.description}
-                onChange={(e) => setCreateForm((p) => ({ ...p, description: e.target.value }))}
-                disabled={isSaving}
-              />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button type="submit" disabled={isSaving}>
-              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : t('common.save')}
-            </Button>
-            <Button type="button" variant="outline" onClick={() => setShowCreate(false)} disabled={isSaving}>
-              {t('common.cancel')}
-            </Button>
-          </div>
-        </form>
-      )}
+      <form onSubmit={handleSearch} className="mb-4 flex gap-2 max-w-md">
+        <Input
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder={t('admin.roles.searchPlaceholder', { defaultValue: 'Search roles…' })}
+        />
+        <Button type="submit" variant="secondary">
+          {t('common.search', { defaultValue: 'Search' })}
+        </Button>
+      </form>
 
       {isLoading ? (
         <Skeleton className="h-48 w-full" />
       ) : (
-        <div className="rounded-lg border overflow-hidden">
+        <div className="overflow-x-auto rounded-lg border mb-8">
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
               <tr className="border-b text-left">
-                <th className="p-4">{t('admin.roles.name', { defaultValue: 'Name' })}</th>
-                <th className="p-4">{t('admin.roles.description', { defaultValue: 'Description' })}</th>
-                <th className="p-4 w-24">{t('admin.roles.users', { defaultValue: 'Users' })}</th>
-                <th className="p-4 w-32 text-right">{t('common.actions', { defaultValue: 'Actions' })}</th>
+                <th className="p-3">{t('admin.roles.name', { defaultValue: 'Name' })}</th>
+                <th className="p-3">{t('admin.roles.description', { defaultValue: 'Description' })}</th>
+                <th className="p-3">{t('admin.roles.users', { defaultValue: 'Users' })}</th>
+                <th className="p-3">{t('admin.roles.type', { defaultValue: 'Type' })}</th>
+                <th className="p-3 w-32" />
               </tr>
             </thead>
             <tbody>
-              {systemRoles.map((role) => renderRoleRow(role, { isSystem: true }))}
-              {customRoles.map((role) => renderRoleRow(role, { isSystem: false }))}
+              {roles.map((role) => (
+                <tr key={role.id} className="border-b">
+                  <td className="p-3 font-medium">
+                    <span className="inline-flex items-center gap-2">
+                      {role.name}
+                      {role.is_system && <Lock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />}
+                    </span>
+                  </td>
+                  <td className="p-3 text-muted-foreground max-w-md truncate">{role.description || '—'}</td>
+                  <td className="p-3">{role.user_count ?? 0}</td>
+                  <td className="p-3">
+                    {role.is_system
+                      ? t('admin.roles.system', { defaultValue: 'System' })
+                      : t('admin.roles.custom', { defaultValue: 'Custom' })}
+                  </td>
+                  <td className="p-3">
+                    <div className="flex gap-1">
+                      <Button asChild size="sm" variant="ghost">
+                        <Link to={`/admin/roles/${role.id}`}>
+                          <Pencil className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                      {!role.is_system && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setDeleteTarget(role)}
+                          aria-label={t('admin.roles.delete', { defaultValue: 'Delete' })}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       )}
 
+      {pagination.total_pages > 1 && (
+        <div className="flex gap-2 mb-8">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={pagination.current_page <= 1 || isLoading}
+            onClick={() => loadRoles(pagination.current_page - 1)}
+          >
+            {t('common.previous', { defaultValue: 'Previous' })}
+          </Button>
+          <span className="text-sm self-center text-muted-foreground">
+            {pagination.current_page} / {pagination.total_pages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={pagination.current_page >= pagination.total_pages || isLoading}
+            onClick={() => loadRoles(pagination.current_page + 1)}
+          >
+            {t('common.next', { defaultValue: 'Next' })}
+          </Button>
+        </div>
+      )}
+
+      <div className="rounded-lg border p-4 space-y-3">
+        <h2 className="font-semibold">{t('admin.rbac.auditTitle', { defaultValue: 'Audit log' })}</h2>
+        {auditLoading ? (
+          <Skeleton className="h-24 w-full" />
+        ) : auditLog.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t('admin.rbac.auditEmpty', { defaultValue: 'No entries yet.' })}</p>
+        ) : (
+          <div className="overflow-x-auto max-h-60 overflow-y-auto">
+            <table className="w-full text-sm">
+              <tbody>
+                {auditLog.map((entry) => (
+                  <tr key={entry.id} className="border-b">
+                    <td className="py-2 pr-3 text-xs whitespace-nowrap">
+                      {entry.created_at ? new Date(entry.created_at).toLocaleString() : '—'}
+                    </td>
+                    <td className="py-2 pr-3 text-xs">{entry.actor_email || '—'}</td>
+                    <td className="py-2">{entry.summary}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {showCreate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <form
+            onSubmit={handleCreate}
+            className="w-full max-w-md rounded-lg border bg-background p-6 shadow-lg space-y-4"
+          >
+            <h2 className="text-lg font-semibold">{t('admin.roles.create', { defaultValue: 'Create role' })}</h2>
+            <Input
+              required
+              value={createForm.name}
+              onChange={(e) => setCreateForm((p) => ({ ...p, name: e.target.value }))}
+              placeholder={t('admin.roles.name', { defaultValue: 'Name' })}
+              disabled={isSaving}
+            />
+            <Input
+              value={createForm.description}
+              onChange={(e) => setCreateForm((p) => ({ ...p, description: e.target.value }))}
+              placeholder={t('admin.roles.description', { defaultValue: 'Description' })}
+              disabled={isSaving}
+            />
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setShowCreate(false)} disabled={isSaving}>
+                {t('common.cancel')}
+              </Button>
+              <Button type="submit" disabled={isSaving}>
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {t('common.create', { defaultValue: 'Create' })}
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+
       <ConfirmationDialog
         isOpen={Boolean(deleteTarget)}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        onConfirm={handleDelete}
         title={t('admin.roles.deleteTitle', { defaultValue: 'Delete role?' })}
         description={t('admin.roles.deleteDescription', {
-          defaultValue: 'This cannot be undone. Roles assigned to users must be reassigned first.',
+          defaultValue: 'Users and collaborators must be reassigned before this role can be deleted.',
         })}
-        onConfirm={handleDelete}
-        confirmText={t('common.delete')}
         isLoading={isSaving}
       />
     </div>

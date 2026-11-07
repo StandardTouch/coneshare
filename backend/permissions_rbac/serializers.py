@@ -98,8 +98,4 @@ class PermissionMatrixSerializer:
                     'label': PERMISSION_DEFINITIONS[PERM_CREATE_DATAROOM].label,
                 }
             ],
-            'role_labels_note': (
-                'Organization role labels (Users page) remain display-only labels for members. '
-                'Dataroom access is controlled by per-dataroom RBAC roles assigned when adding collaborators.'
-            ),
         }

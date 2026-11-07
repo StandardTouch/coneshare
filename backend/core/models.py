@@ -99,6 +99,14 @@ class User(AbstractUser):
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='users')
     avatar = models.ImageField(upload_to=user_avatar_path, null=True, blank=True)
     role = models.CharField(max_length=20, default='member')
+    organization_role = models.ForeignKey(
+        'permissions_rbac.DataroomRole',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='organization_members',
+        help_text='Default organization role (permissions template for dataroom access and site actions).',
+    )
     name = models.CharField(max_length=255, blank=True)
     language = models.CharField(
         max_length=10,

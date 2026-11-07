@@ -32,13 +32,12 @@ import { formatBytes } from '../lib/formatters';
 import { cn } from '../lib/utils';
 import { useBranding } from '../contexts/BrandingProvider';
 import { RoleSelect } from '../components/admin/RoleSelect';
-import { buildRolePayload, displayRoleName, roleSelectionFromUser } from '../lib/adminRoleLabels';
+import { buildRolePayload, displayRoleName, roleSelectionFromUser } from '../lib/adminOrgRoles';
 
 function AddUserForm({
   onAddUser,
   onCancel,
-  roleLabelsEnabled,
-  customRoles,
+  orgRoles,
   inviteEmailEnabled,
 }) {
   const { t } = useTranslation();
@@ -48,10 +47,17 @@ function AddUserForm({
     email: '',
     name: '',
     password: '',
-    roleSelection: 'member',
+    roleSelection: '',
     custom_file_size_quota_mb: '',
   });
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const viewer = orgRoles.find((r) => r.slug === 'viewer');
+    if (viewer) {
+      setFormData((prev) => (prev.roleSelection ? prev : { ...prev, roleSelection: viewer.id }));
+    }
+  }, [orgRoles]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -68,9 +74,7 @@ function AddUserForm({
         ...rest,
         custom_file_size_quota_mb: formData.custom_file_size_quota_mb === '' ? null : parseInt(formData.custom_file_size_quota_mb, 10),
         send_invite: sendInvite,
-        ...(roleLabelsEnabled
-          ? buildRolePayload(roleSelection)
-          : { role: roleSelection === 'admin' ? 'admin' : 'member' }),
+        ...buildRolePayload(roleSelection),
       };
       if (sendInvite) {
         delete payload.password;
@@ -182,25 +186,12 @@ function AddUserForm({
             <label htmlFor="role" className="mb-1 block text-sm font-medium">
               {t('admin.role')}
             </label>
-            {roleLabelsEnabled ? (
-              <RoleSelect
-                value={formData.roleSelection}
-                onChange={handleChange}
-                customRoles={customRoles}
-                disabled={isSaving}
-              />
-            ) : (
-              <Select
-                id="role"
-                name="roleSelection"
-                value={formData.roleSelection}
-                onChange={handleChange}
-                disabled={isSaving}
-              >
-                <option value="member">{t('admin.roleMember')}</option>
-                <option value="admin">{t('admin.roleAdmin')}</option>
-              </Select>
-            )}
+            <RoleSelect
+              value={formData.roleSelection}
+              onChange={handleChange}
+              orgRoles={orgRoles}
+              disabled={isSaving}
+            />
           </div>
           <div>
             <label htmlFor="custom_file_size_quota_mb" className="mb-1 block text-sm font-medium">
@@ -298,8 +289,7 @@ function UserStorageUsage({ user }) {
 
 export function AdminUsersPage() {
   const { t } = useTranslation();
-  const { roleLabelsEnabled } = useBranding();
-  const [customRoles, setCustomRoles] = useState([]);
+  const [orgRoles, setOrgRoles] = useState([]);
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddingUser, setIsAddingUser] = useState(false);
@@ -348,16 +338,12 @@ export function AdminUsersPage() {
   }, []);
 
   useEffect(() => {
-    if (!roleLabelsEnabled) {
-      setCustomRoles([]);
-      return;
-    }
     let cancelled = false;
     (async () => {
       try {
-        const res = await api.getAdminRoleLabels();
+        const res = await api.getAdminRbacRoles({ page_size: 100 });
         if (!cancelled) {
-          setCustomRoles(res.data.custom_roles || []);
+          setOrgRoles(res.data.results || res.data || []);
         }
       } catch {
         // interceptor
@@ -366,7 +352,7 @@ export function AdminUsersPage() {
     return () => {
       cancelled = true;
     };
-  }, [roleLabelsEnabled]);
+  }, []);
 
   // Debounce search input
   useEffect(() => {
@@ -576,9 +562,7 @@ export function AdminUsersPage() {
       const payload = {
         ...restEdit,
         custom_file_size_quota_mb: normalizedQuota,
-        ...(roleLabelsEnabled
-          ? buildRolePayload(roleSelection)
-          : { role: roleSelection === 'admin' ? 'admin' : 'member' }),
+        ...buildRolePayload(roleSelection),
       };
       await handleUpdateUser(userId, payload);
       setEditingUserId(null);
@@ -762,8 +746,7 @@ export function AdminUsersPage() {
         <AddUserForm
           onAddUser={handleAddUser}
           onCancel={() => setIsAddingUser(false)}
-          roleLabelsEnabled={roleLabelsEnabled}
-          customRoles={customRoles}
+          orgRoles={orgRoles}
           inviteEmailEnabled={inviteEmailEnabled}
         />
       )}
@@ -828,26 +811,13 @@ export function AdminUsersPage() {
                         {user.email}
                       </td>
                       <td className="p-4 text-muted-foreground w-28">
-                        {roleLabelsEnabled ? (
-                          <RoleSelect
-                            value={editedUserData.roleSelection}
-                            onChange={handleEditDataChange}
-                            customRoles={customRoles}
-                            disabled={savingUserId === user.id}
-                            className="w-full"
-                          />
-                        ) : (
-                          <Select
-                            name="roleSelection"
-                            value={editedUserData.roleSelection}
-                            onChange={handleEditDataChange}
-                            disabled={savingUserId === user.id}
-                            className="w-full"
-                          >
-                            <option value="member">{t('admin.roleMember')}</option>
-                            <option value="admin">{t('admin.roleAdmin')}</option>
-                          </Select>
-                        )}
+                        <RoleSelect
+                          value={editedUserData.roleSelection}
+                          onChange={handleEditDataChange}
+                          orgRoles={orgRoles}
+                          disabled={savingUserId === user.id}
+                          className="w-full"
+                        />
                       </td>
                       <td className="p-4 text-muted-foreground w-24">
                         <Select

@@ -14,7 +14,7 @@ import { Progress } from '../components/ui/Progress';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/Table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/Tooltip';
 import { formatBytes } from '../lib/formatters';
-import { displayRoleName } from '../lib/adminRoleLabels';
+import { displayRoleName } from '../lib/adminOrgRoles';
 
 export function AdminUserDetailPage() {
   const { t } = useTranslation();
