@@ -2,7 +2,7 @@
 import pytest
 from django.contrib.auth import get_user_model
 
-from permissions_rbac.catalogue import PERM_CREATE_DATAROOM, ROLE_SLUG_VIEWER
+from permissions_rbac.catalogue import PERM_DATAROOM_CREATE, ROLE_SLUG_MANAGER
 from permissions_rbac.models import DataroomRole, DataroomRolePermission
 from permissions_rbac.seed import ensure_default_roles_for_organization
 from permissions_rbac.services import has_site_perm
@@ -15,23 +15,23 @@ User = get_user_model()
 class TestOrganizationRoleOnUser:
     def test_create_member_with_organization_role(self, admin_api_client, admin_user):
         ensure_default_roles_for_organization(admin_user.organization)
-        viewer = DataroomRole.objects.get(organization=admin_user.organization, slug=ROLE_SLUG_VIEWER)
+        manager = DataroomRole.objects.get(organization=admin_user.organization, slug=ROLE_SLUG_MANAGER)
         response = admin_api_client.post(
             '/api/v1/admin/users/',
             {
-                'email': 'viewer-user@example.com',
-                'username': 'viewer-user@example.com',
-                'name': 'Viewer User',
+                'email': 'manager-user@example.com',
+                'username': 'manager-user@example.com',
+                'name': 'Manager User',
                 'password': 'SecurePass123!',
-                'organization_role_id': str(viewer.id),
+                'organization_role_id': str(manager.id),
             },
             format='json',
         )
         assert response.status_code == 201, response.data
-        created = User.objects.get(email='viewer-user@example.com')
-        assert created.organization_role_id == viewer.id
+        created = User.objects.get(email='manager-user@example.com')
+        assert created.organization_role_id == manager.id
         assert created.role == 'member'
-        assert response.data['organization_role']['slug'] == ROLE_SLUG_VIEWER
+        assert response.data['organization_role']['slug'] == ROLE_SLUG_MANAGER
 
     def test_site_create_dataroom_from_org_role_grants(self, organization, user):
         ensure_default_roles_for_organization(organization)
@@ -41,11 +41,11 @@ class TestOrganizationRoleOnUser:
             name='Analyst',
             is_system=False,
         )
-        DataroomRolePermission.objects.create(role=custom, permission=PERM_CREATE_DATAROOM, scope='')
+        DataroomRolePermission.objects.create(role=custom, permission=PERM_DATAROOM_CREATE, scope='')
         user.role = 'member'
         user.organization_role = custom
         user.save(update_fields=['role', 'organization_role'])
-        assert has_site_perm(user, PERM_CREATE_DATAROOM) is True
+        assert has_site_perm(user, PERM_DATAROOM_CREATE) is True
 
     def test_migrate_role_label_idempotent(self, organization, user, admin_user):
         ensure_default_roles_for_organization(organization)

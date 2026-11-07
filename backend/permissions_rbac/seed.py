@@ -7,7 +7,6 @@ from django.db import transaction
 
 from permissions_rbac.catalogue import (
     DEFAULT_SITE_ROLE_GRANTS,
-    PERM_CREATE_DATAROOM,
     SYSTEM_ROLE_SLUGS,
     default_grants_for_role_slug,
 )
@@ -15,9 +14,7 @@ from permissions_rbac.models import DataroomRole, DataroomRolePermission, SiteRo
 
 
 ROLE_DISPLAY_NAMES = {
-    'viewer': 'Viewer',
-    'contributor': 'Contributor',
-    'editor': 'Editor',
+    'admin': 'Admin',
     'manager': 'Manager',
 }
 
@@ -35,6 +32,10 @@ def ensure_default_roles_for_organization(organization) -> Dict[str, DataroomRol
                     'is_system': True,
                 },
             )
+            if role.name != ROLE_DISPLAY_NAMES[slug]:
+                role.name = ROLE_DISPLAY_NAMES[slug]
+                role.is_system = True
+                role.save(update_fields=['name', 'is_system', 'updated_at'])
             roles[slug] = role
             _apply_role_grants(role, default_grants_for_role_slug(slug))
         _ensure_site_role_grants(organization)
@@ -64,12 +65,6 @@ def _ensure_site_role_grants(organization) -> None:
                 site_role=site_role,
                 permission=permission,
             )
-    # Members do not receive create_dataroom unless granted in Roles & Permissions.
-    SiteRolePermission.objects.filter(
-        organization=organization,
-        site_role='member',
-        permission=PERM_CREATE_DATAROOM,
-    ).delete()
 
 
 def reset_system_role_to_defaults(role: DataroomRole) -> None:
@@ -81,5 +76,6 @@ def reset_system_role_to_defaults(role: DataroomRole) -> None:
 
 def reset_all_system_roles_for_organization(organization) -> None:
     for role in DataroomRole.objects.filter(organization=organization, is_system=True):
-        reset_system_role_to_defaults(role)
+        if role.slug in SYSTEM_ROLE_SLUGS:
+            reset_system_role_to_defaults(role)
     _ensure_site_role_grants(organization)

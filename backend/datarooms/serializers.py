@@ -24,13 +24,8 @@ from .models import (
     LOGO_MODE_CHOICES,
 )
 from .collaborator_delete_permissions import user_can_delete_dataroom_item, user_can_modify_dataroom_item
-from permissions_rbac.catalogue import (
-    PERM_EDIT_DATAROOM_SETTINGS,
-    PERM_INVITE_COLLABORATORS,
-    PERM_MANAGE_COLLABORATORS,
-    PERM_UPLOAD,
-)
-from permissions_rbac.services import has_perm, item_permissions_for_user
+from permissions_rbac.catalogue import PERM_UPLOAD
+from permissions_rbac.services import has_perm, item_permissions_for_user, user_dataroom_capabilities
 from permissions_rbac.models import DataroomRole
 from permissions_rbac.dataroom_access import filter_ancestor_chain_for_user
 from .utils import build_ordered_dataroom_items, is_dataroom_owner_or_admin
@@ -577,11 +572,13 @@ class DataroomDetailSerializer(serializers.ModelSerializer):
         if not request or not getattr(request.user, 'is_authenticated', False):
             return {}
         user = request.user
+        caps = user_dataroom_capabilities(user, obj)
         return {
-            'can_upload': has_perm(user, PERM_UPLOAD, obj),
-            'can_invite_collaborators': has_perm(user, PERM_INVITE_COLLABORATORS, obj),
-            'can_manage_collaborators': has_perm(user, PERM_MANAGE_COLLABORATORS, obj),
-            'can_edit_dataroom_settings': has_perm(user, PERM_EDIT_DATAROOM_SETTINGS, obj),
+            'can_upload': caps['can_upload'],
+            'can_edit_dataroom_settings': caps['can_see_settings_tab'] and caps['can_edit_dataroom'],
+            'can_see_qna_tab': caps['can_see_qna_tab'],
+            'can_see_settings_tab': caps['can_see_settings_tab'],
+            'can_edit_dataroom': caps['can_edit_dataroom'],
         }
 
     @extend_schema_field(serializers.IntegerField())

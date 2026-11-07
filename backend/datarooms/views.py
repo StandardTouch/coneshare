@@ -159,7 +159,36 @@ class DataroomViewSet(viewsets.ModelViewSet):
         delete_dataroom(instance)
 
     def perform_update(self, serializer):
-        old_name = self.get_object().name
+        from permissions_rbac.catalogue import PERM_DATAROOM_EDIT, PERM_DATAROOM_SETTINGS_TAB
+        from permissions_rbac.services import assert_dataroom_perm, has_perm
+
+        instance = self.get_object()
+        user = self.request.user
+        validated = serializer.validated_data
+        settings_fields = {
+            'enable_qna',
+            'enable_watermark',
+            'show_file_index',
+            'storage_quota_mb',
+            'storage_version',
+            'banner_mode',
+            'logo_mode',
+            'brand_logo_override',
+            'branding_banner',
+            'protection_type',
+            'protection_password',
+            'protection_email',
+            'nda_text',
+            'nda_version',
+        }
+        if 'name' in validated and validated['name'] != instance.name:
+            assert_dataroom_perm(user, PERM_DATAROOM_EDIT, instance)
+        if any(field in validated for field in settings_fields):
+            if not has_perm(user, PERM_DATAROOM_SETTINGS_TAB, instance):
+                raise PermissionDenied('You do not have permission to edit dataroom settings.')
+            if not has_perm(user, PERM_DATAROOM_EDIT, instance):
+                raise PermissionDenied('You do not have permission to edit this dataroom.')
+        old_name = instance.name
         instance = serializer.save()
         sync_dataroom_rename(instance, old_name)
 
