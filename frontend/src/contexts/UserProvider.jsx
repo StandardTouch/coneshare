@@ -57,6 +57,7 @@ export function UserProvider({ children }) {
         const decoded = jwtDecode(token);
         const response = await getUser(decoded.user_id);
         setUser(response.data);
+        window.dispatchEvent(new Event('coneshare:refetch-branding'));
         return response.data;
       } catch (error) {
         console.error("Failed to refresh user:", error);

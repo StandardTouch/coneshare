@@ -7,15 +7,22 @@ export function useFeatureGates() {
     apiKeysEnabled,
     automationEnabled,
     fileRequestsEnabled,
+    esignEnabled,
+    documentsEnabled,
+    trashEnabled,
   } = useBranding();
   const { user } = useUser();
-  const isAdmin = user?.role === 'admin';
+
+  const isAuthenticated = Boolean(user);
 
   return {
-    canAccessFileRequests: fileRequestsEnabled !== false,
-    canAccessApiKeys: isAdmin && apiKeysEnabled !== false,
-    canAccessAutomations: isAdmin && automationEnabled !== false,
-    canAccessMcpSetup: isAdmin && apiKeysEnabled !== false,
-    canAccessApiDocs: isAdmin && swaggerEnabled !== false,
+    canAccessFileRequests: isAuthenticated && fileRequestsEnabled !== false,
+    canAccessApiKeys: isAuthenticated && apiKeysEnabled !== false,
+    canAccessAutomations: isAuthenticated && automationEnabled !== false,
+    canAccessMcpSetup: isAuthenticated && apiKeysEnabled !== false,
+    canAccessApiDocs: isAuthenticated && swaggerEnabled !== false,
+    canAccessDocuments: isAuthenticated && documentsEnabled !== false,
+    canAccessTrash: isAuthenticated && trashEnabled !== false,
+    canAccessSignatures: esignEnabled !== false,
   };
 }

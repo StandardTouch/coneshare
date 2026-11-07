@@ -60,14 +60,18 @@ export function AdminRoleEditPage() {
     load();
   }, [load]);
 
-  const grouped = useMemo(() => {
-    const map = {};
+  const groupedSections = useMemo(() => {
+    const sections = [];
+    const byKey = {};
     permissions.forEach((p) => {
-      const cat = p.category || 'other';
-      if (!map[cat]) map[cat] = [];
-      map[cat].push(p);
+      const sectionKey = p.group || p.category || 'other';
+      if (!byKey[sectionKey]) {
+        byKey[sectionKey] = [];
+        sections.push(sectionKey);
+      }
+      byKey[sectionKey].push(p);
     });
-    return map;
+    return { sections, byKey };
   }, [permissions]);
 
   const togglePermission = (permission, supportsScope) => {
@@ -167,9 +171,11 @@ export function AdminRoleEditPage() {
       )}
 
       <div className="space-y-6">
-        {Object.entries(grouped).map(([category, perms]) => (
-          <div key={category} className="rounded-lg border p-4">
-            <h2 className="font-semibold capitalize mb-3">{category}</h2>
+        {groupedSections.sections.map((sectionKey) => {
+          const perms = groupedSections.byKey[sectionKey];
+          return (
+          <div key={sectionKey} className="rounded-lg border p-4">
+            <h2 className="font-semibold mb-3">{sectionKey}</h2>
             <ul className="space-y-3">
               {perms.map((perm) => {
                 const enabled = Boolean(draftGrants[perm.codename]);
@@ -205,7 +211,8 @@ export function AdminRoleEditPage() {
               })}
             </ul>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="mt-6 flex gap-2">
