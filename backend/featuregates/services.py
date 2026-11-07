@@ -105,3 +105,8 @@ def ensure_api_keys_enabled():
 
 def ensure_file_requests_enabled():
     raise PermissionDenied('Use per-user RBAC checks.')
+
+
+def ensure_file_requests_enabled_for_owner(user):
+    """Public upload links follow the link creator's role grants."""
+    ensure_file_requests_enabled_for_user(user)

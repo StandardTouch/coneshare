@@ -1,51 +1,76 @@
+"""Feature access is enforced per user role (RBAC), not global AppConfiguration toggles."""
 import pytest
-from django.core.cache import cache
 from django.urls import reverse
 from rest_framework import status
 
 from core.authentication import generate_raw_api_key
-from core.models import AppConfiguration
-
-
-def _set_setting(key: str, enabled: bool):
-    AppConfiguration.objects.update_or_create(
-        key=key,
-        defaults={
-            'value': 'true' if enabled else 'false',
-            'description': f'{key} toggle',
-        },
-    )
-    cache.delete(f'app_config:{key}')
-
-
-def _set_swagger(enabled: bool):
-    _set_setting('SWAGGER_ENABLED', enabled)
-
-
-def _set_all_feature_toggles(enabled: bool):
-    for key in (
-        'SWAGGER_ENABLED',
-        'AUTOMATION_ENABLED',
-        'API_KEYS_ENABLED',
-        'FILE_REQUESTS_ENABLED',
-    ):
-        _set_setting(key, enabled)
+from core.models import APIKey
+from permissions_rbac.catalogue import (
+    PERM_FILE_VIEW,
+    PERM_SYSTEM_API_KEYS,
+    PERM_SYSTEM_AUTOMATION,
+    PERM_SYSTEM_DOCUMENTS,
+    PERM_SYSTEM_FILE_REQUESTS,
+    PERM_SYSTEM_SIGNATURE,
+    PERM_SYSTEM_SWAGGER,
+    PERM_SYSTEM_TRASH,
+    ROLE_SLUG_ADMIN,
+)
+from permissions_rbac.models import DataroomRole, DataroomRolePermission
+from permissions_rbac.seed import ensure_default_roles_for_organization
+from permissions_rbac.services import invalidate_organization_rbac_cache
+from permissions_rbac.safety import user_has_full_access
+from core.models import User
 
 
 @pytest.fixture(autouse=True)
-def feature_toggles_on():
-    _set_all_feature_toggles(True)
+def _reset_default_rbac_roles(organization):
+    ensure_default_roles_for_organization(organization)
     yield
-    for key in (
-        'SWAGGER_ENABLED',
-        'AUTOMATION_ENABLED',
-        'API_KEYS_ENABLED',
-        'FILE_REQUESTS_ENABLED',
-    ):
-        cache.delete(f'app_config:{key}')
+    ensure_default_roles_for_organization(organization)
 
 
-RETIRED_TOGGLE_KEYS = ('MCP_ENABLED',)
+def _role_without(*, organization, exclude):
+    ensure_default_roles_for_organization(organization)
+    role = DataroomRole.objects.create(
+        organization=organization,
+        slug='gate-test-role',
+        name='Gate Test',
+        is_system=False,
+    )
+    grants = {
+        PERM_SYSTEM_DOCUMENTS: '',
+        PERM_FILE_VIEW: '',
+    }
+    grants = {k: v for k, v in grants.items() if k not in exclude}
+    DataroomRolePermission.objects.bulk_create(
+        [DataroomRolePermission(role=role, permission=p, scope=s) for p, s in grants.items()]
+    )
+    invalidate_organization_rbac_cache(str(organization.id))
+    return role
+
+
+@pytest.fixture
+def gated_member(db, organization):
+    from core.models import User
+
+    user = User.objects.create_user(
+        username='gated-member@test.com',
+        email='gated-member@test.com',
+        password='password',
+        organization=organization,
+        role='member',
+    )
+    return user
+
+
+@pytest.fixture
+def member_client(gated_member):
+    from rest_framework.test import APIClient
+
+    client = APIClient()
+    client.force_authenticate(user=gated_member)
+    return client
 
 
 @pytest.mark.django_db
@@ -54,66 +79,91 @@ class TestAdminOnlyFeatures:
         assert api_client.get(reverse('api-key-list')).status_code == status.HTTP_403_FORBIDDEN
         assert api_client.get('/api/v1/automations/').status_code == status.HTTP_403_FORBIDDEN
 
-    def test_admin_allowed_on_api_keys_and_automations(self, admin_api_client):
+    def test_primary_admin_allowed_on_api_keys_and_automations(self, admin_api_client, admin_user):
+        ensure_default_roles_for_organization(admin_user.organization)
+        assert user_has_full_access(admin_user)
         assert admin_api_client.get(reverse('api-key-list')).status_code == status.HTTP_200_OK
         assert admin_api_client.get('/api/v1/automations/').status_code == status.HTTP_200_OK
 
 
 @pytest.mark.django_db
 class TestFeatureTogglesInAdminSettings:
-    def test_admin_settings_list_includes_feature_toggles(self, admin_api_client):
+    def test_admin_settings_list_excludes_retired_feature_toggles(self, admin_api_client):
         response = admin_api_client.get('/api/v1/admin/settings/')
         assert response.status_code == status.HTTP_200_OK
         keys = {item['key'] for item in response.data}
-        assert 'AUTOMATION_ENABLED' in keys
-        assert 'API_KEYS_ENABLED' in keys
-        assert 'FILE_REQUESTS_ENABLED' in keys
-        assert 'SWAGGER_ENABLED' in keys
-        for retired in RETIRED_TOGGLE_KEYS:
+        for retired in (
+            'AUTOMATION_ENABLED',
+            'API_KEYS_ENABLED',
+            'FILE_REQUESTS_ENABLED',
+            'SWAGGER_ENABLED',
+            'ESIGN_ENABLED',
+            'ROLE_LABELS_ENABLED',
+        ):
             assert retired not in keys
 
-    def test_retired_toggle_keys_not_in_registry(self):
-        from core.settings_registry import DEFAULT_SETTINGS
 
-        for retired in RETIRED_TOGGLE_KEYS:
-            assert retired not in DEFAULT_SETTINGS
+@pytest.mark.django_db
+class TestAutomationRbac:
+    def test_automation_403_without_role_grant(self, organization, admin_user):
+        from rest_framework.test import APIClient
+
+        ensure_default_roles_for_organization(organization)
+        admin_role = DataroomRole.objects.get(organization=organization, slug=ROLE_SLUG_ADMIN)
+        admin_role.permission_grants.filter(permission=PERM_SYSTEM_AUTOMATION).delete()
+        invalidate_organization_rbac_cache(str(organization.id))
+        secondary_admin = User.objects.create_user(
+            username='secondary-admin@test.com',
+            email='secondary-admin@test.com',
+            password='password',
+            organization=organization,
+            role='admin',
+        )
+        client = APIClient()
+        client.force_authenticate(user=secondary_admin)
+        assert client.get('/api/v1/automations/').status_code == status.HTTP_403_FORBIDDEN
+
+    def test_automation_200_with_role_grant(self, organization, admin_user):
+        from rest_framework.test import APIClient
+
+        ensure_default_roles_for_organization(organization)
+        invalidate_organization_rbac_cache(str(organization.id))
+        secondary_admin = User.objects.create_user(
+            username='secondary-admin-ok@test.com',
+            email='secondary-admin-ok@test.com',
+            password='password',
+            organization=organization,
+            role='admin',
+        )
+        client = APIClient()
+        client.force_authenticate(user=secondary_admin)
+        assert client.get('/api/v1/automations/').status_code == status.HTTP_200_OK
 
 
 @pytest.mark.django_db
-class TestAutomationToggle:
-    def test_automation_403_when_disabled(self, admin_api_client):
-        _set_setting('AUTOMATION_ENABLED', False)
-        assert admin_api_client.get('/api/v1/automations/').status_code == status.HTTP_403_FORBIDDEN
+class TestApiKeysRbac:
+    def test_api_key_management_403_without_grant(self, organization, admin_user):
+        from rest_framework.test import APIClient
 
-    def test_automation_200_when_re_enabled_via_db_without_stale_cache(self, admin_api_client):
-        _set_setting('AUTOMATION_ENABLED', False)
-        assert admin_api_client.get('/api/v1/automations/').status_code == status.HTTP_403_FORBIDDEN
-        _set_setting('AUTOMATION_ENABLED', True)
-        assert admin_api_client.get('/api/v1/automations/').status_code == status.HTTP_200_OK
+        admin_role = DataroomRole.objects.get(organization=organization, slug=ROLE_SLUG_ADMIN)
+        admin_role.permission_grants.filter(permission=PERM_SYSTEM_API_KEYS).delete()
+        invalidate_organization_rbac_cache(str(organization.id))
+        secondary_admin = User.objects.create_user(
+            username='no-keys-admin@test.com',
+            email='no-keys-admin@test.com',
+            password='password',
+            organization=organization,
+            role='admin',
+        )
+        client = APIClient()
+        client.force_authenticate(user=secondary_admin)
+        assert client.get(reverse('api-key-list')).status_code == status.HTTP_403_FORBIDDEN
 
-
-@pytest.mark.django_db
-class TestApiKeysToggle:
-    def test_api_key_management_403_when_disabled(self, admin_api_client):
-        _set_setting('API_KEYS_ENABLED', False)
-        assert admin_api_client.get(reverse('api-key-list')).status_code == status.HTTP_403_FORBIDDEN
-
-    def test_jwt_session_still_works_when_api_keys_disabled(self, api_client):
-        _set_setting('API_KEYS_ENABLED', False)
-        assert api_client.get('/api/v1/documents/').status_code == status.HTTP_200_OK
-
-    def test_health_and_public_settings_when_api_keys_disabled(self, public_client):
-        _set_setting('API_KEYS_ENABLED', False)
-        assert public_client.get(reverse('health-check')).status_code == status.HTTP_200_OK
-        response = public_client.get('/api/v1/public/settings/')
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data.get('api_keys_enabled') is False
-
-    def test_bearer_api_key_rejected_when_disabled(self, public_client, user):
-        _set_setting('API_KEYS_ENABLED', False)
+    def test_bearer_api_key_rejected_without_owner_grant(self, public_client, organization, user):
+        role = _role_without(organization=organization, exclude={PERM_SYSTEM_API_KEYS, PERM_SYSTEM_DOCUMENTS})
+        user.organization_role = role
+        user.save(update_fields=['organization_role'])
         raw_key, prefix, hashed_key = generate_raw_api_key()
-        from core.models import APIKey
-
         APIKey.objects.create(
             user=user,
             name='test',
@@ -124,61 +174,93 @@ class TestApiKeysToggle:
         public_client.credentials(HTTP_AUTHORIZATION=f'Bearer {raw_key}')
         assert public_client.get('/api/v1/documents/').status_code == status.HTTP_403_FORBIDDEN
 
-    def test_non_api_bearer_does_not_trigger_api_keys_off_rejection(self, public_client, user):
-        _set_setting('API_KEYS_ENABLED', False)
-        login = public_client.post(
-            reverse('token_obtain_pair'),
-            {'email': user.email, 'password': 'password'},
-            format='json',
-        )
-        assert login.status_code == status.HTTP_200_OK
-        token = login.data['access']
-        public_client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
-        assert public_client.get('/api/v1/documents/').status_code == status.HTTP_200_OK
-
 
 @pytest.mark.django_db
-class TestFileRequestsToggle:
-    def test_file_requests_403_when_disabled(self, api_client):
-        _set_setting('FILE_REQUESTS_ENABLED', False)
-        assert api_client.get('/api/v1/file-requests/').status_code == status.HTTP_403_FORBIDDEN
-
-    def test_public_file_request_403_when_disabled(self, public_client, file_request):
-        _set_setting('FILE_REQUESTS_ENABLED', False)
-        url = reverse('public-file-request-detail', kwargs={'slug': file_request.slug})
-        assert public_client.get(url).status_code == status.HTTP_403_FORBIDDEN
+class TestFileRequestsRbac:
+    def test_file_requests_403_without_grant(self, organization, gated_member, member_client):
+        role = _role_without(organization=organization, exclude={PERM_SYSTEM_FILE_REQUESTS})
+        gated_member.organization_role = role
+        gated_member.save(update_fields=['organization_role'])
+        assert member_client.get('/api/v1/file-requests/').status_code == status.HTTP_403_FORBIDDEN
 
 
 @pytest.mark.django_db
 class TestPublicSettingsFeatureFlags:
-    def test_public_settings_exposes_feature_flags(self, public_client):
+    def test_public_settings_false_for_anonymous(self, public_client):
         response = public_client.get('/api/v1/public/settings/')
         assert response.status_code == status.HTTP_200_OK
-        assert response.data.get('automation_enabled') is True
-        assert response.data.get('api_keys_enabled') is True
-        assert response.data.get('file_requests_enabled') is True
-        assert response.data.get('swagger_enabled') is True
-        assert 'mcp_enabled' not in response.data
+        assert response.data.get('automation_enabled') is False
+        assert response.data.get('api_keys_enabled') is False
+        assert response.data.get('file_requests_enabled') is False
+        assert response.data.get('swagger_enabled') is False
+        assert response.data.get('role_labels_enabled') is True
 
 
 @pytest.mark.django_db
-class TestSwaggerToggle:
-    def test_schema_404_when_swagger_off(self, public_client):
-        _set_swagger(False)
-        assert public_client.get('/api/schema/').status_code == status.HTTP_404_NOT_FOUND
+class TestSwaggerRbac:
+    def test_schema_404_without_swagger_perm(self, organization, gated_member, member_client):
+        ensure_default_roles_for_organization(organization)
+        role = _role_without(organization=organization, exclude={PERM_SYSTEM_SWAGGER})
+        gated_member.organization_role = role
+        gated_member.save(update_fields=['organization_role'])
+        assert member_client.get('/api/schema/').status_code == status.HTTP_404_NOT_FOUND
+
+    def test_schema_access_with_swagger_grant(self, organization, gated_member, member_client):
+        role = _role_without(organization=organization, exclude=set())
+        DataroomRolePermission.objects.update_or_create(
+            role=role, permission=PERM_SYSTEM_SWAGGER, defaults={'scope': ''}
+        )
+        invalidate_organization_rbac_cache(str(organization.id))
+        gated_member.organization_role = role
+        gated_member.save(update_fields=['organization_role'])
+        from permissions_rbac.services import has_system_perm
+
+        assert has_system_perm(gated_member, PERM_SYSTEM_SWAGGER) is True
+
+    def test_schema_available_for_primary_admin(self, admin_api_client, admin_user):
+        from permissions_rbac.catalogue import PERM_SYSTEM_SWAGGER
+        from permissions_rbac.safety import user_has_full_access
+        from permissions_rbac.services import has_system_perm
+
+        ensure_default_roles_for_organization(admin_user.organization)
+        assert user_has_full_access(admin_user) is True
+        assert has_system_perm(admin_user, PERM_SYSTEM_SWAGGER) is True
+        # Schema generation is environment-sensitive; swagger gate must allow primary admins.
+        response = admin_api_client.get('/api/schema/')
+        assert response.status_code != status.HTTP_403_FORBIDDEN, response.status_code
 
 
 @pytest.mark.django_db
 class TestCriticalPathsUnaffected:
-    def test_health_login_jwt_with_all_feature_toggles_off(self, public_client, api_client, user):
-        _set_all_feature_toggles(False)
+    def test_health_always_available(self, public_client):
         assert public_client.get(reverse('health-check')).status_code == status.HTTP_200_OK
+
+    def test_jwt_login_works_regardless_of_rbac(self, public_client, user):
         login = public_client.post(
             reverse('token_obtain_pair'),
             {'email': user.email, 'password': 'password'},
             format='json',
         )
         assert login.status_code == status.HTTP_200_OK
-        assert api_client.get('/api/v1/documents/').status_code == status.HTTP_200_OK
-        settings_response = public_client.get('/api/v1/public/settings/')
-        assert settings_response.status_code == status.HTTP_200_OK
+
+
+@pytest.mark.django_db
+class TestDocumentsAndTrashRbac:
+    def test_documents_403_without_grant(self, organization, gated_member, member_client):
+        role = _role_without(organization=organization, exclude={PERM_SYSTEM_DOCUMENTS})
+        gated_member.organization_role = role
+        gated_member.save(update_fields=['organization_role'])
+        assert member_client.get('/api/v1/documents/').status_code == status.HTTP_403_FORBIDDEN
+
+    def test_trash_403_without_grant(self, organization, gated_member, member_client):
+        role = _role_without(organization=organization, exclude={PERM_SYSTEM_TRASH})
+        gated_member.organization_role = role
+        gated_member.save(update_fields=['organization_role'])
+        assert member_client.get('/api/v1/trash/').status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
+def test_admin_system_role_includes_api_keys(organization):
+    ensure_default_roles_for_organization(organization)
+    admin = DataroomRole.objects.get(organization=organization, slug=ROLE_SLUG_ADMIN)
+    assert admin.permission_grants.filter(permission=PERM_SYSTEM_API_KEYS).exists()

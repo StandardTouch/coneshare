@@ -72,13 +72,6 @@ for _automation_viewset in (
 
 _wrap_feature_only(FileRequestViewSet, ensure_file_requests_enabled_for_user)
 
-for _public_file_request_view in (
-    PublicFileRequestView,
-    FileRequestUploadRequestView,
-    FileRequestUploadFinalizeView,
-):
-    _wrap_api_view_feature(_public_file_request_view, ensure_file_requests_enabled_for_user)
-
 
 _original_api_key_authenticate = APIKeyAuthentication.authenticate
 

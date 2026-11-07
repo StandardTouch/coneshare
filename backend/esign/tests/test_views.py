@@ -22,6 +22,14 @@ def organization(db):
     )
 
 
+def _esign_admin_role(organization):
+    from permissions_rbac.models import DataroomRole
+    from permissions_rbac.seed import ensure_default_roles_for_organization
+
+    ensure_default_roles_for_organization(organization)
+    return DataroomRole.objects.get(organization=organization, slug='admin')
+
+
 @pytest.fixture
 def user(db, organization):
     return User.objects.create_user(
@@ -30,6 +38,7 @@ def user(db, organization):
         name="Test Requester",
         password="testpass123",
         organization=organization,
+        organization_role=_esign_admin_role(organization),
         is_active=True
     )
 
@@ -42,6 +51,7 @@ def signer_user(db, organization):
         name="Test Signer",
         password="testpass123",
         organization=organization,
+        organization_role=_esign_admin_role(organization),
         is_active=True
     )
 
@@ -54,6 +64,7 @@ def second_signer_user(db, organization):
         name="Second Signer",
         password="testpass123",
         organization=organization,
+        organization_role=_esign_admin_role(organization),
         is_active=True,
     )
 
@@ -151,15 +162,6 @@ def signer_authenticated_client(api_client, signer_user):
 
 
 @pytest.fixture
-def enable_esign(db, monkeypatch):
-    """Enable esign feature via settings for tests"""
-    # Just set the Django setting directly for tests
-    monkeypatch.setattr(settings, 'ESIGN_ENABLED', True)
-    yield
-    monkeypatch.setattr(settings, 'ESIGN_ENABLED', False)
-
-
-@pytest.fixture
 def signature_request(db, organization, user, document, signer_user):
     """Create a signature request in draft status"""
     request = SignatureRequest.objects.create(
@@ -199,12 +201,27 @@ def signature_request(db, organization, user, document, signer_user):
 @pytest.mark.django_db
 class TestFeatureToggle:
     """Test that ESIGN_ENABLED toggle works correctly"""
-    
-    def test_esign_disabled_blocks_list(self, authenticated_client):
-        """When toggle is OFF, all endpoints should return 403"""
-        response = authenticated_client.get('/api/v1/esign/requests/')
+
+    @pytest.mark.esign_rbac_enforcement
+    def test_esign_disabled_blocks_list(self, api_client, organization):
+        """Without signature permission, endpoints return 403"""
+        from permissions_rbac.models import DataroomRole
+        from permissions_rbac.seed import ensure_default_roles_for_organization
+
+        ensure_default_roles_for_organization(organization)
+        manager = DataroomRole.objects.get(organization=organization, slug='manager')
+        member = User.objects.create_user(
+            username='nosign@example.com',
+            email='nosign@example.com',
+            password='testpass123',
+            organization=organization,
+            organization_role=manager,
+            role='member',
+        )
+        api_client.force_authenticate(user=member)
+        response = api_client.get('/api/v1/esign/requests/')
         assert response.status_code == status.HTTP_403_FORBIDDEN
-        assert 'not enabled' in response.data['detail'].lower()
+        assert 'permission' in response.data['detail'].lower()
     
     def test_esign_enabled_allows_access(self, authenticated_client, enable_esign):
         """When toggle is ON, endpoints should be accessible"""

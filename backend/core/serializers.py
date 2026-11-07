@@ -229,10 +229,7 @@ class AdminUserSerializer(OrganizationRoleAdminUserMixin, UserSerializer):
 
                 user = create_user_with_invite(validated_data, request)
             else:
-                password = validated_data.pop('password', None)
-                if password:
-                    validated_data['password'] = password
-                user = super(UserSerializer, self).create(validated_data)
+                user = UserSerializer.create(self, validated_data)
             OrganizationRoleAdminUserMixin.apply_organization_role_side_effects(
                 user, organization_role_id, clear_role
             )

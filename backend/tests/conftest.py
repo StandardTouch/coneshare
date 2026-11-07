@@ -76,12 +76,30 @@ def organization(db):
 
 @pytest.fixture
 def user(organization):
-    """Fixture to create a standard user."""
+    """Fixture to create a standard user with full system permissions for integration tests."""
+    from permissions_rbac.catalogue import ALL_SYSTEM_PERMISSIONS
+    from permissions_rbac.models import DataroomRole, DataroomRolePermission
+    from permissions_rbac.seed import ensure_default_roles_for_organization
+
+    ensure_default_roles_for_organization(organization)
+    role, _ = DataroomRole.objects.get_or_create(
+        organization=organization,
+        slug='integration-member',
+        defaults={'name': 'Integration Member', 'is_system': False},
+    )
+    DataroomRolePermission.objects.filter(role=role).delete()
+    DataroomRolePermission.objects.bulk_create(
+        [
+            DataroomRolePermission(role=role, permission=perm, scope='')
+            for perm in ALL_SYSTEM_PERMISSIONS
+        ]
+    )
     return User.objects.create_user(
         username="test@example.com",
         email="test@example.com",
         password="password",
-        organization=organization
+        organization=organization,
+        organization_role=role,
     )
 
 

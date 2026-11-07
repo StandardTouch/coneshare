@@ -22,22 +22,7 @@ DEFAULT_SETTINGS = {
     'NEXT_CLOUD_CLIENT_SECRET': {'description': 'Client Secret for Nextcloud integration.', 'type': 'string'},
     'ENABLE_PUBLIC_SIGNUP': {'description': 'Enable public signup with email verification.', 'type': 'bool'},
     'FLATTEN_WATERMARKED_DOWNLOADS': {'description': 'If true, watermarked PDF downloads are flattened (rasterized to JPEGs and recompiled to PDF) to prevent watermark stripping.', 'type': 'bool'},
-    'ESIGN_ENABLED': {'description': 'Enable electronic signature feature. When OFF, all esign UI is hidden and all esign API endpoints return 404/403.', 'type': 'bool'},
-    'ROLE_LABELS_ENABLED': {'description': 'Enable custom display role labels in the admin panel. When OFF, role label UI and API endpoints are hidden.', 'type': 'bool'},
-    'AUTOMATION_ENABLED': {
-        'description': 'Enable automation rules and deliveries (admin-only). When OFF, automation UI and API endpoints are hidden.',
-        'type': 'bool',
-    },
-    'API_KEYS_ENABLED': {
-        'description': 'Enable API keys and MCP setup (admin-only). When OFF, MCP/API key UI is hidden, management endpoints return 403, and Bearer cs_live_ requests are rejected; JWT and normal browsing continue to work.',
-        'type': 'bool',
-    },
-    'FILE_REQUESTS_ENABLED': {
-        'description': 'Enable file request collections and public upload links. When OFF, file request UI and API endpoints (including anonymous upload URLs) are hidden.',
-        'type': 'bool',
-    },
     'USER_INVITE_EMAIL_ENABLED': {'description': 'When ON, admins can create users with an invite email instead of setting a password directly.', 'type': 'bool'},
-    'SWAGGER_ENABLED': {'description': 'Enable OpenAPI schema and Swagger/ReDoc documentation URLs. When OFF, those URLs return 404.', 'type': 'bool'},
 }
 
 VALID_BOOL_TRUE_VALUES = {'true', '1', 'yes', 'on', 't'}

@@ -282,7 +282,13 @@ class DataroomSerializer(serializers.ModelSerializer):
         if collab_match:
             if collab_match.dataroom_role_id and collab_match.dataroom_role:
                 return collab_match.dataroom_role.slug
+            org_role = getattr(user, 'organization_role', None)
+            if org_role:
+                return org_role.slug
             return 'collaborator'
+        org_role = getattr(user, 'organization_role', None)
+        if org_role and obj.organization_id == user.organization_id:
+            return org_role.slug
         return 'none'
 
     @extend_schema_field(serializers.IntegerField())
@@ -563,7 +569,13 @@ class DataroomDetailSerializer(serializers.ModelSerializer):
         if collab_match:
             if collab_match.dataroom_role_id and collab_match.dataroom_role:
                 return collab_match.dataroom_role.slug
+            org_role = getattr(user, 'organization_role', None)
+            if org_role:
+                return org_role.slug
             return 'collaborator'
+        org_role = getattr(user, 'organization_role', None)
+        if org_role and obj.organization_id == user.organization_id:
+            return org_role.slug
         return 'none'
 
     @extend_schema_field(serializers.DictField())

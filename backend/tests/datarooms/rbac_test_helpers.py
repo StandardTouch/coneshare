@@ -4,28 +4,75 @@ import pytest
 
 from datarooms.models import Dataroom, DataroomCollaborator, DataroomDocument
 from documents.models import Document, DocumentVersion
-from permissions_rbac.catalogue import ROLE_SLUG_EDITOR
-from permissions_rbac.models import DataroomRole
+from permissions_rbac.catalogue import (
+    PERM_DATAROOM_CREATE,
+    PERM_FILE_RENAME,
+    PERM_FILE_VIEW,
+    PERM_FOLDER_CREATE,
+    PERM_FOLDER_DELETE,
+    PERM_UPLOAD_FILES,
+    ROLE_SLUG_MANAGER,
+    SCOPE_OWN,
+)
+from permissions_rbac.models import DataroomRole, DataroomRolePermission
 from permissions_rbac.seed import ensure_default_roles_for_organization
+
+
+def _legacy_editor_grants():
+    return {
+        PERM_FILE_VIEW: '',
+        'file_download': '',
+        PERM_UPLOAD_FILES: '',
+        PERM_FOLDER_CREATE: '',
+        PERM_FILE_RENAME: SCOPE_OWN,
+        'folder_rename': SCOPE_OWN,
+        PERM_FOLDER_DELETE: SCOPE_OWN,
+    }
 
 
 @pytest.fixture
 def editor_role_fixture(organization):
     ensure_default_roles_for_organization(organization)
-    return DataroomRole.objects.get(organization=organization, slug=ROLE_SLUG_EDITOR)
+    role, _ = DataroomRole.objects.get_or_create(
+        organization=organization,
+        slug='legacy-editor',
+        defaults={'name': 'Editor', 'is_system': False, 'description': 'Test editor grants'},
+    )
+    DataroomRolePermission.objects.filter(role=role).delete()
+    DataroomRolePermission.objects.bulk_create(
+        [
+            DataroomRolePermission(role=role, permission=p, scope=s if s != 'any' else '')
+            for p, s in _legacy_editor_grants().items()
+        ]
+    )
+    return role
 
 
 def editor_role(organization):
-    roles = ensure_default_roles_for_organization(organization)
-    return roles[ROLE_SLUG_EDITOR]
+    ensure_default_roles_for_organization(organization)
+    role, _ = DataroomRole.objects.get_or_create(
+        organization=organization,
+        slug='legacy-editor',
+        defaults={'name': 'Editor', 'is_system': False},
+    )
+    DataroomRolePermission.objects.filter(role=role).delete()
+    DataroomRolePermission.objects.bulk_create(
+        [
+            DataroomRolePermission(role=role, permission=p, scope=s if s != 'any' else '')
+            for p, s in _legacy_editor_grants().items()
+        ]
+    )
+    return role
 
 
 def add_editor_collaborator(dataroom, user, invited_by, editor_rbac_role):
+    user.organization_role = editor_rbac_role
+    user.save(update_fields=['organization_role'])
     return DataroomCollaborator.objects.create(
         dataroom=dataroom,
         user=user,
         invited_by=invited_by,
-        dataroom_role=editor_rbac_role,
+        dataroom_role=None,
     )
 
 
@@ -78,3 +125,16 @@ def make_shared_dataroom(owner, editor, other_user=None, *, name='RBAC Shared Ro
             name=other_doc.name,
         )
     return dataroom, dd_owner, dd_editor, dd_other
+
+
+def manager_role(organization):
+    ensure_default_roles_for_organization(organization)
+    return DataroomRole.objects.get(organization=organization, slug=ROLE_SLUG_MANAGER)
+
+
+def grant_create_dataroom_on_role(role):
+    DataroomRolePermission.objects.get_or_create(
+        role=role,
+        permission=PERM_DATAROOM_CREATE,
+        defaults={'scope': ''},
+    )

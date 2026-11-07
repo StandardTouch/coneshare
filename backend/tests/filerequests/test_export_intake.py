@@ -96,7 +96,7 @@ class TestFileRequestExportAPI:
         }
         # user2 does not own the file request
         response = api_client.post(f'/api/v1/file-requests/{file_request.id}/exports/', data, format='json')
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_export_uploads_invalid_connection(self, api_client, file_request, uploaded_file):
         data = {

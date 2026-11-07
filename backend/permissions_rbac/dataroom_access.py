@@ -119,9 +119,33 @@ def get_visible_dataroom_document_or_404(user, dataroom_document_id: str) -> Dat
     return ddoc
 
 
-def assert_destination_folder_allowed(user, dataroom: Dataroom, folder: Optional[DataroomFolder], *, for_upload: bool = False) -> None:
-    action = PERM_UPLOAD if for_upload else PERM_CREATE_FOLDER
+def assert_destination_folder_allowed(
+    user,
+    dataroom: Dataroom,
+    folder: Optional[DataroomFolder],
+    *,
+    for_upload: bool = False,
+    upload_mode: str = 'files',
+) -> None:
+    from permissions_rbac.catalogue import (
+        PERM_FOLDER_CREATE,
+        PERM_UPLOAD_ADD_FROM_CONTENT,
+        PERM_UPLOAD_FILES,
+        PERM_UPLOAD_FOLDER,
+    )
+
+    if for_upload:
+        if upload_mode == 'content':
+            action = PERM_UPLOAD_ADD_FROM_CONTENT
+        elif upload_mode == 'folder':
+            action = PERM_UPLOAD_FOLDER
+        else:
+            action = PERM_UPLOAD_FILES
+    else:
+        action = PERM_FOLDER_CREATE
     if folder is None:
+        if for_upload and upload_mode == 'folder' and not has_perm(user, PERM_FOLDER_CREATE, dataroom):
+            raise PermissionDenied('You do not have permission to perform this action.')
         if not has_perm(user, action, dataroom):
             raise PermissionDenied('You do not have permission to perform this action.')
         return

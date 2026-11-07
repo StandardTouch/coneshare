@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from datarooms.models import Dataroom
-from permissions_rbac.catalogue import PERM_DELETE
+from permissions_rbac.catalogue import PERM_DATAROOM_DELETE, PERM_FOLDER_DELETE
 from permissions_rbac.models import DataroomRolePermission
 from permissions_rbac.services import invalidate_organization_rbac_cache
 from permissions_rbac.catalogue import SCOPE_ANY
@@ -79,7 +79,7 @@ class CollaboratorDeletePermissionsTests(APITestCase):
         editor_rbac = editor_role(self.owner.organization)
         DataroomRolePermission.objects.filter(
             role=editor_rbac,
-            permission=PERM_DELETE,
+            permission=PERM_FOLDER_DELETE,
         ).update(scope=SCOPE_ANY)
         invalidate_organization_rbac_cache(str(self.owner.organization_id))
 

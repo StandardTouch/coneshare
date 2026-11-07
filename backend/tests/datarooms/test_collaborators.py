@@ -179,7 +179,31 @@ class TestDataroomCollaborators:
         assert response.data[0]['email'] == "alice@test.com"
 
     def test_collaborator_can_view_and_manage_dataroom(self, api_client, dataroom, user, organization):
-        collab_user = User.objects.create_user(email="collab@test.com", username="collab@test.com", password="password", organization=organization)
+        from permissions_rbac.models import DataroomRole
+        from permissions_rbac.seed import ensure_default_roles_for_organization
+
+        from permissions_rbac.catalogue import ALL_DATAROOM_PERMISSIONS, PERM_DATAROOM_DELETE
+        from permissions_rbac.models import DataroomRolePermission
+
+        ensure_default_roles_for_organization(organization)
+        manager_role = DataroomRole.objects.get(organization=organization, slug='manager')
+        limited_role = DataroomRole.objects.create(
+            organization=organization,
+            slug='collab-no-delete',
+            name='Collaborator (no delete)',
+            is_system=False,
+        )
+        for perm in ALL_DATAROOM_PERMISSIONS:
+            if perm == PERM_DATAROOM_DELETE:
+                continue
+            DataroomRolePermission.objects.create(role=limited_role, permission=perm, scope='any')
+        collab_user = User.objects.create_user(
+            email="collab@test.com",
+            username="collab@test.com",
+            password="password",
+            organization=organization,
+            organization_role=limited_role,
+        )
         DataroomCollaborator.objects.create(dataroom=dataroom, user=collab_user, invited_by=user)
 
         api_client.force_authenticate(user=collab_user)
@@ -189,12 +213,12 @@ class TestDataroomCollaborators:
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data) == 1
         assert response.data[0]['id'] == str(dataroom.id)
-        assert response.data[0]['current_user_role'] == 'collaborator'
+        assert response.data[0]['current_user_role'] == 'collab-no-delete'
 
         # Retrieve detail
         response = api_client.get(f'/api/v1/datarooms/{dataroom.id}/')
         assert response.status_code == status.HTTP_200_OK
-        assert response.data['current_user_role'] == 'collaborator'
+        assert response.data['current_user_role'] == 'collab-no-delete'
 
         # Create folder as collaborator
         response = api_client.post('/api/v1/dataroom-folders/', {
@@ -270,8 +294,18 @@ class TestDataroomCollaborators:
         assert not ShareLink.objects.filter(id=link1_id).exists()
 
     def test_collaborator_folder_creation_sets_created_by(self, api_client, dataroom, user, organization):
+        from permissions_rbac.models import DataroomRole
+        from permissions_rbac.seed import ensure_default_roles_for_organization
+
+        ensure_default_roles_for_organization(organization)
+        manager_role = DataroomRole.objects.get(organization=organization, slug='manager')
         collab = User.objects.create_user(
-            email="folder_collab@test.com", username="folder_collab@test.com", password="password", organization=organization, name="Folder Collab"
+            email="folder_collab@test.com",
+            username="folder_collab@test.com",
+            password="password",
+            organization=organization,
+            name="Folder Collab",
+            organization_role=manager_role,
         )
         DataroomCollaborator.objects.create(dataroom=dataroom, user=collab, invited_by=user)
 

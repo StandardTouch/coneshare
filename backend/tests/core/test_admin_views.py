@@ -291,11 +291,11 @@ class TestAdminOrganizationView:
         response = admin_api_client.patch(url, data, format='multipart')
         assert response.status_code == status.HTTP_200_OK
         assert response.data['brand_name'] == 'My Custom Brand'
-        assert 'logo.svg' in response.data['brand_logo_url']
+        assert response.data['brand_logo_url'].endswith('.svg')
 
         admin_user.organization.refresh_from_db()
         assert admin_user.organization.brand_name == 'My Custom Brand'
-        assert admin_user.organization.brand_logo.name.endswith('logo.svg')
+        assert admin_user.organization.brand_logo.name.endswith('.svg')
 
     def test_patch_organization_branding_clear_fields_and_partial_update(self, admin_api_client, admin_user):
         url = '/api/v1/admin/organization/'
@@ -506,10 +506,10 @@ class TestAdminUserResetPassword:
 
         RefreshToken.for_user(user)
 
-        def mock_get_or_create(*args, **kwargs):
+        def mock_bulk_create(*args, **kwargs):
             raise RuntimeError("Database error during token blacklisting")
 
-        monkeypatch.setattr(BlacklistedToken.objects, 'get_or_create', mock_get_or_create)
+        monkeypatch.setattr(BlacklistedToken.objects, 'bulk_create', mock_bulk_create)
 
         url = f'/api/v1/admin/users/{user.id}/reset-password/'
         payload = {'password': 'BrandNewPassword2026!'}
@@ -752,7 +752,7 @@ class TestAdminUserListOrganizationRoleRobustness:
         admin_user.save(update_fields=['organization_role'])
 
         ensure_default_roles_for_organization(org)
-        viewer = DataroomRole.objects.get(organization=org, slug='viewer', is_system=True)
+        manager_role = DataroomRole.objects.get(organization=org, slug='manager', is_system=True)
 
         no_role = User.objects.create(
             email='norole@example.com',
@@ -769,7 +769,7 @@ class TestAdminUserListOrganizationRoleRobustness:
             name='With Role User',
             organization=org,
             role='member',
-            organization_role=viewer,
+            organization_role=manager_role,
         )
 
         legacy_label = RoleLabel.objects.create(organization=org, name='Legacy Deal Desk')
@@ -813,7 +813,7 @@ class TestAdminUserListOrganizationRoleRobustness:
         by_email = {row['email']: row for row in payload['results']}
         assert by_email[admin_user.email]['role'] == 'admin'
         assert by_email[admin_user.email]['organization_role'] is None
-        assert by_email[with_role.email]['organization_role']['slug'] == 'viewer'
+        assert by_email[with_role.email]['organization_role']['slug'] == 'manager'
         assert by_email[legacy_member.email]['role_label']['name'] == 'Legacy Deal Desk'
         assert by_email[doomed.email]['organization_role'] is None
 
