@@ -48,11 +48,11 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://backend:8000',
+        target: process.env.VITE_DEV_API_TARGET || 'http://backend:8000',
         changeOrigin: true,
       },
       '/media': {
-        target: 'http://backend:8000',
+        target: process.env.VITE_DEV_API_TARGET || 'http://backend:8000',
         changeOrigin: true,
       },
       '/files': {

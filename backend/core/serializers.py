@@ -161,7 +161,7 @@ class AdminUserSerializer(OrganizationRoleAdminUserMixin, UserSerializer):
     class Meta(UserSerializer.Meta):
         fields = [
             'id', 'email', 'name', 'role', 'organization', 'password', 'send_invite',
-            'organization_role', 'organization_role_id', 'role_label', 'role_label_id',
+            'organization_role',
             'avatar', 'avatar_url', 'language', 'date_joined', 'updated_at',
             'total_document_size', 'file_size_quota_mb', 'custom_file_size_quota_mb', 'max_files_per_upload',
             'is_superuser', 'is_active'
@@ -232,7 +232,7 @@ class AdminUserSerializer(OrganizationRoleAdminUserMixin, UserSerializer):
                 password = validated_data.pop('password', None)
                 if password:
                     validated_data['password'] = password
-                user = super(UserSerializer, self).create(validated_data)
+                user = super().create(validated_data)
             OrganizationRoleAdminUserMixin.apply_organization_role_side_effects(
                 user, organization_role_id, clear_role
             )
@@ -248,6 +248,7 @@ class AdminUserSerializer(OrganizationRoleAdminUserMixin, UserSerializer):
         organization_role_id, clear_role = OrganizationRoleAdminUserMixin.extract_organization_role_side_effects(
             validated_data
         )
+        # Bypass UserSerializer.update — it strips `role` and other admin-only fields.
         user = super(UserSerializer, self).update(instance, validated_data)
         OrganizationRoleAdminUserMixin.apply_organization_role_side_effects(
             user, organization_role_id, clear_role
