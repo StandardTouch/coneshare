@@ -161,7 +161,7 @@ class AdminUserSerializer(OrganizationRoleAdminUserMixin, UserSerializer):
     class Meta(UserSerializer.Meta):
         fields = [
             'id', 'email', 'name', 'role', 'organization', 'password', 'send_invite',
-            'organization_role', 'organization_role_id', 'role_label', 'role_label_id',
+            # organization_role* and role_label* are declared in OrganizationRoleAdminUserMixin.get_fields().
             'avatar', 'avatar_url', 'language', 'date_joined', 'updated_at',
             'total_document_size', 'file_size_quota_mb', 'custom_file_size_quota_mb', 'max_files_per_upload',
             'is_superuser', 'is_active'
