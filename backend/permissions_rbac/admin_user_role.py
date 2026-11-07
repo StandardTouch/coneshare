@@ -1,8 +1,13 @@
 """Admin user serializer helpers for unified organization RBAC roles."""
+import logging
+
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
+from core.db_schema import user_has_organization_role_column
 from permissions_rbac.models import DataroomRole
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -45,13 +50,14 @@ class OrganizationRoleAdminUserMixin:
 
     def get_fields(self):
         fields = super().get_fields()
-        fields['organization_role'] = OrganizationRoleNestedSerializer(read_only=True, required=False)
-        fields['organization_role_id'] = serializers.CharField(
-            write_only=True,
-            required=False,
-            allow_null=True,
-            allow_blank=True,
-        )
+        if user_has_organization_role_column():
+            fields['organization_role'] = OrganizationRoleNestedSerializer(read_only=True, required=False)
+            fields['organization_role_id'] = serializers.CharField(
+                write_only=True,
+                required=False,
+                allow_null=True,
+                allow_blank=True,
+            )
         # Deprecated; kept read-only for clients still expecting role labels during transition.
         fields['role_label'] = serializers.SerializerMethodField(read_only=True)
         fields['role_label_id'] = serializers.CharField(
@@ -62,31 +68,62 @@ class OrganizationRoleAdminUserMixin:
         )
         return fields
 
+    @staticmethod
+    def _legacy_role_label(instance):
+        try:
+            assignment = getattr(instance, 'role_label_assignment', None)
+            if assignment is None and hasattr(instance, 'role_label_assignment_id'):
+                return None
+            label = getattr(assignment, 'role_label', None)
+            if label is not None:
+                return {'id': str(label.id), 'name': label.name}
+        except Exception:
+            logger.debug('Failed to resolve legacy role label for user %s', getattr(instance, 'pk', None), exc_info=True)
+        return None
+
     def get_role_label(self, instance):
-        role = getattr(instance, 'organization_role', None)
-        if role:
-            return {'id': str(role.id), 'name': role.name}
+        if user_has_organization_role_column():
+            try:
+                role = getattr(instance, 'organization_role', None)
+            except Exception:
+                role = None
+            if role:
+                return {'id': str(role.id), 'name': role.name}
+        legacy = self._legacy_role_label(instance)
+        if legacy:
+            return legacy
         return None
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        role = getattr(instance, 'organization_role', None)
-        if role:
-            data['organization_role'] = OrganizationRoleNestedSerializer(
-                {
-                    'id': str(role.id),
-                    'name': role.name,
-                    'slug': role.slug,
-                    'is_system': role.is_system,
-                }
-            ).data
+        if user_has_organization_role_column():
+            try:
+                role = getattr(instance, 'organization_role', None)
+            except Exception:
+                role = None
+            if role:
+                data['organization_role'] = OrganizationRoleNestedSerializer(
+                    {
+                        'id': str(role.id),
+                        'name': role.name,
+                        'slug': role.slug,
+                        'is_system': role.is_system,
+                    }
+                ).data
+            else:
+                data['organization_role'] = None
         else:
-            data['organization_role'] = None
+            data.pop('organization_role', None)
         return data
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
         organization = self.context['request'].user.organization
+
+        if not user_has_organization_role_column():
+            attrs.pop('organization_role_id', None)
+            attrs.pop('role_label_id', None)
+            return attrs
 
         organization_role_id = attrs.pop('organization_role_id', serializers.empty)
         legacy_label_id = attrs.pop('role_label_id', serializers.empty)

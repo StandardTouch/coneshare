@@ -735,5 +735,95 @@ class TestAdminUserExport:
         assert res.status_code == status.HTTP_403_FORBIDDEN
 
 
+@pytest.mark.django_db
+class TestAdminUserListOrganizationRoleRobustness:
+    """Regression for GET /api/v1/admin/users/ (production-shaped org user mix)."""
+
+    def test_list_survives_mixed_role_shapes_and_default_ordering(self, admin_api_client, admin_user):
+        from django.contrib.auth import get_user_model
+
+        from permissions_rbac.models import DataroomRole
+        from permissions_rbac.seed import ensure_default_roles_for_organization
+        from rolelabels.models import RoleLabel, UserRoleLabel
+
+        User = get_user_model()
+        org = admin_user.organization
+        admin_user.organization_role = None
+        admin_user.save(update_fields=['organization_role'])
+
+        ensure_default_roles_for_organization(org)
+        viewer = DataroomRole.objects.get(organization=org, slug='viewer', is_system=True)
+
+        no_role = User.objects.create(
+            email='norole@example.com',
+            username='norole@example.com',
+            name='No Role User',
+            organization=org,
+            role='member',
+        )
+        assert no_role.organization_role_id is None
+
+        with_role = User.objects.create(
+            email='withrole@example.com',
+            username='withrole@example.com',
+            name='With Role User',
+            organization=org,
+            role='member',
+            organization_role=viewer,
+        )
+
+        legacy_label = RoleLabel.objects.create(organization=org, name='Legacy Deal Desk')
+        legacy_member = User.objects.create(
+            email='legacy@example.com',
+            username='legacy@example.com',
+            name='Legacy Label User',
+            organization=org,
+            role='member',
+        )
+        UserRoleLabel.objects.create(user=legacy_member, role_label=legacy_label)
+
+        custom = DataroomRole.objects.create(
+            organization=org,
+            slug='temp-delete-me',
+            name='To Delete',
+            is_system=False,
+        )
+        doomed = User.objects.create(
+            email='doomedrole@example.com',
+            username='doomedrole@example.com',
+            name='Deleted Role User',
+            organization=org,
+            role='member',
+            organization_role=custom,
+        )
+        custom.delete()
+        doomed.refresh_from_db()
+        assert doomed.organization_role_id is None
+
+        response = admin_api_client.get('/api/v1/admin/users/?page=1&page_size=10&ordering=-created')
+        assert response.status_code == status.HTTP_200_OK
+        payload = response.json()
+        emails = {row['email'] for row in payload['results']}
+        assert admin_user.email in emails
+        assert no_role.email in emails
+        assert with_role.email in emails
+        assert legacy_member.email in emails
+        assert doomed.email in emails
+
+        by_email = {row['email']: row for row in payload['results']}
+        assert by_email[admin_user.email]['role'] == 'admin'
+        assert by_email[admin_user.email]['organization_role'] is None
+        assert by_email[with_role.email]['organization_role']['slug'] == 'viewer'
+        assert by_email[legacy_member.email]['role_label']['name'] == 'Legacy Deal Desk'
+        assert by_email[doomed.email]['organization_role'] is None
+
+    def test_list_when_organization_role_column_absent(self, admin_api_client, admin_user, monkeypatch):
+        absent = lambda: False
+        monkeypatch.setattr('core.db_schema.user_has_organization_role_column', absent)
+        monkeypatch.setattr('permissions_rbac.admin_user_role.user_has_organization_role_column', absent)
+        monkeypatch.setattr('rolelabels.extensions.user_has_organization_role_column', absent)
+        response = admin_api_client.get('/api/v1/admin/users/?ordering=-created')
+        assert response.status_code == status.HTTP_200_OK
+        assert 'results' in response.json()
 
 
