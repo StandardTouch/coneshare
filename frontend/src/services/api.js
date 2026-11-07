@@ -756,6 +756,12 @@ export const getAdminRoleLabels = () => api.get('/admin/role-labels/');
 export const createAdminRoleLabel = (data) => api.post('/admin/role-labels/', data);
 export const updateAdminRoleLabel = (id, data) => api.patch(`/admin/role-labels/${id}/`, data);
 export const deleteAdminRoleLabel = (id) => api.delete(`/admin/role-labels/${id}/`);
+export const getAdminRbacRoles = (params = {}) => api.get('/admin/rbac/roles/', { params });
+export const getAdminRbacRole = (roleId) => api.get(`/admin/rbac/roles/${roleId}/`);
+export const createAdminRbacRole = (data) => api.post('/admin/rbac/roles/', data);
+export const updateAdminRbacRole = (roleId, data) => api.patch(`/admin/rbac/roles/${roleId}/`, data);
+export const deleteAdminRbacRole = (roleId) => api.delete(`/admin/rbac/roles/${roleId}/`);
+export const getAdminRbacPermissionCatalog = () => api.get('/admin/rbac/roles/permission-catalog/');
 export const getAdminRbacMatrix = () => api.get('/admin/rbac/roles/matrix/');
 export const updateAdminRbacRolePermissions = (roleId, data) =>
   api.put(`/admin/rbac/roles/${roleId}/permissions/`, data);

@@ -3,7 +3,7 @@ from django.db.models.functions import Lower
 
 from core.models import BaseModel, Organization, User
 from permissions_rbac.catalogue import (
-    ALL_DATAROOM_PERMISSIONS,
+    ALL_ROLE_GRANT_PERMISSIONS,
     ALL_SITE_PERMISSIONS,
     SCOPE_CHOICES,
     SITE_ROLE_ADMIN,
@@ -51,7 +51,7 @@ class DataroomRolePermission(BaseModel):
         on_delete=models.CASCADE,
         related_name='permission_grants',
     )
-    permission = models.CharField(max_length=64, choices=[(p, p) for p in ALL_DATAROOM_PERMISSIONS])
+    permission = models.CharField(max_length=64, choices=[(p, p) for p in ALL_ROLE_GRANT_PERMISSIONS])
     scope = models.CharField(
         max_length=8,
         choices=[(s, s) for s in SCOPE_CHOICES],

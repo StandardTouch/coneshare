@@ -1,17 +1,21 @@
 """Admin API for dataroom RBAC configuration."""
+from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.db.models import Count
+from django.db.models import Count, Q
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from core.pagination import StandardResultsSetPagination
 from core.permissions import IsAdmin
+
+User = get_user_model()
 from permissions_rbac.audit import log_permission_change
 from permissions_rbac.catalogue import (
     PERMISSION_DEFINITIONS,
     PERM_CREATE_DATAROOM,
     SYSTEM_ROLE_SLUGS,
-    iter_dataroom_permission_definitions,
+    iter_role_grant_permission_definitions,
 )
 from permissions_rbac.models import DataroomRole, DataroomRolePermission, PermissionAuditLog, SiteRolePermission
 from permissions_rbac.seed import ensure_default_roles_for_organization, reset_all_system_roles_for_organization
@@ -26,18 +30,67 @@ from permissions_rbac.services import invalidate_organization_rbac_cache
 class AdminDataroomRoleViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdmin]
     serializer_class = DataroomRoleSerializer
+    pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
         org = self.request.user.organization
-        return (
+        qs = (
             DataroomRole.objects.filter(organization=org)
-            .annotate(user_count=Count('collaborators'))
+            .annotate(collaborator_count=Count('collaborators', distinct=True))
             .prefetch_related('permission_grants')
             .order_by('name')
         )
+        search = (self.request.query_params.get('search') or '').strip()
+        if search:
+            qs = qs.filter(Q(name__icontains=search) | Q(slug__icontains=search))
+        return qs
+
+    def _attach_user_count(self, role):
+        collab = getattr(role, 'collaborator_count', None)
+        if collab is None:
+            collab = role.collaborators.count()
+        members = User.objects.filter(organization_role_id=role.id).count()
+        role.user_count = collab + members
+        return role
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self._attach_user_count(instance)
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
+    def list(self, request, *args, **kwargs):
+        ensure_default_roles_for_organization(request.user.organization)
+        queryset = self.filter_queryset(self.get_queryset())
+        org_member_counts = dict(
+            User.objects.filter(organization=request.user.organization, organization_role__isnull=False)
+            .values('organization_role_id')
+            .annotate(c=Count('id'))
+            .values_list('organization_role_id', 'c')
+        )
+        page = self.paginate_queryset(queryset)
+        roles = page if page is not None else list(queryset)
+        for role in roles:
+            collab = getattr(role, 'collaborator_count', 0) or 0
+            role.user_count = collab + org_member_counts.get(role.id, 0)
+        serializer = self.get_serializer(roles, many=True)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
 
     def perform_create(self, serializer):
-        role = serializer.save(organization=self.request.user.organization, is_system=False)
+        from django.utils.text import slugify
+
+        org = self.request.user.organization
+        name = serializer.validated_data.get('name', '')
+        base = slugify(name)[:32] or 'custom'
+        slug = base
+        n = 2
+        while DataroomRole.objects.filter(organization=org, slug=slug).exists():
+            suffix = f'-{n}'
+            slug = f'{base[: max(1, 32 - len(suffix))]}{suffix}'
+            n += 1
+        role = serializer.save(organization=org, is_system=False, slug=slug)
         log_permission_change(
             self.request.user,
             PermissionAuditLog.TARGET_ROLE,
@@ -67,9 +120,9 @@ class AdminDataroomRoleViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         if instance.is_system:
             return Response({'detail': 'System roles cannot be deleted.'}, status=status.HTTP_400_BAD_REQUEST)
-        if instance.collaborators.exists():
+        if instance.collaborators.exists() or User.objects.filter(organization_role=instance).exists():
             return Response(
-                {'detail': 'Reassign collaborators before deleting this role.'},
+                {'detail': 'Reassign users and collaborators before deleting this role.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         role_id = str(instance.id)
@@ -88,6 +141,19 @@ class AdminDataroomRoleViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         pass
+
+    @action(detail=False, methods=['get'], url_path='permission-catalog')
+    def permission_catalog(self, request):
+        permissions = [
+            {
+                'codename': d.codename,
+                'label': d.label,
+                'supports_scope': d.supports_scope,
+                'category': d.category,
+            }
+            for d in iter_role_grant_permission_definitions()
+        ]
+        return Response({'permissions': permissions})
 
     @action(detail=False, methods=['get'], url_path='matrix')
     def matrix(self, request):

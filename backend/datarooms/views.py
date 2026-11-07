@@ -947,7 +947,15 @@ class DataroomViewSet(viewsets.ModelViewSet):
             if not dataroom_role:
                 return Response({'detail': 'Invalid dataroom role.'}, status=status.HTTP_400_BAD_REQUEST)
         else:
-            dataroom_role = DataroomRole.objects.filter(
+            dataroom_role = None
+
+        def _resolve_dataroom_role_for_user(target_user):
+            if dataroom_role:
+                return dataroom_role
+            org_role = getattr(target_user, 'organization_role', None)
+            if org_role and org_role.organization_id == request.user.organization_id:
+                return org_role
+            return DataroomRole.objects.filter(
                 organization=request.user.organization,
                 slug=ROLE_SLUG_EDITOR,
             ).first()
@@ -957,8 +965,8 @@ class DataroomViewSet(viewsets.ModelViewSet):
             target_user = User.objects.filter(
                 organization=request.user.organization,
                 email__iexact=email,
-                is_active=True
-            ).first()
+                is_active=True,
+            ).select_related('organization_role').first()
             if not target_user:
                 return Response(
                     {"detail": f"User with email '{email}' was not found in your organization."},
@@ -970,8 +978,8 @@ class DataroomViewSet(viewsets.ModelViewSet):
             found_users = User.objects.filter(
                 organization=request.user.organization,
                 id__in=user_ids,
-                is_active=True
-            )
+                is_active=True,
+            ).select_related('organization_role')
             if found_users.count() != len(user_ids):
                 return Response(
                     {"detail": "One or more selected users were not found in your organization."},
@@ -997,17 +1005,18 @@ class DataroomViewSet(viewsets.ModelViewSet):
         created_collaborators = []
         with transaction.atomic():
             for target_user in deduped_users:
+                resolved_role = _resolve_dataroom_role_for_user(target_user)
                 collab, created = DataroomCollaborator.objects.get_or_create(
                     dataroom=dataroom,
                     user=target_user,
                     defaults={
                         'invited_by': request.user,
                         'role': DataroomCollaborator.ROLE_COLLABORATOR,
-                        'dataroom_role': dataroom_role,
+                        'dataroom_role': resolved_role,
                     },
                 )
-                if not created and dataroom_role:
-                    collab.dataroom_role = dataroom_role
+                if not created and resolved_role:
+                    collab.dataroom_role = resolved_role
                     collab.save(update_fields=['dataroom_role', 'updated_at'])
                 if created:
                     created_collaborators.append(collab)

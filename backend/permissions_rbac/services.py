@@ -160,8 +160,24 @@ def has_site_perm(user, permission: str) -> bool:
     if user is None or not getattr(user, 'is_authenticated', False):
         return False
     site_role = getattr(user, 'role', '') or 'member'
+    if site_role == 'admin':
+        org_id = str(user.organization_id)
+        grants = _load_site_grants(org_id, site_role)
+        return permission in grants
+
+    org_role = getattr(user, 'organization_role', None)
+    if org_role is None and getattr(user, 'organization_role_id', None):
+        org_role = (
+            DataroomRole.objects.filter(id=user.organization_role_id)
+            .only('id', 'organization_id')
+            .first()
+        )
+    if org_role is not None:
+        role_grants = _load_role_grants(org_role)
+        return permission in role_grants
+
     org_id = str(user.organization_id)
-    grants = _load_site_grants(org_id, site_role)
+    grants = _load_site_grants(org_id, 'member')
     return permission in grants
 
 

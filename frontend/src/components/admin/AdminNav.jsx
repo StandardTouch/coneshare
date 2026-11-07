@@ -1,20 +1,14 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useBranding } from '../../contexts/BrandingProvider';
-
 export function AdminNav() {
   const { t } = useTranslation();
   const { pathname } = useLocation();
-  const { roleLabelsEnabled } = useBranding();
 
   const navLinks = [
     { to: '/admin/settings', label: t('admin.settingsNav') },
     { to: '/admin/branding', label: t('admin.branding') },
     { to: '/admin/users', label: t('admin.users') },
-    { to: '/admin/rbac', label: t('admin.rbac.nav', { defaultValue: 'Roles & Permissions' }) },
-    ...(roleLabelsEnabled
-      ? [{ to: '/admin/roles', label: t('admin.roles.nav', { defaultValue: 'Roles' }) }]
-      : []),
+    { to: '/admin/roles', label: t('admin.roles.nav', { defaultValue: 'Roles' }) },
     { to: '/admin/datarooms', label: t('admin.datarooms') },
     { to: '/admin/login-activity', label: t('admin.loginActivity') },
     { to: '/admin/security-alerts', label: t('admin.securityAlerts') },
@@ -28,7 +22,7 @@ export function AdminNav() {
             key={link.to}
             to={link.to}
             className={
-              pathname === link.to
+              pathname === link.to || (link.to === '/admin/roles' && pathname.startsWith('/admin/roles/'))
                 ? 'font-semibold text-primary'
                 : 'text-muted-foreground transition-colors hover:text-primary'
             }

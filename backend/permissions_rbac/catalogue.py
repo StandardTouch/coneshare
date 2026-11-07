@@ -61,6 +61,9 @@ ALL_DATAROOM_PERMISSIONS: List[str] = [
 
 ALL_SITE_PERMISSIONS: List[str] = [PERM_CREATE_DATAROOM]
 
+# Permissions assignable on organization/dataroom role definitions (includes site grants).
+ALL_ROLE_GRANT_PERMISSIONS: List[str] = ALL_DATAROOM_PERMISSIONS + [PERM_CREATE_DATAROOM]
+
 ROLE_SLUG_VIEWER = 'viewer'
 ROLE_SLUG_CONTRIBUTOR = 'contributor'
 ROLE_SLUG_EDITOR = 'editor'
@@ -114,6 +117,11 @@ PERMISSION_DEFINITIONS: Dict[str, PermissionDefinition] = {
 
 def iter_dataroom_permission_definitions() -> Iterable[PermissionDefinition]:
     for codename in ALL_DATAROOM_PERMISSIONS:
+        yield PERMISSION_DEFINITIONS[codename]
+
+
+def iter_role_grant_permission_definitions() -> Iterable[PermissionDefinition]:
+    for codename in ALL_ROLE_GRANT_PERMISSIONS:
         yield PERMISSION_DEFINITIONS[codename]
 
 
