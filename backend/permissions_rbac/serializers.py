@@ -31,7 +31,21 @@ class DataroomRoleSerializer(serializers.ModelSerializer):
             'permission_grants',
             'user_count',
         )
-        read_only_fields = ('id', 'is_system')
+        read_only_fields = ('id', 'slug', 'is_system')
+
+    def validate_name(self, value):
+        request = self.context.get('request')
+        if not request:
+            return value
+        org = request.user.organization
+        qs = DataroomRole.objects.filter(organization=org, name__iexact=value.strip())
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                'A role with this name already exists in your organization.'
+            )
+        return value.strip()
 
     def validate_slug(self, value):
         if self.instance and self.instance.is_system:

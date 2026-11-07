@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Loader2, Lock, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
 
 import * as api from '../services/api';
+import { getLocalizedErrorMessage } from '../utils/errorTranslator';
 import { AdminNav } from '../components/admin/AdminNav';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -80,8 +81,13 @@ export function AdminRolesPage() {
       setShowCreate(false);
       await loadRoles(pagination.current_page);
       await loadAuditLog();
-    } catch {
-      // interceptor
+    } catch (err) {
+      toast.error(
+        getLocalizedErrorMessage(
+          err,
+          t('admin.roles.createFailed', { defaultValue: 'Could not create role.' })
+        )
+      );
     } finally {
       setIsSaving(false);
     }
