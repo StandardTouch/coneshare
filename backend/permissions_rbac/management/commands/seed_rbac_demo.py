@@ -135,8 +135,15 @@ class Command(BaseCommand):
             )
             return dd
 
+        try:
+            from datarooms.services import get_or_create_dataroom_storage_folder
+
+            get_or_create_dataroom_storage_folder(dataroom, requesting_user=admin)
+        except Exception:
+            pass
+
         admin_dd = ensure_doc('admin-owned.pdf', admin)
-        ensure_doc('contributor-owned.pdf', contributor)
+        contributor_dd = ensure_doc('contributor-owned.pdf', contributor)
 
         meta_path = Path('/opt/cursor/artifacts/rbac-demo-meta.json')
         meta_path.parent.mkdir(parents=True, exist_ok=True)
@@ -146,6 +153,7 @@ class Command(BaseCommand):
                     'dataroom_id': str(dataroom.id),
                     'dataroom_name': dataroom.name,
                     'admin_dataroom_document_id': str(admin_dd.id),
+                    'contributor_dataroom_document_id': str(contributor_dd.id),
                 }
             ),
             encoding='utf-8',
