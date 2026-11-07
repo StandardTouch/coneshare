@@ -215,6 +215,13 @@ class PublicFileRequestView(APIView):
         except FileRequest.DoesNotExist:
             return Response({"detail": "File request not found or has been disabled."}, status=status.HTTP_404_NOT_FOUND)
 
+        from featuregates.services import ensure_file_requests_enabled_for_owner
+
+        try:
+            ensure_file_requests_enabled_for_owner(file_request.created_by)
+        except Exception:
+            return Response({"detail": "File requests are not available."}, status=status.HTTP_403_FORBIDDEN)
+
         if file_request.expires_at and file_request.expires_at < timezone.now():
             return Response({"detail": "This file request has expired."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -244,9 +251,16 @@ class FileRequestUploadRequestView(APIView):
     )
     def post(self, request, slug, *args, **kwargs):
         try:
-            file_request = FileRequest.objects.get(slug=slug, is_active=True)
+            file_request = FileRequest.objects.select_related('created_by').get(slug=slug, is_active=True)
         except FileRequest.DoesNotExist:
             return Response({"detail": "File request not found or has been disabled."}, status=status.HTTP_404_NOT_FOUND)
+
+        from featuregates.services import ensure_file_requests_enabled_for_owner
+
+        try:
+            ensure_file_requests_enabled_for_owner(file_request.created_by)
+        except Exception:
+            return Response({"detail": "File requests are not available."}, status=status.HTTP_403_FORBIDDEN)
 
         if file_request.expires_at and file_request.expires_at < timezone.now():
             return Response({"detail": "This file request has expired."}, status=status.HTTP_400_BAD_REQUEST)
@@ -304,9 +318,16 @@ class FileRequestUploadFinalizeView(APIView):
     )
     def post(self, request, slug, *args, **kwargs):
         try:
-            file_request = FileRequest.objects.get(slug=slug, is_active=True)
+            file_request = FileRequest.objects.select_related('created_by').get(slug=slug, is_active=True)
         except FileRequest.DoesNotExist:
             return Response({"detail": "File request not found or has been disabled."}, status=status.HTTP_404_NOT_FOUND)
+
+        from featuregates.services import ensure_file_requests_enabled_for_owner
+
+        try:
+            ensure_file_requests_enabled_for_owner(file_request.created_by)
+        except Exception:
+            return Response({"detail": "File requests are not available."}, status=status.HTTP_403_FORBIDDEN)
 
         if file_request.expires_at and file_request.expires_at < timezone.now():
             return Response({"detail": "This file request has expired."}, status=status.HTTP_400_BAD_REQUEST)

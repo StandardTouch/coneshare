@@ -1,5 +1,5 @@
 """
-Permission evaluation for dataroom and site actions.
+Permission evaluation for system, dataroom, and site actions.
 """
 from __future__ import annotations
 
@@ -9,34 +9,47 @@ from django.core.cache import cache
 from django.db.models import Q
 
 from datarooms.models import Dataroom, DataroomCollaborator, DataroomDocument, DataroomFolder
-from datarooms.utils import is_dataroom_owner_or_admin
 from permissions_rbac.catalogue import (
+    ALL_SYSTEM_PERMISSIONS,
     MODIFY_PERMISSIONS,
     PERM_CREATE_DATAROOM,
     PERM_CREATE_FOLDER,
+    PERM_DATAROOM_CREATE,
+    PERM_DATAROOM_DELETE,
+    PERM_DATAROOM_EDIT,
+    PERM_DATAROOM_QNA_TAB,
+    PERM_DATAROOM_SETTINGS_TAB,
     PERM_DELETE,
     PERM_DELETE_DATAROOM,
     PERM_DOWNLOAD,
     PERM_EDIT_DATAROOM_SETTINGS,
-    PERM_INVITE_COLLABORATORS,
-    PERM_MANAGE_COLLABORATORS,
+    PERM_FILE_CREATE_SHARE_LINK,
+    PERM_FILE_DOWNLOAD,
+    PERM_FILE_RENAME,
+    PERM_FILE_VIEW,
+    PERM_FOLDER_CREATE,
+    PERM_FOLDER_DELETE,
+    PERM_FOLDER_RENAME,
     PERM_MANAGE_SHARE_SETTINGS,
     PERM_MOVE,
     PERM_RENAME,
     PERM_REORDER,
     PERM_UPLOAD,
+    PERM_UPLOAD_ADD_FROM_CONTENT,
+    PERM_UPLOAD_FILES,
+    PERM_UPLOAD_FOLDER,
     PERM_VIEW,
-    ROLE_SLUG_EDITOR,
+    ROLE_SLUG_ADMIN,
     SCOPE_ANY,
     SCOPE_OWN,
 )
 from permissions_rbac.models import (
-    DataroomFolderRoleRule,
     DataroomRole,
     DataroomRolePermission,
     SiteRolePermission,
 )
 from permissions_rbac.request_context import rbac_request_state
+from permissions_rbac.safety import user_has_full_access
 
 CACHE_TIMEOUT = 3600
 
@@ -60,6 +73,11 @@ def invalidate_organization_rbac_cache(organization_id: str) -> None:
 
 def invalidate_role_cache(role: DataroomRole) -> None:
     cache.delete(_role_cache_key(str(role.organization_id), str(role.id)))
+
+
+def invalidate_folder_rule_cache(role: DataroomRole) -> None:
+    """No-op after folder rule removal; kept for model compatibility."""
+    return None
 
 
 def _load_role_grants(role: DataroomRole) -> Dict[str, str]:
@@ -90,25 +108,34 @@ def _load_site_grants(organization_id: str, site_role: str) -> Set[str]:
     return perms
 
 
+def resolve_organization_role(user) -> Optional[DataroomRole]:
+    if user is None or not getattr(user, 'is_authenticated', False):
+        return None
+    org_role = getattr(user, 'organization_role', None)
+    if org_role is None and getattr(user, 'organization_role_id', None):
+        org_role = (
+            DataroomRole.objects.filter(id=user.organization_role_id)
+            .only('id', 'organization_id', 'slug')
+            .first()
+        )
+    if org_role is not None:
+        return org_role
+    if getattr(user, 'role', '') == 'admin' and getattr(user, 'organization_id', None):
+        return DataroomRole.objects.filter(
+            organization_id=user.organization_id,
+            slug=ROLE_SLUG_ADMIN,
+        ).first()
+    return None
+
+
 def get_collaborator_dataroom_role(user, dataroom: Dataroom) -> Optional[DataroomRole]:
     if user is None or not user.is_authenticated:
         return None
     if dataroom.created_by_id == user.id:
         return None
-    collab = (
-        DataroomCollaborator.objects.filter(dataroom=dataroom, user=user)
-        .select_related('dataroom_role')
-        .first()
-    )
-    if not collab:
+    if not DataroomCollaborator.objects.filter(dataroom=dataroom, user=user).exists():
         return None
-    if collab.dataroom_role_id:
-        return collab.dataroom_role
-    # Fallback for rows not yet migrated
-    return DataroomRole.objects.filter(
-        organization=dataroom.organization,
-        slug=ROLE_SLUG_EDITOR,
-    ).first()
+    return resolve_organization_role(user)
 
 
 def _item_created_by_user(user, dataroom: Dataroom, item_type: str, item) -> bool:
@@ -156,28 +183,82 @@ def _effective_scope(stored_scope: str, permission: str) -> str:
     return stored_scope or SCOPE_ANY
 
 
+def _resolve_action_codename(action: str, item_type: Optional[str] = None) -> str:
+    legacy_actions = {
+        'view': PERM_FILE_VIEW,
+        'download': PERM_FILE_DOWNLOAD,
+        'upload': PERM_UPLOAD_FILES,
+        'create_folder': PERM_FOLDER_CREATE,
+        'delete': PERM_FOLDER_DELETE,
+        'rename': PERM_RENAME,
+        'move': PERM_MOVE,
+        'reorder': PERM_REORDER,
+        'create_dataroom': PERM_DATAROOM_CREATE,
+        'delete_dataroom': PERM_DATAROOM_DELETE,
+        'edit_dataroom_settings': PERM_EDIT_DATAROOM_SETTINGS,
+        'manage_share_settings': PERM_MANAGE_SHARE_SETTINGS,
+    }
+    if action in legacy_actions and action not in (
+        PERM_RENAME,
+        PERM_MOVE,
+        PERM_REORDER,
+        PERM_DELETE,
+    ):
+        return legacy_actions[action]
+    if action == PERM_VIEW:
+        return PERM_FILE_VIEW
+    if action == PERM_DOWNLOAD:
+        return PERM_FILE_DOWNLOAD
+    if action == PERM_UPLOAD:
+        return PERM_UPLOAD_FILES
+    if action == PERM_CREATE_FOLDER:
+        return PERM_FOLDER_CREATE
+    if action == PERM_DELETE_DATAROOM:
+        return PERM_DATAROOM_DELETE
+    if action == PERM_CREATE_DATAROOM:
+        return PERM_DATAROOM_CREATE
+    if action == PERM_EDIT_DATAROOM_SETTINGS:
+        return PERM_DATAROOM_SETTINGS_TAB
+    if action == PERM_MANAGE_SHARE_SETTINGS:
+        return PERM_FILE_CREATE_SHARE_LINK
+    if action in (PERM_RENAME, PERM_MOVE, PERM_REORDER):
+        if item_type == 'folder':
+            return PERM_FOLDER_RENAME
+        if item_type == 'document':
+            return PERM_FILE_RENAME
+        return PERM_FOLDER_RENAME
+    if action in (PERM_DELETE, 'delete'):
+        return PERM_FOLDER_DELETE
+    return action
+
+
+def has_system_perm(user, permission: str) -> bool:
+    if user is None or not getattr(user, 'is_authenticated', False):
+        return False
+    if user_has_full_access(user):
+        return True
+    if permission not in ALL_SYSTEM_PERMISSIONS:
+        return False
+    role = resolve_organization_role(user)
+    if role is None:
+        return False
+    grants = _load_role_grants(role)
+    return permission in grants
+
+
 def has_site_perm(user, permission: str) -> bool:
     if user is None or not getattr(user, 'is_authenticated', False):
         return False
+    if user_has_full_access(user):
+        return True
+    if permission == PERM_CREATE_DATAROOM or permission == PERM_DATAROOM_CREATE:
+        role = resolve_organization_role(user)
+        if role is None:
+            return False
+        grants = _load_role_grants(role)
+        return PERM_DATAROOM_CREATE in grants
     site_role = getattr(user, 'role', '') or 'member'
-    if site_role == 'admin':
-        org_id = str(user.organization_id)
-        grants = _load_site_grants(org_id, site_role)
-        return permission in grants
-
-    org_role = getattr(user, 'organization_role', None)
-    if org_role is None and getattr(user, 'organization_role_id', None):
-        org_role = (
-            DataroomRole.objects.filter(id=user.organization_role_id)
-            .only('id', 'organization_id')
-            .first()
-        )
-    if org_role is not None:
-        role_grants = _load_role_grants(org_role)
-        return permission in role_grants
-
-    org_id = str(user.organization_id)
-    grants = _load_site_grants(org_id, 'member')
+    grants = _load_site_grants(str(user.organization_id), site_role)
     return permission in grants
 
 
@@ -191,54 +272,51 @@ def has_perm(
     if user is None or not getattr(user, 'is_authenticated', False):
         return False
 
-    if action == PERM_CREATE_DATAROOM:
-        return has_site_perm(user, PERM_CREATE_DATAROOM)
+    if user_has_full_access(user):
+        if action in (PERM_CREATE_DATAROOM, PERM_DATAROOM_CREATE):
+            return True
+        if dataroom is not None:
+            return True
+        return has_system_perm(user, action) or action in ALL_SYSTEM_PERMISSIONS
+
+    if action in (PERM_CREATE_DATAROOM, PERM_DATAROOM_CREATE, 'create_dataroom'):
+        return has_site_perm(user, PERM_DATAROOM_CREATE)
+
+    if action in ALL_SYSTEM_PERMISSIONS:
+        return has_system_perm(user, action)
 
     if dataroom is None:
         return False
 
-    if is_dataroom_owner_or_admin(user, dataroom):
+    if getattr(dataroom, 'created_by_id', None) == user.id:
         return True
 
     role = get_collaborator_dataroom_role(user, dataroom)
     if role is None:
         return False
 
+    resolved_type = item_type
+    if resolved_type is None and item is not None:
+        if isinstance(item, DataroomFolder):
+            resolved_type = 'folder'
+        elif isinstance(item, DataroomDocument):
+            resolved_type = 'document'
+
+    codename = _resolve_action_codename(action, resolved_type)
     grants = _load_role_grants(role)
-    if action not in grants:
+    if codename not in grants:
         return False
 
-    stored_scope = grants[action]
-    scope = _effective_scope(stored_scope, action)
+    stored_scope = grants[codename]
+    scope = _effective_scope(stored_scope, codename)
 
     if scope == SCOPE_ANY:
-        allowed = True
-    elif scope == SCOPE_OWN:
+        return True
+    if scope == SCOPE_OWN:
         if item is None:
-            allowed = False
-        else:
-            resolved_type = item_type
-            if resolved_type is None:
-                if isinstance(item, DataroomFolder):
-                    resolved_type = 'folder'
-                elif isinstance(item, DataroomDocument):
-                    resolved_type = 'document'
-            allowed = _item_created_by_user(user, dataroom, resolved_type or '', item)
-    else:
-        allowed = False
-
-    if not allowed:
-        return False
-
-    if item is not None:
-        folder = resolved_folder_for_item(item, item_type)
-        if folder and is_folder_hidden_for_role(folder, role):
             return False
-        if folder and is_folder_view_only_for_role(folder, role):
-            if action not in (PERM_VIEW, PERM_DOWNLOAD):
-                return False
-
-    return True
+        return _item_created_by_user(user, dataroom, resolved_type or '', item)
+    return False
 
 
 def resolved_folder_for_item(item, item_type: Optional[str] = None):
@@ -249,104 +327,24 @@ def resolved_folder_for_item(item, item_type: Optional[str] = None):
     return None
 
 
-def _folder_rule_map_for_role(role: DataroomRole) -> Dict[str, str]:
-    cache_key = f'rbac:folder_rules:{role.organization_id}:{role.id}'
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return cached
-    rules = {
-        str(row.dataroom_folder_id): row.rule
-        for row in DataroomFolderRoleRule.objects.filter(dataroom_role=role).select_related('dataroom_folder')
-    }
-    cache.set(cache_key, rules, CACHE_TIMEOUT)
-    return rules
-
-
-def invalidate_folder_rule_cache(role: DataroomRole) -> None:
-    cache.delete(f'rbac:folder_rules:{role.organization_id}:{role.id}')
-
-
-def _effective_folder_rule_from_maps(
-    folder_id: str,
-    rule_map: Dict[str, str],
-    parent_by_id: Dict[str, Optional[str]],
-) -> str:
-    current = folder_id
-    visited = set()
-    while current and current not in visited:
-        visited.add(current)
-        rule = rule_map.get(current)
-        if rule and rule != DataroomFolderRoleRule.RULE_INHERIT:
-            return rule
-        current = parent_by_id.get(current)
-    return DataroomFolderRoleRule.RULE_INHERIT
-
-
-def _effective_folder_rule(folder: DataroomFolder, role: DataroomRole) -> str:
-    rules = _folder_rule_map_for_role(role)
-    parent_by_id = rbac_request_state().get(f'folder_parents:{folder.dataroom_id}')
-    if parent_by_id is None:
-        parent_by_id = {
-            str(row['id']): str(row['parent_id']) if row['parent_id'] else None
-            for row in DataroomFolder.objects.filter(dataroom_id=folder.dataroom_id).values('id', 'parent_id')
-        }
-        rbac_request_state()[f'folder_parents:{folder.dataroom_id}'] = parent_by_id
-    return _effective_folder_rule_from_maps(str(folder.id), rules, parent_by_id)
-
-
-def _compute_hidden_folder_ids(user, dataroom: Dataroom) -> Set[str]:
-    if is_dataroom_owner_or_admin(user, dataroom):
-        return set()
-    role = get_collaborator_dataroom_role(user, dataroom)
-    if role is None:
-        return set()
-    state = rbac_request_state()
-    parent_key = f'folder_parents:{dataroom.id}'
-    parent_by_id = state.get(parent_key)
-    if parent_by_id is None:
-        parent_by_id = {
-            str(row['id']): str(row['parent_id']) if row['parent_id'] else None
-            for row in DataroomFolder.objects.filter(dataroom=dataroom).values('id', 'parent_id')
-        }
-        state[parent_key] = parent_by_id
-    rule_map = _folder_rule_map_for_role(role)
-    hidden = set()
-    for folder_id in parent_by_id.keys():
-        if _effective_folder_rule_from_maps(folder_id, rule_map, parent_by_id) == DataroomFolderRoleRule.RULE_HIDDEN:
-            hidden.add(folder_id)
-    return hidden
-
-
 def hidden_folder_ids_for_user(user, dataroom: Dataroom) -> Set[str]:
-    cache_key = f'hidden_folder_ids:{user.id}:{dataroom.id}'
-    state = rbac_request_state()
-    if cache_key in state:
-        return state[cache_key]
-    hidden = _compute_hidden_folder_ids(user, dataroom)
-    state[cache_key] = hidden
-    return hidden
+    return set()
 
 
 def is_folder_hidden_for_role(folder: DataroomFolder, role: DataroomRole) -> bool:
-    return _effective_folder_rule(folder, role) == DataroomFolderRoleRule.RULE_HIDDEN
+    return False
 
 
 def is_folder_view_only_for_role(folder: DataroomFolder, role: DataroomRole) -> bool:
-    return _effective_folder_rule(folder, role) == DataroomFolderRoleRule.RULE_VIEW_ONLY
+    return False
 
 
 def filter_dataroom_documents_for_user(qs, user, dataroom: Dataroom):
-    hidden = hidden_folder_ids_for_user(user, dataroom)
-    if not hidden:
-        return qs
-    return qs.exclude(folder_id__in=hidden)
+    return qs
 
 
 def filter_dataroom_folders_for_user(qs, user, dataroom: Dataroom):
-    hidden = hidden_folder_ids_for_user(user, dataroom)
-    if not hidden:
-        return qs
-    return qs.exclude(id__in=hidden)
+    return qs
 
 
 def assert_dataroom_perm(user, action: str, dataroom: Dataroom, item=None, item_type: Optional[str] = None) -> None:
@@ -356,13 +354,13 @@ def assert_dataroom_perm(user, action: str, dataroom: Dataroom, item=None, item_
 
     if has_perm(user, action, dataroom, item=item, item_type=item_type):
         return
-    if action in MODIFY_PERMISSIONS or action == PERM_DELETE:
+    if action in MODIFY_PERMISSIONS or action in (PERM_DELETE, PERM_RENAME, PERM_MOVE, PERM_REORDER):
         raise PermissionDenied(COLLABORATOR_MODIFY_DENIED_DETAIL)
     raise PermissionDenied('You do not have permission to perform this action.')
 
 
 def item_permissions_for_user(user, dataroom: Dataroom, item_type: str, item) -> Dict[str, bool]:
-    if is_dataroom_owner_or_admin(user, dataroom):
+    if getattr(dataroom, 'created_by_id', None) == user.id or user_has_full_access(user):
         return {
             'can_view': True,
             'can_download': True,
@@ -389,7 +387,6 @@ def item_permissions_for_user(user, dataroom: Dataroom, item_type: str, item) ->
     }
 
 
-# Map legacy modify checks to RBAC actions
 MODIFY_ACTIONS = (
     PERM_RENAME,
     PERM_MOVE,
@@ -481,6 +478,19 @@ def assert_user_may_create_dataroom(user) -> None:
 
     from datarooms.dataroom_create_policy import DATAROOM_CREATE_DENIED_DETAIL
 
-    if has_site_perm(user, PERM_CREATE_DATAROOM):
+    if has_site_perm(user, PERM_DATAROOM_CREATE):
         return
     raise PermissionDenied(DATAROOM_CREATE_DENIED_DETAIL)
+
+
+def user_dataroom_capabilities(user, dataroom: Dataroom) -> Dict[str, bool]:
+    owner = getattr(dataroom, 'created_by_id', None) == getattr(user, 'id', None)
+    full = owner or user_has_full_access(user)
+    return {
+        'can_upload': full or has_perm(user, PERM_UPLOAD, dataroom),
+        'can_edit_dataroom_settings': full or has_perm(user, PERM_EDIT_DATAROOM_SETTINGS, dataroom),
+        'can_delete_dataroom': full or has_perm(user, PERM_DELETE_DATAROOM, dataroom),
+        'can_edit_dataroom': full or has_perm(user, PERM_DATAROOM_EDIT, dataroom),
+        'can_see_qna_tab': full or has_perm(user, PERM_DATAROOM_QNA_TAB, dataroom),
+        'can_see_settings_tab': full or has_perm(user, PERM_DATAROOM_SETTINGS_TAB, dataroom),
+    }

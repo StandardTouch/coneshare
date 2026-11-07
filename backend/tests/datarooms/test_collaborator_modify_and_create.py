@@ -4,8 +4,8 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from permissions_rbac.catalogue import PERM_CREATE_DATAROOM, PERM_RENAME, SCOPE_ANY
-from permissions_rbac.models import DataroomRolePermission, SiteRolePermission
+from permissions_rbac.catalogue import PERM_DATAROOM_CREATE, PERM_FILE_RENAME, SCOPE_ANY
+from permissions_rbac.models import DataroomRole, DataroomRolePermission
 from permissions_rbac.services import invalidate_organization_rbac_cache
 from django.contrib.auth import get_user_model
 from tests.datarooms.rbac_test_helpers import editor_role, make_shared_dataroom
@@ -35,11 +35,6 @@ class CollaboratorModifyAndCreateTests(APITestCase):
             self.editor,
             self.other,
         )
-        SiteRolePermission.objects.filter(
-            organization=self.owner.organization,
-            site_role='member',
-            permission=PERM_CREATE_DATAROOM,
-        ).delete()
         invalidate_organization_rbac_cache(str(self.owner.organization_id))
 
     def test_member_cannot_create_dataroom_by_default(self):
@@ -74,10 +69,18 @@ class CollaboratorModifyAndCreateTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_granting_member_create_dataroom_allows_create(self):
-        SiteRolePermission.objects.get_or_create(
+        from permissions_rbac.seed import ensure_default_roles_for_organization
+
+        ensure_default_roles_for_organization(self.owner.organization)
+        custom, _ = DataroomRole.objects.get_or_create(
             organization=self.owner.organization,
-            site_role='member',
-            permission=PERM_CREATE_DATAROOM,
+            slug='creator',
+            defaults={'name': 'Creator', 'is_system': False},
+        )
+        DataroomRolePermission.objects.update_or_create(
+            role=custom,
+            permission=PERM_DATAROOM_CREATE,
+            defaults={'scope': ''},
         )
         invalidate_organization_rbac_cache(str(self.owner.organization_id))
 
@@ -86,6 +89,7 @@ class CollaboratorModifyAndCreateTests(APITestCase):
             email="member2@example.com",
             password="password",
             organization=self.owner.organization,
+            organization_role=custom,
         )
         self.client.force_authenticate(user=member)
         response = self.client.post(
@@ -119,7 +123,7 @@ class CollaboratorModifyAndCreateTests(APITestCase):
         editor_rbac = editor_role(self.owner.organization)
         DataroomRolePermission.objects.filter(
             role=editor_rbac,
-            permission=PERM_RENAME,
+            permission=PERM_FILE_RENAME,
         ).update(scope=SCOPE_ANY)
         invalidate_organization_rbac_cache(str(self.owner.organization_id))
 

@@ -13,7 +13,6 @@ import {
   selectionIncludesNonModifiableItems,
   scopeIncludesNonModifiableItems,
 } from '../utils/dataroomItemPermissions';
-import { FolderAccessRulesDialog } from '../components/datarooms/FolderAccessRulesDialog';
 import { getDataroom, addContentToDataroom, createDataroomFolder, moveDataroomContent, getDataroomFolderContents, getShareLinksForDataroom, deleteShareLink, getDataroomViewSessions, getDataroomStats, removeContentFromDataroom, updateDataroomFolder, updateDataroomDocument, updateDataroomBranding, reorderDataroomItems, deleteDataroom, ensureDataroomFolderPaths, uploadDataroomDocument, upgradeDataroomStorage, getDataroomBannerImages } from '../services/api';
 import { useBreadcrumb } from '../components/layout/BreadcrumbProvider';
 import { useUpload } from '../contexts/UploadProvider';
@@ -108,8 +107,6 @@ export function DataroomPage() {
   const [itemToRemove, setItemToRemove] = useState(null);
   const [isTransferOwnershipOpen, setIsTransferOwnershipOpen] = useState(false);
   const [showStarredOnly, setShowStarredOnly] = useState(false);
-  const [accessRulesFolder, setAccessRulesFolder] = useState(null);
-  const [isAccessRulesOpen, setIsAccessRulesOpen] = useState(false);
   const [brandingForm, setBrandingForm] = useState({
     brandPrimaryColor: '',
     brandSecondaryColor: '',
@@ -924,6 +921,21 @@ export function DataroomPage() {
     }
   };
 
+  useEffect(() => {
+    if (!dataroom) return;
+    const isOwner = isDataroomOwner(dataroom, user);
+    const canManage = isOwner || user?.role === 'admin';
+    const perms = dataroom.current_user_permissions ?? {};
+    const seeQna = perms.can_see_qna_tab ?? canManage;
+    const seeSettings = perms.can_see_settings_tab ?? canManage;
+    if (activeTab === 'qna' && !seeQna) {
+      updateSearchParam('tab', 'documents');
+      return;
+    }
+    if (activeTab === 'settings' && !seeSettings) {
+      updateSearchParam('tab', 'documents');
+    }
+  }, [activeTab, dataroom, user, updateSearchParam]);
 
   if (isLoading && !dataroom) {
     return (
@@ -973,11 +985,12 @@ export function DataroomPage() {
   const isCollaborator = isDataroomCollaborator(dataroom, user);
   const isOrgAdmin = user?.role === 'admin';
   const canManage = isOwner || isOrgAdmin;
-  const userDataroomRole = dataroom?.current_user_role;
-  const canManageFolderRules =
-    canManage || userDataroomRole === 'manager';
-  const canManageCollaborators =
-    dataroom?.current_user_permissions?.can_manage_collaborators ?? canManage;
+  const roomPermissions = dataroom?.current_user_permissions ?? {};
+  const canSeeQnaTab = roomPermissions.can_see_qna_tab ?? canManage;
+  const canSeeSettingsTab = roomPermissions.can_see_settings_tab ?? canManage;
+  const canEditDataroom = roomPermissions.can_edit_dataroom ?? canManage;
+  const canManageCollaborators = canManage;
+
   const canUploadInCurrentFolder = canUploadToDataroom({
     dataroom,
     user,
@@ -1151,8 +1164,8 @@ export function DataroomPage() {
         <TabsList>
           <TabsTrigger value="documents">{t('datarooms.tabDocuments')}</TabsTrigger>
           <TabsTrigger value="links">{t('datarooms.tabLinks')}</TabsTrigger>
-          <TabsTrigger value="qna">{t('datarooms.tabQna')}</TabsTrigger>
-          <TabsTrigger value="settings">{t('datarooms.tabSettings')}</TabsTrigger>
+          {canSeeQnaTab && <TabsTrigger value="qna">{t('datarooms.tabQna')}</TabsTrigger>}
+          {canSeeSettingsTab && <TabsTrigger value="settings">{t('datarooms.tabSettings')}</TabsTrigger>}
         </TabsList>
         <TabsContent value="documents" className="mt-6">
           <div className="mb-4">
@@ -1225,11 +1238,6 @@ export function DataroomPage() {
               deleteLabel={t('common.remove')}
               onToggleStar={handleToggleStar}
               viewsTooltip={t('datarooms.viewsTooltip')}
-              showAccessRules={canManageFolderRules}
-              onAccessRules={(folderItem) => {
-                setAccessRulesFolder(folderItem);
-                setIsAccessRulesOpen(true);
-              }}
               emptyState={
                 <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted bg-muted/20 p-12 text-center my-4">
                   <h3 className="text-xl font-semibold tracking-tight">
@@ -1675,7 +1683,7 @@ export function DataroomPage() {
                         {t('datarooms.legacyStorageNotice')}
                       </p>
                     </div>
-                    {canManage && (
+                    {canEditDataroom && (
                       <Button
                         size="sm"
                         onClick={() => setIsUpgradeStorageDialogOpen(true)}
@@ -1765,7 +1773,7 @@ export function DataroomPage() {
                 </div>
 
                 {/* Quota Management Control & Quick Presets (Owner & Admin only) */}
-                {canManage && (
+                {canEditDataroom && (
                   <div className="pt-4 border-t border-border/60 space-y-4">
                     {/* Quick Presets */}
                     <div className="space-y-1.5">
@@ -1944,13 +1952,6 @@ export function DataroomPage() {
           setIsManagePermissionsOpen(false);
         }}
         link={selectedLinkForPermissions}
-      />
-      <FolderAccessRulesDialog
-        isOpen={isAccessRulesOpen}
-        onOpenChange={setIsAccessRulesOpen}
-        dataroomId={dataroomId}
-        folder={accessRulesFolder}
-        onSaved={fetchContent}
       />
       <TransferOwnershipDialog
         isOpen={isTransferOwnershipOpen}

@@ -142,8 +142,10 @@ if SENTRY_DSN:
     )
 
 
-# Redis base URL from environment (should not include database number)
-REDIS_BASE_URL = os.environ.get('REDIS_URL', 'redis://redis:6379').rstrip('/')
+# Redis base URL from environment (database number appended below for cache/celery)
+_redis_url = os.environ.get('REDIS_URL', 'redis://redis:6379').rstrip('/')
+# Allow REDIS_URL with a trailing /N while still appending cache/celery DB indices.
+REDIS_BASE_URL = re.sub(r'/\d+$', '', _redis_url)
 
 # Cache Configuration (using Redis)
 CACHES = {

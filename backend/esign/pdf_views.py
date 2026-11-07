@@ -25,7 +25,7 @@ class EsignDocumentPdfView(APIView):
     permission_classes = [IsAuthenticated, APIKeyTierPermission]
 
     def get(self, request, document_id: str):
-        check_esign_enabled()
+        check_esign_enabled(request.user)
         document = get_object_or_404(
             Document,
             pk=document_id,
@@ -51,7 +51,7 @@ class EsignRequestDocumentPdfView(APIView):
     permission_classes = [IsAuthenticated, APIKeyTierPermission]
 
     def get(self, request, request_id: str):
-        check_esign_enabled()
+        check_esign_enabled(request.user)
         signature_request = get_object_or_404(SignatureRequest, pk=request_id)
         user = request.user
         is_owner = (
@@ -81,7 +81,7 @@ class EsignSignerDocumentPdfView(APIView):
     permission_classes = [IsAuthenticated, APIKeyTierPermission]
 
     def get(self, request, token: str):
-        check_esign_enabled()
+        check_esign_enabled(request.user)
         signer = get_object_or_404(Signer, token=token)
         signature_request = signer.signature_request
 

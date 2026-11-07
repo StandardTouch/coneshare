@@ -20,15 +20,18 @@ const getSettingGroups = (t) => [
   { key: 'other', label: t('admin.groupOther'), help: t('admin.groupOtherHelp') },
 ];
 
+const RETIRED_RBAC_FEATURE_SETTING_KEYS = new Set([
+  'AUTOMATION_ENABLED',
+  'API_KEYS_ENABLED',
+  'FILE_REQUESTS_ENABLED',
+  'SWAGGER_ENABLED',
+  'ESIGN_ENABLED',
+  'ROLE_LABELS_ENABLED',
+]);
+
 const SETTING_GROUP_BY_KEY = {
   ENABLE_PUBLIC_SIGNUP: 'security',
   FLATTEN_WATERMARKED_DOWNLOADS: 'security',
-  SWAGGER_ENABLED: 'features',
-  ESIGN_ENABLED: 'features',
-  ROLE_LABELS_ENABLED: 'features',
-  AUTOMATION_ENABLED: 'features',
-  API_KEYS_ENABLED: 'features',
-  FILE_REQUESTS_ENABLED: 'features',
   MAX_PREVIEW_FILE_SIZE_MB: 'quota',
   MAX_VIDEO_PREVIEW_SIZE_MB: 'quota',
   MAX_PREVIEW_PAGES: 'quota',
@@ -287,6 +290,9 @@ export function AdminSettingsPage() {
   const filteredSettings = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return settings.filter((setting) => {
+      if (RETIRED_RBAC_FEATURE_SETTING_KEYS.has(setting.key)) {
+        return false;
+      }
       return (
         q.length === 0 ||
         setting.key.toLowerCase().includes(q) ||

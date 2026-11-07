@@ -14,12 +14,15 @@ import { useBranding } from '../../contexts/BrandingProvider';
 import { useUser } from '../../contexts/UserProvider';
 
 describe('useFeatureGates', () => {
-  it('allows admin api keys, automations, and mcp setup when toggles are on', () => {
+  it('allows api keys, automations, and mcp setup when toggles are on', () => {
     useBranding.mockReturnValue({
       swaggerEnabled: true,
       apiKeysEnabled: true,
       automationEnabled: true,
       fileRequestsEnabled: true,
+      documentsEnabled: true,
+      trashEnabled: true,
+      esignEnabled: true,
     });
     useUser.mockReturnValue({ user: { role: 'admin' } });
 
@@ -29,30 +32,39 @@ describe('useFeatureGates', () => {
     expect(result.current.canAccessMcpSetup).toBe(true);
     expect(result.current.canAccessApiDocs).toBe(true);
     expect(result.current.canAccessFileRequests).toBe(true);
+    expect(result.current.canAccessDocuments).toBe(true);
+    expect(result.current.canAccessTrash).toBe(true);
   });
 
-  it('blocks members from admin features', () => {
+  it('allows members with role-based feature flags when enabled', () => {
     useBranding.mockReturnValue({
       swaggerEnabled: true,
       apiKeysEnabled: true,
       automationEnabled: true,
       fileRequestsEnabled: true,
+      documentsEnabled: true,
+      trashEnabled: true,
+      esignEnabled: false,
     });
     useUser.mockReturnValue({ user: { role: 'member' } });
 
     const { result } = renderHook(() => useFeatureGates());
-    expect(result.current.canAccessApiKeys).toBe(false);
-    expect(result.current.canAccessAutomations).toBe(false);
-    expect(result.current.canAccessApiDocs).toBe(false);
+    expect(result.current.canAccessApiKeys).toBe(true);
+    expect(result.current.canAccessAutomations).toBe(true);
+    expect(result.current.canAccessApiDocs).toBe(true);
     expect(result.current.canAccessFileRequests).toBe(true);
+    expect(result.current.canAccessSignatures).toBe(false);
   });
 
-  it('hides api docs for admin when swagger is disabled', () => {
+  it('hides api docs when swagger is disabled', () => {
     useBranding.mockReturnValue({
       swaggerEnabled: false,
       apiKeysEnabled: true,
       automationEnabled: true,
       fileRequestsEnabled: true,
+      documentsEnabled: true,
+      trashEnabled: true,
+      esignEnabled: true,
     });
     useUser.mockReturnValue({ user: { role: 'admin' } });
 
@@ -61,12 +73,15 @@ describe('useFeatureGates', () => {
     expect(result.current.canAccessApiKeys).toBe(true);
   });
 
-  it('blocks admin api keys and automations when feature toggles are off', () => {
+  it('blocks features when toggles are off', () => {
     useBranding.mockReturnValue({
       swaggerEnabled: true,
       apiKeysEnabled: false,
       automationEnabled: false,
       fileRequestsEnabled: false,
+      documentsEnabled: false,
+      trashEnabled: false,
+      esignEnabled: true,
     });
     useUser.mockReturnValue({ user: { role: 'admin' } });
 
@@ -75,5 +90,24 @@ describe('useFeatureGates', () => {
     expect(result.current.canAccessAutomations).toBe(false);
     expect(result.current.canAccessMcpSetup).toBe(false);
     expect(result.current.canAccessFileRequests).toBe(false);
+    expect(result.current.canAccessDocuments).toBe(false);
+    expect(result.current.canAccessTrash).toBe(false);
+  });
+
+  it('blocks gated nav features when user is not authenticated', () => {
+    useBranding.mockReturnValue({
+      swaggerEnabled: true,
+      apiKeysEnabled: true,
+      automationEnabled: true,
+      fileRequestsEnabled: true,
+      documentsEnabled: true,
+      trashEnabled: true,
+      esignEnabled: true,
+    });
+    useUser.mockReturnValue({ user: null });
+
+    const { result } = renderHook(() => useFeatureGates());
+    expect(result.current.canAccessDocuments).toBe(false);
+    expect(result.current.canAccessAutomations).toBe(false);
   });
 });

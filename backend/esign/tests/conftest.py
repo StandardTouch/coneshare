@@ -11,6 +11,10 @@ def pytest_configure(config):
         "markers",
         "postgres: requires PostgreSQL (enforces varchar length limits)",
     )
+    config.addinivalue_line(
+        "markers",
+        "esign_rbac_enforcement: run real signature RBAC checks (no autouse bypass)",
+    )
 
 
 @pytest.fixture
@@ -31,11 +35,29 @@ def disable_redis_cache(settings):
     }
 
 
+@pytest.fixture(autouse=True)
+def _allow_signature_unless_rbac_toggle_tests(request, monkeypatch):
+    """Integration tests expect signature access unless explicitly testing RBAC denial."""
+    if request.node.get_closest_marker("esign_rbac_enforcement"):
+        return
+    monkeypatch.setattr(
+        "featuregates.services.ensure_signature_enabled_for_user",
+        lambda user: None,
+    )
+    monkeypatch.setattr("esign.views.check_esign_enabled", lambda user: None)
+    try:
+        import esign.pdf_views as esign_pdf_views
+
+        if hasattr(esign_pdf_views, "check_esign_enabled"):
+            monkeypatch.setattr(esign_pdf_views, "check_esign_enabled", lambda user: None)
+    except ImportError:
+        pass
+
+
 @pytest.fixture
-def enable_esign(db, monkeypatch):
-    monkeypatch.setattr(settings, "ESIGN_ENABLED", True)
+def enable_esign():
+    """Backward-compatible no-op (signature access handled by autouse bypass)."""
     yield
-    monkeypatch.setattr(settings, "ESIGN_ENABLED", False)
 
 
 @pytest.fixture(autouse=True)

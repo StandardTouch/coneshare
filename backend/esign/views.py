@@ -15,7 +15,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError as DRFVa
 
 from core.models import User
 from core.permissions import APIKeyTierPermission
-from core.services import get_dynamic_setting
+from featuregates.services import ensure_signature_enabled_for_user
 from documents.models import Document, DocumentVersion
 from .models import (
     SignatureRequest, Signer, SignatureField,
@@ -42,10 +42,9 @@ from .tasks import (
 logger = logging.getLogger(__name__)
 
 
-def check_esign_enabled():
-    """Check if e-signature feature is enabled."""
-    if not get_dynamic_setting('ESIGN_ENABLED'):
-        raise PermissionDenied(_("E-Signature feature is not enabled."))
+def check_esign_enabled(user):
+    """Check if the user's role includes signature permission."""
+    ensure_signature_enabled_for_user(user)
 
 
 class SignatureRequestViewSet(viewsets.ModelViewSet):
@@ -55,7 +54,7 @@ class SignatureRequestViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, APIKeyTierPermission]
     
     def get_queryset(self):
-        check_esign_enabled()
+        check_esign_enabled(self.request.user)
         
         user = self.request.user
         
@@ -110,7 +109,7 @@ class SignatureRequestViewSet(viewsets.ModelViewSet):
         return context
     
     def perform_create(self, serializer):
-        check_esign_enabled()
+        check_esign_enabled(self.request.user)
         
         # Set document queryset for validation
         serializer.fields['document_id'].queryset = Document.objects.filter(
@@ -136,7 +135,7 @@ class SignatureRequestViewSet(viewsets.ModelViewSet):
         """
         Update signature fields for a request in draft status.
         """
-        check_esign_enabled()
+        check_esign_enabled(self.request.user)
         
         signature_request = self.get_object()
         
@@ -182,7 +181,7 @@ class SignatureRequestViewSet(viewsets.ModelViewSet):
         """
         Send signature request to signers.
         """
-        check_esign_enabled()
+        check_esign_enabled(self.request.user)
         
         signature_request = self.get_object()
         
@@ -241,7 +240,7 @@ class SignatureRequestViewSet(viewsets.ModelViewSet):
         """
         Cancel/void signature request.
         """
-        check_esign_enabled()
+        check_esign_enabled(self.request.user)
         
         signature_request = self.get_object()
         
@@ -262,7 +261,7 @@ class SignatureRequestViewSet(viewsets.ModelViewSet):
         """
         Send reminder to pending signers.
         """
-        check_esign_enabled()
+        check_esign_enabled(self.request.user)
         
         signature_request = self.get_object()
         
@@ -294,7 +293,7 @@ class SignatureRequestViewSet(viewsets.ModelViewSet):
         """
         Get download URL for signed document.
         """
-        check_esign_enabled()
+        check_esign_enabled(self.request.user)
         
         signature_request = self.get_object()
         
@@ -323,7 +322,7 @@ class SignatureRequestViewSet(viewsets.ModelViewSet):
         """
         Get download URL for certificate of completion.
         """
-        check_esign_enabled()
+        check_esign_enabled(self.request.user)
         
         signature_request = self.get_object()
         
@@ -352,7 +351,7 @@ class SignatureRequestViewSet(viewsets.ModelViewSet):
         """
         Get list of users in the organization for creating signature requests.
         """
-        check_esign_enabled()
+        check_esign_enabled(self.request.user)
         
         from core.models import User
         users = User.objects.filter(
@@ -375,7 +374,7 @@ class SigningViewSet(viewsets.ViewSet):
         """
         Get signing page data by token.
         """
-        check_esign_enabled()
+        check_esign_enabled(self.request.user)
         token = pk
         
         signer = get_object_or_404(Signer, token=token)
@@ -446,7 +445,7 @@ class SigningViewSet(viewsets.ViewSet):
         """
         Request OTP for signing.
         """
-        check_esign_enabled()
+        check_esign_enabled(self.request.user)
         token = pk
         
         signer = get_object_or_404(Signer, token=token)
@@ -491,7 +490,7 @@ class SigningViewSet(viewsets.ViewSet):
         """
         Verify OTP for signing.
         """
-        check_esign_enabled()
+        check_esign_enabled(self.request.user)
         token = pk
         
         signer = get_object_or_404(Signer, token=token)
@@ -566,7 +565,7 @@ class SigningViewSet(viewsets.ViewSet):
         """
         Submit signature.
         """
-        check_esign_enabled()
+        check_esign_enabled(self.request.user)
         token = pk
         
         signer = get_object_or_404(Signer, token=token)
@@ -688,7 +687,7 @@ class SigningViewSet(viewsets.ViewSet):
         """
         Decline to sign.
         """
-        check_esign_enabled()
+        check_esign_enabled(self.request.user)
         token = pk
         
         signer = get_object_or_404(Signer, token=token)
@@ -749,7 +748,7 @@ class FieldTemplateViewSet(viewsets.ModelViewSet):
     serializer_class = FieldTemplateSerializer
     
     def get_queryset(self):
-        check_esign_enabled()
+        check_esign_enabled(self.request.user)
         
         return FieldTemplate.objects.filter(
             organization=self.request.user.organization,
@@ -757,7 +756,7 @@ class FieldTemplateViewSet(viewsets.ModelViewSet):
         )
     
     def perform_create(self, serializer):
-        check_esign_enabled()
+        check_esign_enabled(self.request.user)
         
         serializer.save(
             organization=self.request.user.organization,

@@ -150,6 +150,7 @@ class AdminDataroomRoleViewSet(viewsets.ModelViewSet):
                 'label': d.label,
                 'supports_scope': d.supports_scope,
                 'category': d.category,
+                'group': d.group,
             }
             for d in iter_role_grant_permission_definitions()
         ]

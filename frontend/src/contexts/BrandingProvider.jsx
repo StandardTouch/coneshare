@@ -18,6 +18,8 @@ export function BrandingProvider({ children }) {
     automationEnabled: true,
     apiKeysEnabled: true,
     fileRequestsEnabled: true,
+    documentsEnabled: true,
+    trashEnabled: true,
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -40,6 +42,8 @@ export function BrandingProvider({ children }) {
         automationEnabled: data?.automation_enabled !== false,
         apiKeysEnabled: data?.api_keys_enabled !== false,
         fileRequestsEnabled: data?.file_requests_enabled !== false,
+        documentsEnabled: data?.documents_enabled !== false,
+        trashEnabled: data?.trash_enabled !== false,
       });
     } catch (error) {
       console.error("Failed to fetch public settings/branding:", error);
@@ -50,6 +54,14 @@ export function BrandingProvider({ children }) {
 
   useEffect(() => {
     fetchBranding();
+  }, [fetchBranding]);
+
+  useEffect(() => {
+    const onRefetch = () => {
+      fetchBranding();
+    };
+    window.addEventListener('coneshare:refetch-branding', onRefetch);
+    return () => window.removeEventListener('coneshare:refetch-branding', onRefetch);
   }, [fetchBranding]);
 
   useEffect(() => {
@@ -87,6 +99,8 @@ export function useBranding() {
       automationEnabled: true,
       apiKeysEnabled: true,
       fileRequestsEnabled: true,
+      documentsEnabled: true,
+      trashEnabled: true,
       isLoading: false,
       refetchBranding: async () => {},
     };

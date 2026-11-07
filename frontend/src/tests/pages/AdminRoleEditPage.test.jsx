@@ -30,7 +30,26 @@ describe('AdminRoleEditPage', () => {
     api.getAdminRbacPermissionCatalog.mockResolvedValue({
       data: {
         permissions: [
-          { codename: 'view', label: 'View content', supports_scope: false, category: 'content' },
+          {
+            codename: 'system_documents',
+            label: 'Documents',
+            supports_scope: false,
+            category: 'system',
+            group: 'System',
+          },
+          {
+            codename: 'dataroom_create',
+            label: 'Create',
+            supports_scope: false,
+            category: 'dataroom_global',
+            group: 'Datarooms — Global Settings',
+          },
+          {
+            codename: 'legacy_view',
+            label: 'Legacy view',
+            supports_scope: false,
+            category: 'content',
+          },
         ],
       },
     });
@@ -48,6 +67,22 @@ describe('AdminRoleEditPage', () => {
       expect(api.getAdminRbacRole).toHaveBeenCalledWith('role-1');
     });
     expect(screen.getByRole('heading', { name: 'Contributor' })).toBeInTheDocument();
-    expect(screen.getByText('View content')).toBeInTheDocument();
+    expect(screen.getByText('Documents')).toBeInTheDocument();
+  });
+
+  it('groups permissions by catalogue group with category fallback', async () => {
+    render(
+      <MemoryRouter initialEntries={['/admin/roles/role-1']}>
+        <Routes>
+          <Route path="/admin/roles/:roleId" element={<AdminRoleEditPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'System' })).toBeInTheDocument();
+    });
+    expect(screen.getByRole('heading', { name: 'Datarooms — Global Settings' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'content' })).toBeInTheDocument();
   });
 });

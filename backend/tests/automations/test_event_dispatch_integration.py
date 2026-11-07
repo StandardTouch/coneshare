@@ -159,8 +159,13 @@ class TestEventDispatchIntegration:
         assert found_view
 
     @patch('sharelinks.views.dispatch_automation_event_task.delay')
+    @patch(
+        'sharelinks.views.fileserver_client.generate_download_url',
+        return_value='https://example.com/download',
+    )
     def test_dataroom_download_file_with_view_session_dispatches_document_downloaded(
         self,
+        _mock_download_url,
         mock_delay,
         public_client,
         user,
@@ -193,8 +198,13 @@ class TestEventDispatchIntegration:
         assert 'document_downloaded' in event_types
 
     @patch('sharelinks.views.dispatch_automation_event_task.delay')
+    @patch(
+        'sharelinks.views.fileserver_client.generate_download_url',
+        return_value='https://example.com/download',
+    )
     def test_dataroom_download_file_dispatches_even_if_session_already_marked_downloaded(
         self,
+        _mock_download_url,
         mock_delay,
         public_client,
         user,

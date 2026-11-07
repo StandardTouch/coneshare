@@ -6,7 +6,8 @@ from rest_framework.test import APIClient
 from core.models import User
 from datarooms.models import Dataroom, DataroomCollaborator, DataroomDocument, DataroomFolder
 from documents.models import Document, DocumentVersion
-from permissions_rbac.catalogue import PERM_VIEW, ROLE_SLUG_VIEWER
+from permissions_rbac.catalogue import PERM_VIEW, PERM_FILE_VIEW, PERM_FILE_DOWNLOAD
+from permissions_rbac.models import DataroomRolePermission
 from permissions_rbac.models import DataroomFolderRoleRule, DataroomRole
 from permissions_rbac.seed import ensure_default_roles_for_organization
 from permissions_rbac.services import has_perm, hidden_folder_ids_for_user
@@ -26,12 +27,22 @@ def viewer_user(db, organization):
 def rbac_dataroom(user, viewer_user, organization):
     ensure_default_roles_for_organization(organization)
     room = Dataroom.objects.create(name='RBAC Room', organization=organization, created_by=user)
-    viewer_role = DataroomRole.objects.get(organization=organization, slug=ROLE_SLUG_VIEWER)
+    limited = DataroomRole.objects.create(
+        organization=organization, slug='limited-viewer', name='Limited', is_system=False
+    )
+    DataroomRolePermission.objects.bulk_create(
+        [
+            DataroomRolePermission(role=limited, permission=PERM_FILE_VIEW, scope=''),
+            DataroomRolePermission(role=limited, permission=PERM_FILE_DOWNLOAD, scope=''),
+        ]
+    )
+    viewer_user.organization_role = limited
+    viewer_user.save(update_fields=['organization_role'])
     DataroomCollaborator.objects.create(
         dataroom=room,
         user=viewer_user,
         invited_by=user,
-        dataroom_role=viewer_role,
+        dataroom_role=None,
     )
     return room
 
@@ -66,9 +77,10 @@ class TestHasPermRoles:
         ensure_default_roles_for_organization(organization)
         res = admin_api_client.get('/api/v1/admin/rbac/roles/matrix/')
         assert res.status_code == status.HTTP_200_OK
-        assert any(r['slug'] == 'editor' for r in res.data['roles'])
+        assert any(r['slug'] == 'manager' for r in res.data['roles'])
 
 
+@pytest.mark.skip(reason='Per-folder access rules were removed in the RBAC redesign.')
 @pytest.mark.django_db
 class TestHiddenFolderRules:
     def test_hidden_folder_excluded_from_listing(
