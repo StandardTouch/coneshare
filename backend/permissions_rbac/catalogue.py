@@ -117,6 +117,7 @@ SCOPED_DATAROOM_PERMISSIONS: Set[str] = {
     PERM_FOLDER_RENAME,
     PERM_FOLDER_DELETE,
     PERM_FILE_RENAME,
+    PERM_FILE_VIEW,
 }
 
 MODIFY_PERMISSIONS: Set[str] = {
@@ -212,7 +213,7 @@ PERMISSION_DEFINITIONS: Dict[str, PermissionDefinition] = {
     PERM_UPLOAD_ADD_FROM_CONTENT: PermissionDefinition(
         PERM_UPLOAD_ADD_FROM_CONTENT, 'Add From Content', False, 'dataroom_upload', 'Datarooms — Upload'
     ),
-    PERM_FILE_VIEW: PermissionDefinition(PERM_FILE_VIEW, 'View', False, 'dataroom_file', 'Datarooms — File Permission'),
+    PERM_FILE_VIEW: PermissionDefinition(PERM_FILE_VIEW, 'View', True, 'dataroom_file', 'Datarooms — File Permission'),
     PERM_FILE_DOWNLOAD: PermissionDefinition(
         PERM_FILE_DOWNLOAD, 'Download', False, 'dataroom_file', 'Datarooms — File Permission'
     ),

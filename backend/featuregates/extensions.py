@@ -119,7 +119,40 @@ PublicSettingsView.get = _patched_public_settings_get
 
 from documents.views import DocumentViewSet, TrashViewSet
 
-from .services import ensure_documents_enabled_for_user, ensure_trash_enabled_for_user
+from .services import documents_enabled_for_user, ensure_trash_enabled_for_user
 
-_wrap_feature_only(DocumentViewSet, ensure_documents_enabled_for_user)
+_DATAROOM_DOCUMENT_READ_ACTIONS = frozenset({
+    'retrieve',
+    'status',
+    'stats',
+    'versions',
+})
+
+
+def _ensure_document_viewset_access(view, user):
+    if documents_enabled_for_user(user):
+        return
+    action = getattr(view, 'action', None)
+    if action in _DATAROOM_DOCUMENT_READ_ACTIONS:
+        lookup_url_kwarg = getattr(view, 'lookup_url_kwarg', None) or view.lookup_field
+        document_id = view.kwargs.get(lookup_url_kwarg or 'pk')
+        if document_id:
+            from permissions_rbac.services import user_can_view_document_via_dataroom
+
+            if user_can_view_document_via_dataroom(user, document_id):
+                return
+    raise PermissionDenied('You do not have permission to perform this action.')
+
+
+def _wrap_document_viewset(viewset_cls):
+    original_initial = viewset_cls.initial
+
+    def patched_initial(self, request, *args, **kwargs):
+        _ensure_document_viewset_access(self, request.user)
+        return original_initial(self, request, *args, **kwargs)
+
+    viewset_cls.initial = patched_initial
+
+
+_wrap_document_viewset(DocumentViewSet)
 _wrap_feature_only(TrashViewSet, ensure_trash_enabled_for_user)

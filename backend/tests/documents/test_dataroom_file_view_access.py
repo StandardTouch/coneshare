@@ -1,0 +1,161 @@
+"""Dataroom file_view without system_documents and own/any scope."""
+from unittest.mock import patch
+
+import pytest
+from django.contrib.auth import get_user_model
+from rest_framework import status
+from rest_framework.test import APIClient
+
+from datarooms.models import Dataroom, DataroomCollaborator, DataroomDocument
+from documents.models import Document, DocumentVersion
+from permissions_rbac.catalogue import (
+    PERM_FILE_DOWNLOAD,
+    PERM_FILE_VIEW,
+    PERM_UPLOAD_FILES,
+    SCOPE_ANY,
+    SCOPE_OWN,
+)
+from permissions_rbac.models import DataroomRole, DataroomRolePermission
+from permissions_rbac.services import invalidate_organization_rbac_cache
+
+User = get_user_model()
+
+
+def _role_with_grants(organization, grants):
+    role = DataroomRole.objects.create(
+        organization=organization,
+        slug='dataroom-viewer-role',
+        name='Dataroom Viewer',
+        is_system=False,
+    )
+    rows = [
+        DataroomRolePermission(role=role, permission=perm, scope=scope or '')
+        for perm, scope in grants.items()
+    ]
+    DataroomRolePermission.objects.bulk_create(rows)
+    invalidate_organization_rbac_cache(str(organization.id))
+    return role
+
+
+def _ready_doc(name, creator, organization):
+    doc = Document.objects.create(
+        name=name,
+        created_by=creator,
+        organization=organization,
+        status='ready',
+        file_size=100,
+        type='pdf',
+    )
+    DocumentVersion.objects.create(
+        document=doc,
+        version_number=1,
+        is_primary=True,
+        original_storage_key=f'org/{name}',
+        file_size=100,
+        content_type='application/pdf',
+        type='pdf',
+    )
+    return doc
+
+
+@pytest.fixture
+def dataroom_viewer(db, organization):
+    return User.objects.create_user(
+        username='dr-viewer@test.com',
+        email='dr-viewer@test.com',
+        password='password123',
+        organization=organization,
+    )
+
+
+@pytest.fixture
+def viewer_client(dataroom_viewer):
+    client = APIClient()
+    client.force_authenticate(user=dataroom_viewer)
+    return client
+
+
+@pytest.mark.django_db
+class TestDataroomFileViewWithoutSystemDocuments:
+    def test_collaborator_can_retrieve_own_upload_without_system_documents(
+        self, user, organization, dataroom_viewer, viewer_client
+    ):
+        role = _role_with_grants(
+            organization,
+            {
+                PERM_FILE_VIEW: SCOPE_ANY,
+                PERM_UPLOAD_FILES: '',
+            },
+        )
+        dataroom_viewer.organization_role = role
+        dataroom_viewer.save(update_fields=['organization_role'])
+
+        room = Dataroom.objects.create(name='Deal', organization=organization, created_by=user)
+        DataroomCollaborator.objects.create(dataroom=room, user=dataroom_viewer, invited_by=user)
+        own_doc = _ready_doc('own-upload.pdf', dataroom_viewer, organization)
+        DataroomDocument.objects.create(dataroom=room, document=own_doc, name=own_doc.name)
+
+        assert viewer_client.get('/api/v1/documents/').status_code == status.HTTP_403_FORBIDDEN
+
+        resp = viewer_client.get(f'/api/v1/documents/{own_doc.id}/')
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp.data['id'] == str(own_doc.id)
+
+    @patch('documents.views.prepare_pages_data')
+    def test_preview_allowed_with_view_not_download(
+        self, mock_pages, user, organization, dataroom_viewer, viewer_client
+    ):
+        mock_pages.return_value = []
+        role = _role_with_grants(organization, {PERM_FILE_VIEW: SCOPE_ANY})
+        dataroom_viewer.organization_role = role
+        dataroom_viewer.save(update_fields=['organization_role'])
+
+        room = Dataroom.objects.create(name='Preview Room', organization=organization, created_by=user)
+        DataroomCollaborator.objects.create(dataroom=room, user=dataroom_viewer, invited_by=user)
+        owner_doc = _ready_doc('owner.pdf', user, organization)
+        DataroomDocument.objects.create(dataroom=room, document=owner_doc, name=owner_doc.name)
+
+        resp = viewer_client.get(f'/api/v1/documents/{owner_doc.id}/preview-data/')
+        assert resp.status_code == status.HTTP_200_OK
+
+        dl = viewer_client.get(f'/api/v1/documents/{owner_doc.id}/download/')
+        assert dl.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_own_scope_hides_other_users_files(self, user, organization, dataroom_viewer, viewer_client):
+        role = _role_with_grants(organization, {PERM_FILE_VIEW: SCOPE_OWN})
+        dataroom_viewer.organization_role = role
+        dataroom_viewer.save(update_fields=['organization_role'])
+
+        room = Dataroom.objects.create(name='Scoped', organization=organization, created_by=user)
+        DataroomCollaborator.objects.create(dataroom=room, user=dataroom_viewer, invited_by=user)
+        owner_doc = _ready_doc('other.pdf', user, organization)
+        own_doc = _ready_doc('mine.pdf', dataroom_viewer, organization)
+        DataroomDocument.objects.create(dataroom=room, document=owner_doc, name=owner_doc.name)
+        DataroomDocument.objects.create(dataroom=room, document=own_doc, name=own_doc.name)
+
+        assert viewer_client.get(f'/api/v1/documents/{own_doc.id}/').status_code == status.HTTP_200_OK
+        assert viewer_client.get(f'/api/v1/documents/{owner_doc.id}/').status_code == status.HTTP_404_NOT_FOUND
+
+        list_resp = viewer_client.get(f'/api/v1/datarooms/{room.id}/')
+        assert list_resp.status_code == status.HTTP_200_OK
+        doc_ids = {item['document_id'] for item in list_resp.data.get('items', []) if item.get('type') == 'document'}
+        assert str(own_doc.id) in doc_ids
+        assert str(owner_doc.id) not in doc_ids
+
+
+@pytest.mark.django_db
+def test_migration_file_view_scope_defaults_to_any(organization):
+    role = DataroomRole.objects.create(
+        organization=organization, slug='legacy-view', name='Legacy', is_system=False
+    )
+    DataroomRolePermission.objects.create(role=role, permission=PERM_FILE_VIEW, scope='')
+    import importlib
+
+    from django.apps import apps
+
+    migration = importlib.import_module('permissions_rbac.migrations.0006_file_view_scope')
+    migration.forwards(apps, None)
+
+    assert (
+        DataroomRolePermission.objects.get(role=role, permission=PERM_FILE_VIEW).scope == SCOPE_ANY
+    )
