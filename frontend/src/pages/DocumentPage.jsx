@@ -54,6 +54,9 @@ export function DocumentPage() {
 
   useEffect(() => {
     const fetchProviders = async () => {
+      if (searchParams.get('from_dataroom')) {
+        return;
+      }
       try {
         const [providersRes, connectionsRes] = await Promise.all([
           getCloudProviders(),
@@ -126,12 +129,24 @@ export function DocumentPage() {
         }
       }      
 
-      const [docResponse, statsResponse] = await Promise.all([
-        getDocumentDetails(documentId),
-        getDocumentStats(documentId),
-      ]);
+      const docResponse = await getDocumentDetails(documentId, {
+        dataroomId: fromDataroomId || undefined,
+      });
       setDocument(docResponse.data);
-      setStats(statsResponse.data);
+      const drPerms = docResponse.data?.dataroom_context_permissions;
+      const inDataroom = Boolean(fromDataroomId);
+      const mayFetchStats = !inDataroom || drPerms?.can_see_analytics;
+      if (mayFetchStats) {
+        try {
+          const statsResponse = await getDocumentStats(documentId);
+          setStats(statsResponse.data);
+        } catch (statsError) {
+          setStats(null);
+          console.error('Document stats unavailable:', statsError);
+        }
+      } else {
+        setStats(null);
+      }
       setBreadcrumbData({
         folder: docResponse.data.folder,
         documentName: docResponse.data.name,
@@ -147,12 +162,35 @@ export function DocumentPage() {
     }
   }, [documentId, searchParams, setBreadcrumbData]);
 
+  const fromDataroomId = searchParams.get('from_dataroom');
+  const inDataroomContext = Boolean(fromDataroomId);
+  const drPerms = document?.dataroom_context_permissions;
   const isOwner = document?.created_by === user?.id || document?.created_by_user?.id === user?.id;
   const isOrgAdmin = user?.role === 'admin';
-  const canManage = Boolean(document && (isOwner || isOrgAdmin));
+  const canManageWorkspace = Boolean(document && !inDataroomContext && (isOwner || isOrgAdmin));
+  const canShowAnalytics = Boolean(
+    document && (!inDataroomContext || drPerms?.can_see_analytics),
+  );
+  const canShowShareLinks = Boolean(
+    document && (!inDataroomContext ? (isOwner || isOrgAdmin) : drPerms?.can_create_share_link),
+  );
+  const canShowViewSessions = canShowAnalytics;
+  const canShowQna = Boolean(
+    document && (!inDataroomContext ? (isOwner || isOrgAdmin) : drPerms?.can_see_qna_tab),
+  );
+  const canRename = Boolean(
+    document && (!inDataroomContext ? (isOwner || isOrgAdmin) : drPerms?.can_rename),
+  );
+  const canDownload = Boolean(
+    document && (!inDataroomContext ? (isOwner || isOrgAdmin) : drPerms?.can_download),
+  );
+  const canCreateLink = canShowShareLinks;
+  const showDataroomCollaboratorNotice = Boolean(
+    inDataroomContext && !canShowShareLinks && !canShowViewSessions && !canShowQna,
+  );
 
   const fetchViews = useCallback(async () => {
-    if (!canManage) return;
+    if (!canShowViewSessions) return;
     try {
       setViewsLoading(true);
       const response = await getDocumentViews(documentId, currentPage);
@@ -162,7 +200,7 @@ export function DocumentPage() {
     } finally {
       setViewsLoading(false);
     }
-  }, [documentId, currentPage, canManage]);
+  }, [documentId, currentPage, canShowViewSessions]);
 
   useEffect(() => {
     fetchDocumentAndStats();
@@ -172,10 +210,13 @@ export function DocumentPage() {
   }, [fetchDocumentAndStats, setBreadcrumbData]);
 
   useEffect(() => {
-    if (canManage) {
+    if (canShowViewSessions) {
       fetchViews();
+    } else {
+      setViewsData(null);
+      setViewsLoading(false);
     }
-  }, [canManage, fetchViews]);
+  }, [canShowViewSessions, fetchViews]);
 
   useEffect(() => {
     if (!document) return;
@@ -509,33 +550,40 @@ export function DocumentPage() {
         onVersionHistory={() => navigate(`/documents/${documentId}/versions`)}
         onDelete={handleDelete}
         onRenameDocument={handleRenameDocument}
-        onRequestSignature={document?.type === 'pdf' && canManage ? () => setIsCreateRequestOpen(true) : undefined}
+        onRequestSignature={document?.type === 'pdf' && canManageWorkspace ? () => setIsCreateRequestOpen(true) : undefined}
         isProcessing={isProcessing}
         cloudProviders={cloudProviders}
-        canManage={canManage}
+        canManage={canManageWorkspace}
+        canRename={canRename}
+        canCreateLink={canCreateLink}
+        canDownload={canDownload}
+        canWorkspaceManage={canManageWorkspace}
       />
       <div className="mt-8 space-y-8">
-        <Stats stats={stats} />
-        {canManage ? (
-          <>
-            <LinksTable
-              links={document.share_links}
-              onEditLink={handleEditLink}
-              onDeleteLink={handleDeleteLink}
-              onLinkUpdate={handleLinkUpdate}
-              contextType="document"
-            />
-            <ViewSessionsTable
-              views={viewsData?.results || []}
-              totalCount={viewsData?.count || 0}
-              loading={viewsLoading}
-              currentPage={currentPage}
-              onPageChange={setCurrentPage}
-              pageSize={10}
-            />
-            <OwnerQnAManager documentId={documentId} shareLinks={document.share_links || []} />
-          </>
-        ) : (
+        {canShowAnalytics && <Stats stats={stats} />}
+        {canShowShareLinks && (
+          <LinksTable
+            links={document.share_links}
+            onEditLink={handleEditLink}
+            onDeleteLink={handleDeleteLink}
+            onLinkUpdate={handleLinkUpdate}
+            contextType="document"
+          />
+        )}
+        {canShowViewSessions && (
+          <ViewSessionsTable
+            views={viewsData?.results || []}
+            totalCount={viewsData?.count || 0}
+            loading={viewsLoading}
+            currentPage={currentPage}
+            onPageChange={setCurrentPage}
+            pageSize={10}
+          />
+        )}
+        {canShowQna && (
+          <OwnerQnAManager documentId={documentId} shareLinks={document.share_links || []} />
+        )}
+        {showDataroomCollaboratorNotice && (
           <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-6 dark:border-blue-900/50 dark:bg-blue-950/20">
             <div className="flex items-start gap-4">
               <div className="rounded-full bg-blue-100 p-2.5 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400">

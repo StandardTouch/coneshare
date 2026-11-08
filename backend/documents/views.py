@@ -702,7 +702,17 @@ class DocumentPreviewDataView(APIView):
         responses={200: DocumentPreviewResponseSerializer, 400: dict, 404: dict},
     )
     def get(self, request, document_id, *args, **kwargs):
+        from featuregates.services import documents_enabled_for_user
         from permissions_rbac.dataroom_access import assert_document_view_allowed
+        from permissions_rbac.document_dataroom_access import user_can_preview_document
+
+        if not documents_enabled_for_user(request.user) and not user_can_preview_document(
+            request.user, document_id
+        ):
+            return Response(
+                {"detail": "You do not have permission to perform this action."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         # Authentication & Authorization is handled by DRF + this query
         try:
@@ -1041,9 +1051,11 @@ class DocumentViewSet(viewsets.ModelViewSet):
         from sharelinks.models import ViewSession
         from sharelinks.serializers import ViewSessionSerializer
 
+        from permissions_rbac.document_dataroom_access import user_can_view_document_analytics
+
         document = self.get_object()
-        if document.created_by != request.user and getattr(request.user, 'role', '') != 'admin':
-            raise PermissionDenied("Only the document owner or an organization admin can view access sessions.")
+        if not user_can_view_document_analytics(request.user, document):
+            raise PermissionDenied("You do not have permission to view access sessions for this document.")
 
         view_queryset = ViewSession.objects.filter(
             share_link__document=document

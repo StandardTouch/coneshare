@@ -1683,6 +1683,33 @@ class QnAThreadViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewset
     queryset = QnAThread.objects.none()
     serializer_class = QnAThreadSerializer
 
+    def _assert_document_qna_access(self, document_id, dataroom_id=None):
+        from documents.models import Document
+        from featuregates.services import documents_enabled_for_user
+        from permissions_rbac.document_dataroom_access import user_can_access_dataroom_qna_for_document
+
+        if not document_id:
+            return
+        document = Document.objects.filter(
+            id=document_id,
+            organization=self.request.user.organization,
+        ).first()
+        if document is None:
+            raise NotFound()
+        if documents_enabled_for_user(self.request.user):
+            return
+        if not user_can_access_dataroom_qna_for_document(
+            self.request.user, document, dataroom_id
+        ):
+            raise PermissionDenied('You do not have permission to perform this action.')
+
+    def list(self, request, *args, **kwargs):
+        self._assert_document_qna_access(
+            request.query_params.get('document_id'),
+            request.query_params.get('dataroom_id'),
+        )
+        return super().list(request, *args, **kwargs)
+
     def get_queryset(self):
         queryset = (
             QnAThread.objects.filter(organization=self.request.user.organization)
@@ -1735,6 +1762,12 @@ class QnAThreadViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewset
         serializer = QnAOwnerThreadCreateSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        share_link = ShareLink.objects.filter(
+            id=serializer.validated_data['share_link_id'],
+        ).select_related('document', 'dataroom').first()
+        if share_link and share_link.document_id:
+            self._assert_document_qna_access(str(share_link.document_id))
 
         try:
             link = self._get_manageable_share_link(serializer.validated_data['share_link_id'])

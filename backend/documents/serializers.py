@@ -205,6 +205,7 @@ class DocumentSerializer(serializers.ModelSerializer):
     folder = FolderSerializer(read_only=True)
 
     created_by_user = serializers.SerializerMethodField()
+    dataroom_context_permissions = serializers.SerializerMethodField()
 
     class Meta:
         model = Document
@@ -214,7 +215,7 @@ class DocumentSerializer(serializers.ModelSerializer):
             'num_pages', 'file_size', 'download_only', 'assistant_enabled', 'is_starred', 'created_by',
             'created_by_user',
             'created_at', 'updated_at', 'versions', 'share_links', 'uploader_info', 'share_link_view_count',
-            'cloud_import'
+            'cloud_import', 'dataroom_context_permissions',
         ]
         read_only_fields = [
             'id', 'organization', 'folder', 'status', 'status_message',
@@ -234,20 +235,36 @@ class DocumentSerializer(serializers.ModelSerializer):
             }
         return None
 
+    @extend_schema_field(serializers.DictField(allow_null=True))
+    def get_dataroom_context_permissions(self, instance):
+        request = self.context.get('request')
+        if not request or not getattr(request.user, 'is_authenticated', False):
+            return None
+        dataroom_id = request.query_params.get('dataroom_id')
+        if not dataroom_id:
+            return None
+        from permissions_rbac.document_dataroom_access import document_dataroom_page_permissions
+
+        return document_dataroom_page_permissions(request.user, instance, dataroom_id)
+
     @extend_schema_field(serializers.ListField(child=serializers.DictField()))
     def get_share_links(self, instance):
         request = self.context.get('request')
         if request and hasattr(request, 'user') and request.user and request.user.is_authenticated:
             user = request.user
+            from permissions_rbac.document_dataroom_access import user_can_manage_document_share_links
+
+            if not user_can_manage_document_share_links(user, instance):
+                return []
             is_owner = instance.created_by_id == user.id
             is_admin = getattr(user, 'role', '') == 'admin' and instance.organization_id == user.organization_id
-            if not (is_owner or is_admin):
-                return []
+        else:
+            is_owner = is_admin = False
 
         from sharelinks.serializers import ShareLinkSerializer
-        # The 'share_links' related manager is often prefetched in the viewset,
-        # so this should be efficient.
         queryset = instance.share_links.all()
+        if not (is_owner or is_admin):
+            queryset = queryset.filter(created_by=request.user)
         return ShareLinkSerializer(queryset, many=True, context=self.context).data
 
     @extend_schema_field(serializers.DictField(allow_null=True))
@@ -259,9 +276,9 @@ class DocumentSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request and hasattr(request, 'user') and request.user and request.user.is_authenticated:
             user = request.user
-            is_owner = obj.created_by_id == user.id
-            is_admin = getattr(user, 'role', '') == 'admin' and obj.organization_id == user.organization_id
-            if not (is_owner or is_admin):
+            from permissions_rbac.document_dataroom_access import user_can_view_document_analytics
+
+            if not user_can_view_document_analytics(user, obj):
                 return 0
 
         annotated_count = getattr(obj, 'share_link_view_count', None)

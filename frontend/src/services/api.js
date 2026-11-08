@@ -245,7 +245,10 @@ export const getDocumentVersions = (documentId, page = 1) =>
 
 export const getDocumentDownloadUrl = (id) => api.get(`/documents/${id}/download/`);
 
-export const getDocumentDetails = (id) => api.get(`/documents/${id}/`);
+export const getDocumentDetails = (id, { dataroomId } = {}) => {
+  const params = dataroomId ? { dataroom_id: dataroomId } : undefined;
+  return api.get(`/documents/${id}/`, { params });
+};
 
 export const getDocumentStatus = (id) => api.get(`/documents/${id}/status/`);
 

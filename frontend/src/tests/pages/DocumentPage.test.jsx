@@ -60,6 +60,7 @@ describe('DocumentPage', () => {
     mockCurrentUser = { id: 'u1', role: 'user' };
     api.getCloudProviders.mockResolvedValue({ data: [] });
     api.getCloudConnections.mockResolvedValue({ data: [] });
+    api.getDataroom.mockResolvedValue({ data: { id: 'dr1', name: 'Room' } });
   });
 
   const mockDocument = { id: 'doc123', name: 'Test Doc', created_by: 'u1', share_links: [] };
@@ -95,6 +96,37 @@ describe('DocumentPage', () => {
       </MemoryRouter>
     );
   };
+
+  it('skips view-sessions fetch in dataroom context without analytics permission', async () => {
+    render(
+      <MemoryRouter initialEntries={['/documents/doc123?from_dataroom=dr1&from_folder=']}>
+        <BreadcrumbProvider>
+          <Routes>
+            <Route path="/documents/:documentId" element={<DocumentPage />} />
+          </Routes>
+        </BreadcrumbProvider>
+      </MemoryRouter>
+    );
+
+    api.getDataroom.mockResolvedValue({ data: { id: 'dr1', name: 'Room' } });
+    api.getDocumentDetails.mockResolvedValue({
+      data: {
+        ...mockDocument,
+        dataroom_context_permissions: {
+          can_see_analytics: false,
+          can_create_share_link: true,
+          can_see_qna_tab: false,
+        },
+      },
+    });
+    api.getDocumentStats.mockResolvedValue({ data: mockStats });
+
+    await waitFor(() => {
+      expect(api.getDocumentDetails).toHaveBeenCalledWith('doc123', { dataroomId: 'dr1' });
+    });
+    expect(api.getDocumentViews).not.toHaveBeenCalled();
+    expect(api.getDocumentStats).not.toHaveBeenCalled();
+  });
 
   it('handles pagination for view sessions table', async () => {
     api.getDocumentDetails.mockResolvedValue({ data: mockDocument });
@@ -327,7 +359,7 @@ describe('DocumentPage', () => {
       });
     });
 
-    it('renders collaborator access notice banner when user is not the document owner or admin', async () => {
+    it('renders collaborator access notice in dataroom context without management sections', async () => {
       mockCurrentUser = { id: 'collab_user', role: 'user' };
       const otherDoc = {
         id: 'doc123',
@@ -335,18 +367,28 @@ describe('DocumentPage', () => {
         created_by: 'owner_999',
         created_by_user: { id: 'owner_999', name: 'Alice Owner' },
         share_links: [],
+        dataroom_context_permissions: {
+          can_see_analytics: false,
+          can_create_share_link: false,
+          can_see_qna_tab: false,
+        },
       };
       api.getDocumentDetails.mockResolvedValue({ data: otherDoc });
       api.getDocumentStats.mockResolvedValue({ data: { total_views: 0 } });
-      api.getDocumentViews.mockResolvedValue({ data: { results: [], count: 0 } });
 
-      renderComponent();
+      render(
+        <MemoryRouter initialEntries={['/documents/doc123?from_dataroom=dr1']}>
+          <BreadcrumbProvider>
+            <Routes>
+              <Route path="/documents/:documentId" element={<DocumentPage />} />
+            </Routes>
+          </BreadcrumbProvider>
+        </MemoryRouter>
+      );
 
       expect(await screen.findByText('Dataroom Shared Document')).toBeInTheDocument();
       expect(screen.getByText(/You have view-only collaborator access to this document via a shared Dataroom/i)).toBeInTheDocument();
-      // Should not render Owner Q&A Manager
       expect(screen.queryByText('Owner Q&A Manager')).not.toBeInTheDocument();
-      // Should not fetch view sessions for unauthorized collaborator
       expect(api.getDocumentViews).not.toHaveBeenCalled();
     });
   });

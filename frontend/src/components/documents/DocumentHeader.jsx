@@ -35,7 +35,15 @@ export function DocumentHeader({
   isProcessing,
   cloudProviders = [],
   canManage = true,
+  canRename,
+  canCreateLink,
+  canDownload,
+  canWorkspaceManage,
 }) {
+  const canRenameDoc = canRename ?? canManage;
+  const canCreateShareLink = canCreateLink ?? canManage;
+  const canDownloadDoc = canDownload ?? canManage;
+  const canWorkspace = canWorkspaceManage ?? canManage;
   const { t } = useTranslation();
   const { esignEnabled } = useBranding();
   const [isEditing, setIsEditing] = useState(false);
@@ -46,7 +54,7 @@ export function DocumentHeader({
   }, [document.name]);
 
   const handleStartEdit = () => {
-    if (!canManage || isProcessing) return;
+    if (!canRenameDoc || isProcessing) return;
     setEditedName(document.name);
     setIsEditing(true);
   };
@@ -76,7 +84,7 @@ export function DocumentHeader({
     <TooltipProvider>
       <div className="border-b border-gray-200 pb-5 sm:flex sm:items-center sm:justify-between">
         <div className="flex-1 min-w-0 mr-4">
-          {isEditing && canManage ? (
+          {isEditing && canRenameDoc ? (
             <input
               type="text"
               className="text-2xl font-bold leading-6 text-gray-900 border-b border-gray-900 focus:outline-none bg-transparent w-full focus:border-b-2 py-0"
@@ -89,13 +97,13 @@ export function DocumentHeader({
           ) : (
             <div className="flex items-center gap-2 group max-w-full">
               <h1 
-                className={`text-2xl font-bold leading-6 text-gray-900 truncate rounded px-1 -mx-1 ${canManage ? 'cursor-pointer hover:bg-gray-100/50' : ''}`}
-                onClick={canManage ? handleStartEdit : undefined}
-                title={canManage ? "Click to rename" : undefined}
+                className={`text-2xl font-bold leading-6 text-gray-900 truncate rounded px-1 -mx-1 ${canRenameDoc ? 'cursor-pointer hover:bg-gray-100/50' : ''}`}
+                onClick={canRenameDoc ? handleStartEdit : undefined}
+                title={canRenameDoc ? "Click to rename" : undefined}
               >
                 {document.name}
               </h1>
-              {canManage && (
+              {canRenameDoc && (
                 <button
                   onClick={handleStartEdit}
                   disabled={isProcessing}
@@ -109,7 +117,7 @@ export function DocumentHeader({
             </div>
           )}
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            {!canManage && (
+            {!canRenameDoc && !canCreateShareLink && (
               <Badge variant="outline" className="border-indigo-500/30 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
                 {document.created_by_user ? `Owner: ${document.created_by_user.name || document.created_by_user.email}` : t('datarooms.collaboratorRole')}
               </Badge>
@@ -181,7 +189,7 @@ export function DocumentHeader({
             </TooltipContent>
           </Tooltip>
 
-          {canManage && document.cloud_import && (
+          {canWorkspace && document.cloud_import && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <span>
@@ -203,7 +211,7 @@ export function DocumentHeader({
             </Tooltip>
           )}
 
-          {canManage && (
+          {canWorkspace && (
             <DropdownMenu>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -239,7 +247,7 @@ export function DocumentHeader({
             </DropdownMenu>
           )}
 
-          {canManage && (
+          {canCreateShareLink && (
             <Button className="mr-2" onClick={onCreateLink} disabled={isProcessing}>
               <PlusIcon className="-ml-1 mr-2 h-5 w-5" />
               {t('documents.getLink')}
@@ -268,9 +276,13 @@ export function DocumentHeader({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={onDownload}>{t('documents.download')}</DropdownMenuItem>
-              <DropdownMenuItem onSelect={onVersionHistory}>{t('documents.versions')}</DropdownMenuItem>
-              {canManage && (
+              {canDownloadDoc && (
+                <DropdownMenuItem onSelect={onDownload}>{t('documents.download')}</DropdownMenuItem>
+              )}
+              {canWorkspace && (
+                <DropdownMenuItem onSelect={onVersionHistory}>{t('documents.versions')}</DropdownMenuItem>
+              )}
+              {canWorkspace && (
                 <DropdownMenuItem
                   onSelect={onDelete}
                   className="text-red-600 hover:!text-red-600 hover:!bg-red-50 focus:!text-red-600 focus:!bg-red-50"

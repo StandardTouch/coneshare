@@ -121,27 +121,10 @@ from documents.views import DocumentViewSet, TrashViewSet
 
 from .services import documents_enabled_for_user, ensure_trash_enabled_for_user
 
-_DATAROOM_DOCUMENT_READ_ACTIONS = frozenset({
-    'retrieve',
-    'status',
-    'stats',
-    'versions',
-})
-
-
 def _ensure_document_viewset_access(view, user):
-    if documents_enabled_for_user(user):
-        return
-    action = getattr(view, 'action', None)
-    if action in _DATAROOM_DOCUMENT_READ_ACTIONS:
-        lookup_url_kwarg = getattr(view, 'lookup_url_kwarg', None) or view.lookup_field
-        document_id = view.kwargs.get(lookup_url_kwarg or 'pk')
-        if document_id:
-            from permissions_rbac.services import user_can_view_document_via_dataroom
+    from permissions_rbac.document_dataroom_access import ensure_document_viewset_dataroom_access
 
-            if user_can_view_document_via_dataroom(user, document_id):
-                return
-    raise PermissionDenied('You do not have permission to perform this action.')
+    ensure_document_viewset_dataroom_access(view, user)
 
 
 def _wrap_document_viewset(viewset_cls):
