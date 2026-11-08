@@ -1439,16 +1439,29 @@ class TestDocumentViewSet:
         """
         from datarooms.models import DataroomCollaborator, DataroomDocument
 
-        # Add user2 as collaborator to dataroom containing user's document
+        from permissions_rbac.catalogue import PERM_FILE_DOWNLOAD
+        from permissions_rbac.models import DataroomRole, DataroomRolePermission
+        from permissions_rbac.services import invalidate_organization_rbac_cache
+
+        limited = DataroomRole.objects.create(
+            organization=dataroom.organization,
+            slug='no-view',
+            name='No View',
+            is_system=False,
+        )
+        DataroomRolePermission.objects.create(role=limited, permission=PERM_FILE_DOWNLOAD, scope='')
+        user2.organization_role = limited
+        user2.save(update_fields=['organization_role'])
+        invalidate_organization_rbac_cache(str(dataroom.organization_id))
+
         DataroomCollaborator.objects.create(dataroom=dataroom, user=user2)
         DataroomDocument.objects.create(dataroom=dataroom, document=document, name=document.name)
 
-        # 1. As collaborator (user2): document details are accessible (200 OK)
+        # 1. As collaborator without file_view: document detail and sessions are blocked
         api_client.force_authenticate(user=user2)
         doc_resp = api_client.get(f'/api/v1/documents/{document.id}/')
-        assert doc_resp.status_code == status.HTTP_200_OK
+        assert doc_resp.status_code == status.HTTP_404_NOT_FOUND
 
-        # But view-sessions access is forbidden (403 Forbidden)
         views_resp = api_client.get(f'/api/v1/documents/{document.id}/view-sessions/')
         assert views_resp.status_code == status.HTTP_403_FORBIDDEN
 

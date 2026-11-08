@@ -383,7 +383,17 @@ class ShareLinkSerializer(serializers.ModelSerializer):
                 if document:
                     is_owner = document.created_by_id is not None and document.created_by_id == user.id
                     if not (is_owner or is_admin):
-                        raise serializers.ValidationError({'document': 'You do not have permission to share this document.'})
+                        from permissions_rbac.catalogue import PERM_FILE_CREATE_SHARE_LINK
+                        from permissions_rbac.document_dataroom_access import (
+                            user_has_dataroom_document_permission,
+                        )
+
+                        if not user_has_dataroom_document_permission(
+                            user, str(document.id), PERM_FILE_CREATE_SHARE_LINK
+                        ):
+                            raise serializers.ValidationError(
+                                {'document': 'You do not have permission to share this document.'}
+                            )
                 if dataroom:
                     is_owner = dataroom.created_by_id is not None and dataroom.created_by_id == user.id
                     is_collaborator = dataroom.collaborators.filter(user=user).exists()

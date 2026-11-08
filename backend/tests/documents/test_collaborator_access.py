@@ -90,9 +90,9 @@ class TestCollaboratorDocumentAccess:
         assert stats_resp.status_code == status.HTTP_200_OK
         assert "total_views" in stats_resp.data
 
-        # But collaborator cannot access detailed visitor view-sessions
+        # Collaborator with default org role (file_view) may access visitor sessions via dataroom.
         sessions_resp = api_client.get(f"/api/v1/documents/{owner_document.id}/view-sessions/")
-        assert sessions_resp.status_code == status.HTTP_403_FORBIDDEN
+        assert sessions_resp.status_code == status.HTTP_200_OK
 
         # Document owner can access detailed view-sessions
         api_client.force_authenticate(user=user)

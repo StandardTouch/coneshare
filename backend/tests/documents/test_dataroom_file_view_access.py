@@ -9,6 +9,7 @@ from rest_framework.test import APIClient
 from datarooms.models import Dataroom, DataroomCollaborator, DataroomDocument
 from documents.models import Document, DocumentVersion
 from permissions_rbac.catalogue import (
+    PERM_FILE_CREATE_SHARE_LINK,
     PERM_FILE_DOWNLOAD,
     PERM_FILE_VIEW,
     PERM_UPLOAD_FILES,
@@ -141,6 +142,58 @@ class TestDataroomFileViewWithoutSystemDocuments:
         doc_ids = {item['document_id'] for item in list_resp.data.get('items', []) if item.get('type') == 'document'}
         assert str(own_doc.id) in doc_ids
         assert str(owner_doc.id) not in doc_ids
+
+    def test_view_sessions_and_stats_without_system_documents(
+        self, user, organization, dataroom_viewer, viewer_client
+    ):
+        role = _role_with_grants(
+            organization,
+            {
+                PERM_FILE_VIEW: SCOPE_ANY,
+                PERM_FILE_CREATE_SHARE_LINK: '',
+            },
+        )
+        dataroom_viewer.organization_role = role
+        dataroom_viewer.save(update_fields=['organization_role'])
+
+        room = Dataroom.objects.create(name='Analytics', organization=organization, created_by=user)
+        DataroomCollaborator.objects.create(dataroom=room, user=dataroom_viewer, invited_by=user)
+        own_doc = _ready_doc('stats.pdf', dataroom_viewer, organization)
+        DataroomDocument.objects.create(dataroom=room, document=own_doc, name=own_doc.name)
+
+        stats = viewer_client.get(f'/api/v1/documents/{own_doc.id}/stats/')
+        assert stats.status_code == status.HTTP_200_OK
+
+        sessions = viewer_client.get(f'/api/v1/documents/{own_doc.id}/view-sessions/')
+        assert sessions.status_code == status.HTTP_200_OK
+
+    def test_retrieve_includes_dataroom_context_permissions(
+        self, user, organization, dataroom_viewer, viewer_client
+    ):
+        role = _role_with_grants(
+            organization,
+            {
+                PERM_FILE_VIEW: SCOPE_ANY,
+                PERM_FILE_CREATE_SHARE_LINK: '',
+            },
+        )
+        dataroom_viewer.organization_role = role
+        dataroom_viewer.save(update_fields=['organization_role'])
+
+        room = Dataroom.objects.create(name='Ctx', organization=organization, created_by=user)
+        DataroomCollaborator.objects.create(dataroom=room, user=dataroom_viewer, invited_by=user)
+        own_doc = _ready_doc('ctx.pdf', dataroom_viewer, organization)
+        DataroomDocument.objects.create(dataroom=room, document=own_doc, name=own_doc.name)
+
+        resp = viewer_client.get(
+            f'/api/v1/documents/{own_doc.id}/',
+            {'dataroom_id': str(room.id)},
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        perms = resp.data.get('dataroom_context_permissions') or {}
+        assert perms.get('can_view') is True
+        assert perms.get('can_create_share_link') is True
+        assert perms.get('can_download') is False
 
 
 @pytest.mark.django_db
