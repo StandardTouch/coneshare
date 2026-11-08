@@ -850,6 +850,32 @@ describe('DataroomPage', () => {
         });
     });
 
+    describe('Granular upload permissions', () => {
+        it('shows upload files only when collaborator has upload_files but not folder or add content', async () => {
+            api.getDataroom.mockResolvedValue({
+                data: {
+                    ...mockDataroomRoot,
+                    created_by: { id: 'owner' },
+                    collaborators: [{ user: { id: 'u1' } }],
+                    current_user_permissions: {
+                        can_upload: true,
+                        can_upload_files: true,
+                        can_upload_folder: false,
+                        can_upload_add_from_content: false,
+                        can_create_folder: false,
+                    },
+                },
+            });
+            const { container } = renderComponent();
+            expect(await screen.findByRole('heading', { name: 'Test Dataroom' })).toBeInTheDocument();
+
+            expect(screen.getByRole('button', { name: /upload/i })).toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: /add content/i })).not.toBeInTheDocument();
+            expect(container.querySelector('input[type="file"][multiple]')).toBeInTheDocument();
+            expect(container.querySelector('input[webkitdirectory]')).not.toBeInTheDocument();
+        });
+    });
+
     describe('Direct Uploads', () => {
         beforeEach(() => {
             api.ensureDataroomFolderPaths.mockResolvedValue({

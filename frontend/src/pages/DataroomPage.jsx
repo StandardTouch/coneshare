@@ -9,7 +9,12 @@ import { formatBytes } from '../lib/formatters';
 import { isDataroomOwner, isDataroomCollaborator } from '../utils/formatters';
 import { selectionIncludesNonDeletableItems } from '../utils/dataroomDeletePermissions';
 import {
-  canUploadToDataroom,
+  canAddContentToDataroom,
+  canCreateFolderInDataroom,
+  canShowDataroomDocumentsToolbar,
+  canShowDataroomUploadDropdown,
+  canUploadFilesToDataroom,
+  canUploadFolderToDataroom,
   selectionIncludesNonModifiableItems,
   scopeIncludesNonModifiableItems,
 } from '../utils/dataroomItemPermissions';
@@ -156,7 +161,11 @@ export function DataroomPage() {
   const handleFileUploads = async (files) => {
     if (!files || files.length === 0) return;
 
-    if (!canUploadToDataroom({ dataroom, user, folderItem: currentDataroomFolder })) {
+    const folderUpload = Array.from(files).some((file) => file.webkitRelativePath);
+    const uploadAllowed = folderUpload
+      ? canUploadFolderToDataroom({ dataroom, user, folderItem: currentDataroomFolder })
+      : canUploadFilesToDataroom({ dataroom, user, folderItem: currentDataroomFolder });
+    if (!uploadAllowed) {
       toast.error(t('datarooms.uploadNotAllowed', { defaultValue: 'You cannot upload in this folder.' }));
       return;
     }
@@ -991,11 +1000,13 @@ export function DataroomPage() {
   const canEditDataroom = roomPermissions.can_edit_dataroom ?? canManage;
   const canManageCollaborators = canManage;
 
-  const canUploadInCurrentFolder = canUploadToDataroom({
-    dataroom,
-    user,
-    folderItem: currentDataroomFolder,
-  });
+  const uploadPermContext = { dataroom, user, folderItem: currentDataroomFolder };
+  const canUploadFiles = canUploadFilesToDataroom(uploadPermContext);
+  const canUploadFolder = canUploadFolderToDataroom(uploadPermContext);
+  const canAddContent = canAddContentToDataroom(uploadPermContext);
+  const canCreateFolder = canCreateFolderInDataroom(uploadPermContext);
+  const canShowUploadDropdown = canShowDataroomUploadDropdown(uploadPermContext);
+  const canShowDocumentsToolbar = canShowDataroomDocumentsToolbar(uploadPermContext);
   const bulkRemoveBlocked = selectionIncludesNonDeletableItems({
     allItems,
     selectedDocuments: selection.documents,
@@ -1079,64 +1090,78 @@ export function DataroomPage() {
           />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {activeTab === 'documents' && canUploadInCurrentFolder && (
+          {activeTab === 'documents' && canShowDocumentsToolbar && (
             <>
-              <input
-                type="file"
-                multiple
-                ref={fileInputRef}
-                onChange={onFileChange}
-                className="hidden"
-              />
-              <input
-                type="file"
-                ref={folderInputRef}
-                onChange={onFolderChange}
-                className="hidden"
-                webkitdirectory=""
-              />
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-10 w-10"
-                onClick={() => setIsAddFolderOpen(true)}
-                title={t('documents.createFolder')}
-              >
-                <FolderPlusIcon className="h-5 w-5" />
-              </Button>
-              <Button variant="outline" onClick={() => setIsAddContentOpen(true)} title={t('datarooms.addContent')} className="px-3">
-                <Plus className="mr-2 h-4 w-4 shrink-0" />
-                <span className="text-xs sm:text-base">{t('datarooms.addContent')}</span>
-              </Button>
-              <DropdownMenu.Root>
-                <DropdownMenu.Trigger asChild>
-                  <Button className="flex items-center gap-1 sm:gap-x-2 px-3">
-                    <span className="text-xs sm:text-base">{t('documents.upload')}</span>
-                    <ChevronDown className="h-4 w-4 shrink-0" />
-                  </Button>
-                </DropdownMenu.Trigger>
-                <DropdownMenu.Portal>
-                  <DropdownMenu.Content
-                    className="z-[9999] w-40 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none dark:bg-gray-800"
-                    sideOffset={8}
-                  >
-                    <DropdownMenu.Item
-                      onSelect={handleFileSelect}
-                      className="flex w-full cursor-pointer items-center gap-x-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none dark:text-gray-200 hover:dark:bg-gray-700 focus:dark:bg-gray-700"
+              {canUploadFiles && (
+                <input
+                  type="file"
+                  multiple
+                  ref={fileInputRef}
+                  onChange={onFileChange}
+                  className="hidden"
+                />
+              )}
+              {canUploadFolder && (
+                <input
+                  type="file"
+                  ref={folderInputRef}
+                  onChange={onFolderChange}
+                  className="hidden"
+                  webkitdirectory=""
+                />
+              )}
+              {canCreateFolder && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10"
+                  onClick={() => setIsAddFolderOpen(true)}
+                  title={t('documents.createFolder')}
+                >
+                  <FolderPlusIcon className="h-5 w-5" />
+                </Button>
+              )}
+              {canAddContent && (
+                <Button variant="outline" onClick={() => setIsAddContentOpen(true)} title={t('datarooms.addContent')} className="px-3">
+                  <Plus className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="text-xs sm:text-base">{t('datarooms.addContent')}</span>
+                </Button>
+              )}
+              {canShowUploadDropdown && (
+                <DropdownMenu.Root>
+                  <DropdownMenu.Trigger asChild>
+                    <Button className="flex items-center gap-1 sm:gap-x-2 px-3">
+                      <span className="text-xs sm:text-base">{t('documents.upload')}</span>
+                      <ChevronDown className="h-4 w-4 shrink-0" />
+                    </Button>
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.Content
+                      className="z-[9999] w-40 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none dark:bg-gray-800"
+                      sideOffset={8}
                     >
-                      <DocumentPlusIcon className="h-5 w-5" aria-hidden="true" />
-                      <span>{t('documents.files')}</span>
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item
-                      onSelect={handleFolderSelect}
-                      className="flex w-full cursor-pointer items-center gap-x-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none dark:text-gray-200 hover:dark:bg-gray-700 focus:dark:bg-gray-700"
-                    >
-                      <FolderPlusIcon className="h-5 w-5" aria-hidden="true" />
-                      <span>{t('documents.folder')}</span>
-                    </DropdownMenu.Item>
-                  </DropdownMenu.Content>
-                </DropdownMenu.Portal>
-              </DropdownMenu.Root>
+                      {canUploadFiles && (
+                        <DropdownMenu.Item
+                          onSelect={handleFileSelect}
+                          className="flex w-full cursor-pointer items-center gap-x-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none dark:text-gray-200 hover:dark:bg-gray-700 focus:dark:bg-gray-700"
+                        >
+                          <DocumentPlusIcon className="h-5 w-5" aria-hidden="true" />
+                          <span>{t('documents.files')}</span>
+                        </DropdownMenu.Item>
+                      )}
+                      {canUploadFolder && (
+                        <DropdownMenu.Item
+                          onSelect={handleFolderSelect}
+                          className="flex w-full cursor-pointer items-center gap-x-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none dark:text-gray-200 hover:dark:bg-gray-700 focus:dark:bg-gray-700"
+                        >
+                          <FolderPlusIcon className="h-5 w-5" aria-hidden="true" />
+                          <span>{t('documents.folder')}</span>
+                        </DropdownMenu.Item>
+                      )}
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Portal>
+                </DropdownMenu.Root>
+              )}
             </>
           )}
           {activeTab === 'links' && (
@@ -1228,7 +1253,7 @@ export function DataroomPage() {
               showIndex={showFileIndex}
               onItemClick={handleItemClick}
               onItemSelect={handleItemSelect}
-              onFilesDrop={handleFileUploads}
+              onFilesDrop={canUploadFiles ? handleFileUploads : undefined}
               selectedDocuments={selection.documents}
               selectedFolders={selection.folders}
               onSort={handleSort}
@@ -1246,7 +1271,7 @@ export function DataroomPage() {
                   <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto">
                     {t('datarooms.emptyStateNotice')}
                   </p>
-                  <Button className="mt-4" variant="outline" onClick={() => setIsAddContentOpen(true)} disabled={!canUploadInCurrentFolder}>
+                  <Button className="mt-4" variant="outline" onClick={() => setIsAddContentOpen(true)} disabled={!canAddContent}>
                     <DocumentPlusIcon className="mr-2 h-4 w-4" />
                     {t('datarooms.addContent')}
                   </Button>

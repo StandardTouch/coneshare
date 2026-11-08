@@ -587,6 +587,10 @@ class DataroomDetailSerializer(serializers.ModelSerializer):
         caps = user_dataroom_capabilities(user, obj)
         return {
             'can_upload': caps['can_upload'],
+            'can_upload_files': caps['can_upload_files'],
+            'can_upload_folder': caps['can_upload_folder'],
+            'can_upload_add_from_content': caps['can_upload_add_from_content'],
+            'can_create_folder': caps['can_create_folder'],
             'can_edit_dataroom_settings': caps['can_see_settings_tab'] and caps['can_edit_dataroom'],
             'can_see_qna_tab': caps['can_see_qna_tab'],
             'can_see_settings_tab': caps['can_see_settings_tab'],
