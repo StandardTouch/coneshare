@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Loader2, Lock, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
@@ -10,9 +10,28 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Skeleton } from '../components/ui/Skeleton';
 import { ConfirmationDialog } from '../components/dialogs/ConfirmationDialog';
+import { getLocalizedErrorMessage } from '../utils/errorTranslator';
+
+function getRoleCreateValidationMessage(error) {
+  const data = error?.response?.data;
+  if (!data || typeof data !== 'object') {
+    return getLocalizedErrorMessage(error);
+  }
+  if (typeof data.detail === 'string') {
+    return data.detail;
+  }
+  for (const key of ['name', 'slug', 'description', 'non_field_errors']) {
+    if (data[key]) {
+      const value = data[key];
+      return Array.isArray(value) ? value[0] : String(value);
+    }
+  }
+  return getLocalizedErrorMessage(error);
+}
 
 export function AdminRolesPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [roles, setRoles] = useState([]);
   const [pagination, setPagination] = useState({ count: 0, current_page: 1, total_pages: 1 });
   const [search, setSearch] = useState('');
@@ -20,6 +39,7 @@ export function AdminRolesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState({ name: '', description: '' });
+  const [createError, setCreateError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [isResetting, setIsResetting] = useState(false);
@@ -72,16 +92,24 @@ export function AdminRolesPage() {
 
   const handleCreate = async (e) => {
     e.preventDefault();
+    setCreateError('');
     setIsSaving(true);
     try {
-      await api.createAdminRbacRole(createForm);
+      const { data: created } = await api.createAdminRbacRole(createForm);
       toast.success(t('admin.roles.createSuccess', { defaultValue: 'Role created.' }));
       setCreateForm({ name: '', description: '' });
       setShowCreate(false);
-      await loadRoles(pagination.current_page);
-      await loadAuditLog();
-    } catch {
-      // interceptor
+      if (created?.id) {
+        navigate(`/admin/roles/${created.id}`);
+      } else {
+        await loadRoles(pagination.current_page);
+        await loadAuditLog();
+      }
+    } catch (err) {
+      setCreateError(
+        getRoleCreateValidationMessage(err) ||
+          t('admin.roles.createFailed', { defaultValue: 'Could not create role.' })
+      );
     } finally {
       setIsSaving(false);
     }
@@ -138,7 +166,12 @@ export function AdminRolesPage() {
             {isResetting ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />}
             {t('admin.rbac.resetDefaults', { defaultValue: 'Reset system roles' })}
           </Button>
-          <Button onClick={() => setShowCreate(true)}>
+          <Button
+            onClick={() => {
+              setCreateError('');
+              setShowCreate(true);
+            }}
+          >
             <Plus className="mr-2 h-4 w-4" />
             {t('admin.roles.create', { defaultValue: 'Create role' })}
           </Button>
@@ -271,9 +304,13 @@ export function AdminRolesPage() {
             <Input
               required
               value={createForm.name}
-              onChange={(e) => setCreateForm((p) => ({ ...p, name: e.target.value }))}
+              onChange={(e) => {
+                setCreateForm((p) => ({ ...p, name: e.target.value }));
+                if (createError) setCreateError('');
+              }}
               placeholder={t('admin.roles.name', { defaultValue: 'Name' })}
               disabled={isSaving}
+              aria-invalid={Boolean(createError)}
             />
             <Input
               value={createForm.description}
@@ -281,8 +318,21 @@ export function AdminRolesPage() {
               placeholder={t('admin.roles.description', { defaultValue: 'Description' })}
               disabled={isSaving}
             />
+            {createError ? (
+              <p className="text-sm text-destructive" role="alert">
+                {createError}
+              </p>
+            ) : null}
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setShowCreate(false)} disabled={isSaving}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowCreate(false);
+                  setCreateError('');
+                }}
+                disabled={isSaving}
+              >
                 {t('common.cancel')}
               </Button>
               <Button type="submit" disabled={isSaving}>

@@ -758,7 +758,8 @@ export const updateAdminRoleLabel = (id, data) => api.patch(`/admin/role-labels/
 export const deleteAdminRoleLabel = (id) => api.delete(`/admin/role-labels/${id}/`);
 export const getAdminRbacRoles = (params = {}) => api.get('/admin/rbac/roles/', { params });
 export const getAdminRbacRole = (roleId) => api.get(`/admin/rbac/roles/${roleId}/`);
-export const createAdminRbacRole = (data) => api.post('/admin/rbac/roles/', data);
+export const createAdminRbacRole = (data) =>
+  api.post('/admin/rbac/roles/', data, { skipGlobalErrorToast: true });
 export const updateAdminRbacRole = (roleId, data) => api.patch(`/admin/rbac/roles/${roleId}/`, data);
 export const deleteAdminRbacRole = (roleId) => api.delete(`/admin/rbac/roles/${roleId}/`);
 export const getAdminRbacPermissionCatalog = () => api.get('/admin/rbac/roles/permission-catalog/');

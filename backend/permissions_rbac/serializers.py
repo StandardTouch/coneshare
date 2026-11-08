@@ -31,12 +31,24 @@ class DataroomRoleSerializer(serializers.ModelSerializer):
             'permission_grants',
             'user_count',
         )
-        read_only_fields = ('id', 'is_system')
+        read_only_fields = ('id', 'is_system', 'slug')
 
-    def validate_slug(self, value):
-        if self.instance and self.instance.is_system:
-            return self.instance.slug
-        return value
+    def validate_name(self, value):
+        name = (value or '').strip()
+        if not name:
+            raise serializers.ValidationError('This field may not be blank.')
+        request = self.context.get('request')
+        if request is None or not getattr(request.user, 'organization_id', None):
+            return name
+        qs = DataroomRole.objects.filter(
+            organization_id=request.user.organization_id,
+            name__iexact=name,
+        )
+        if self.instance is not None:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError('A role with this name already exists.')
+        return name
 
 
 class PermissionAuditLogSerializer(serializers.ModelSerializer):

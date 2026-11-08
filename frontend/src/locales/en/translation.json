@@ -1077,7 +1077,7 @@
     "roles": {
       "nav": "Roles",
       "title": "Roles",
-      "subtitle": "Custom roles are display labels only; permissions follow the Member role.",
+      "subtitle": "Manage organization roles and permissions. Roles apply to users across every dataroom.",
       "addRole": "Add role",
       "name": "Name",
       "description": "Description",
