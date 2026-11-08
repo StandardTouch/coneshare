@@ -370,6 +370,10 @@ def item_permissions_for_user(user, dataroom: Dataroom, item_type: str, item) ->
             'can_move': True,
             'can_reorder': True,
             'can_manage_share_settings': True,
+            'can_upload_files': True,
+            'can_upload_folder': True,
+            'can_upload_add_from_content': True,
+            'can_create_folder': True,
             'can_upload': True,
         }
     return {
@@ -383,7 +387,13 @@ def item_permissions_for_user(user, dataroom: Dataroom, item_type: str, item) ->
         'can_manage_share_settings': has_perm(
             user, PERM_MANAGE_SHARE_SETTINGS, dataroom, item, item_type
         ),
-        'can_upload': has_perm(user, PERM_UPLOAD, dataroom, item, item_type),
+        'can_upload_files': has_perm(user, PERM_UPLOAD_FILES, dataroom, item, item_type),
+        'can_upload_folder': has_perm(user, PERM_UPLOAD_FOLDER, dataroom, item, item_type),
+        'can_upload_add_from_content': has_perm(
+            user, PERM_UPLOAD_ADD_FROM_CONTENT, dataroom, item, item_type
+        ),
+        'can_create_folder': has_perm(user, PERM_FOLDER_CREATE, dataroom, item, item_type),
+        'can_upload': has_perm(user, PERM_UPLOAD_FILES, dataroom, item, item_type),
     }
 
 
@@ -486,8 +496,16 @@ def assert_user_may_create_dataroom(user) -> None:
 def user_dataroom_capabilities(user, dataroom: Dataroom) -> Dict[str, bool]:
     owner = getattr(dataroom, 'created_by_id', None) == getattr(user, 'id', None)
     full = owner or user_has_full_access(user)
+    can_upload_files = full or has_perm(user, PERM_UPLOAD_FILES, dataroom)
+    can_upload_folder = full or has_perm(user, PERM_UPLOAD_FOLDER, dataroom)
     return {
-        'can_upload': full or has_perm(user, PERM_UPLOAD, dataroom),
+        'can_upload_files': can_upload_files,
+        'can_upload_folder': can_upload_folder,
+        'can_upload_add_from_content': full or has_perm(
+            user, PERM_UPLOAD_ADD_FROM_CONTENT, dataroom
+        ),
+        'can_create_folder': full or has_perm(user, PERM_FOLDER_CREATE, dataroom),
+        'can_upload': can_upload_files or can_upload_folder,
         'can_edit_dataroom_settings': full or has_perm(user, PERM_EDIT_DATAROOM_SETTINGS, dataroom),
         'can_delete_dataroom': full or has_perm(user, PERM_DELETE_DATAROOM, dataroom),
         'can_edit_dataroom': full or has_perm(user, PERM_DATAROOM_EDIT, dataroom),

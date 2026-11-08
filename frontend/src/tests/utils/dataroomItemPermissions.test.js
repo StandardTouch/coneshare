@@ -1,93 +1,62 @@
 import { describe, it, expect } from 'vitest';
 import {
-  canModifyDataroomItem,
-  selectionIncludesNonModifiableItems,
-  scopeIncludesNonModifiableItems,
+  canAddContentToDataroom,
+  canCreateFolderInDataroom,
+  canShowDataroomUploadDropdown,
+  canUploadFilesToDataroom,
+  canUploadFolderToDataroom,
 } from '../../utils/dataroomItemPermissions';
 
-const dataroom = { id: 'dr1', created_by: { id: 'owner1' } };
-const owner = { id: 'owner1', role: 'member' };
-const collab = { id: 'collab1', role: 'member' };
-const admin = { id: 'admin1', role: 'admin' };
+const user = { id: 'u1', role: 'member' };
 
-describe('dataroomItemPermissions', () => {
-  it('respects API can_modify when provided', () => {
-    expect(
-      canModifyDataroomItem({
-        item: { id: '1', type: 'document', can_modify: false },
-        user: collab,
-        dataroom: { ...dataroom, collaborators: [{ user: collab }] },
-      })
-    ).toBe(false);
+const dataroomWithPerms = (permissions) => ({
+  id: 'dr1',
+  created_by: { id: 'owner' },
+  current_user_permissions: permissions,
+});
+
+describe('dataroomItemPermissions granular upload', () => {
+  it('maps each UI action to its own permission flag', () => {
+    const dataroom = dataroomWithPerms({
+      can_upload_files: true,
+      can_upload_folder: false,
+      can_upload_add_from_content: false,
+      can_create_folder: false,
+    });
+    const ctx = { dataroom, user, folderItem: null };
+
+    expect(canUploadFilesToDataroom(ctx)).toBe(true);
+    expect(canUploadFolderToDataroom(ctx)).toBe(false);
+    expect(canAddContentToDataroom(ctx)).toBe(false);
+    expect(canCreateFolderInDataroom(ctx)).toBe(false);
+    expect(canShowDataroomUploadDropdown(ctx)).toBe(true);
   });
 
-  it('allows owner to modify any item', () => {
-    expect(
-      canModifyDataroomItem({
-        item: { id: '1', type: 'document', created_by: { id: 'other' } },
-        user: owner,
-        dataroom,
-      })
-    ).toBe(true);
+  it('hides upload dropdown when both file and folder upload are denied', () => {
+    const dataroom = dataroomWithPerms({
+      can_upload_files: false,
+      can_upload_folder: false,
+      can_upload_add_from_content: true,
+      can_create_folder: true,
+    });
+    const ctx = { dataroom, user, folderItem: null };
+
+    expect(canShowDataroomUploadDropdown(ctx)).toBe(false);
+    expect(canAddContentToDataroom(ctx)).toBe(true);
+    expect(canCreateFolderInDataroom(ctx)).toBe(true);
   });
 
-  it('blocks collaborator from modifying others items via RBAC fallback', () => {
-    expect(
-      canModifyDataroomItem({
-        item: { id: '1', type: 'document', created_by: { id: 'owner1' } },
-        user: collab,
-        dataroom: { ...dataroom, collaborators: [{ user: collab }] },
-      })
-    ).toBe(false);
-  });
+  it('shows folder upload option only when upload_folder is granted', () => {
+    const dataroom = dataroomWithPerms({
+      can_upload_files: false,
+      can_upload_folder: true,
+      can_upload_add_from_content: false,
+      can_create_folder: false,
+    });
+    const ctx = { dataroom, user, folderItem: null };
 
-  it('allows collaborator to modify own items', () => {
-    expect(
-      canModifyDataroomItem({
-        item: { id: '1', type: 'document', created_by: { id: 'collab1' } },
-        user: collab,
-        dataroom: { ...dataroom, collaborators: [{ user: collab }] },
-      })
-    ).toBe(true);
-  });
-
-  it('allows admin to modify any item', () => {
-    expect(
-      canModifyDataroomItem({
-        item: { id: '1', type: 'document', created_by: { id: 'owner1' } },
-        user: admin,
-        dataroom,
-      })
-    ).toBe(true);
-  });
-
-  it('detects bulk selection with non-modifiable items', () => {
-    const allItems = [
-      { id: 'd1', type: 'document', can_modify: true },
-      { id: 'd2', type: 'document', can_modify: false },
-    ];
-    expect(
-      selectionIncludesNonModifiableItems({
-        allItems,
-        selectedDocuments: ['d1', 'd2'],
-        selectedFolders: [],
-        user: collab,
-        dataroom,
-      })
-    ).toBe(true);
-  });
-
-  it('detects reorder scope with foreign items', () => {
-    const allItems = [
-      { id: 'd1', type: 'document', can_modify: true },
-      { id: 'd2', type: 'document', can_modify: false },
-    ];
-    expect(
-      scopeIncludesNonModifiableItems({
-        allItems,
-        user: collab,
-        dataroom,
-      })
-    ).toBe(true);
+    expect(canUploadFilesToDataroom(ctx)).toBe(false);
+    expect(canUploadFolderToDataroom(ctx)).toBe(true);
+    expect(canShowDataroomUploadDropdown(ctx)).toBe(true);
   });
 });

@@ -23,6 +23,67 @@ function perm(item, key) {
   return undefined;
 }
 
+function roomPerm(dataroom, key) {
+  if (dataroom?.current_user_permissions && typeof dataroom.current_user_permissions[key] === 'boolean') {
+    return dataroom.current_user_permissions[key];
+  }
+  return undefined;
+}
+
+function roomHasGranularUploadPerms(dataroom) {
+  const perms = dataroom?.current_user_permissions;
+  if (!perms || typeof perms !== 'object') {
+    return false;
+  }
+  return (
+    'can_upload_files' in perms
+    || 'can_upload_folder' in perms
+    || 'can_upload_add_from_content' in perms
+    || 'can_create_folder' in perms
+  );
+}
+
+function legacyCollaboratorUploadAccess({ dataroom, user }) {
+  return (
+    isDataroomOwner(dataroom, user)
+    || user.role === 'admin'
+    || isDataroomCollaborator(dataroom, user)
+  );
+}
+
+function resolveDataroomPerm({ dataroom, user, folderItem, key }) {
+  if (!user || !dataroom) return false;
+  const fromFolder = folderItem ? perm(folderItem, key) : undefined;
+  if (typeof fromFolder === 'boolean') {
+    return fromFolder;
+  }
+  const fromRoom = roomPerm(dataroom, key);
+  if (typeof fromRoom === 'boolean') {
+    return fromRoom;
+  }
+
+  const granularMode = roomHasGranularUploadPerms(dataroom);
+  if (granularMode) {
+    return false;
+  }
+
+  const legacyUpload = folderItem ? perm(folderItem, 'can_upload') : roomPerm(dataroom, 'can_upload');
+  if (typeof legacyUpload === 'boolean') {
+    if (
+      key === 'can_upload_files'
+      || key === 'can_upload_folder'
+      || key === 'can_upload_add_from_content'
+    ) {
+      return legacyUpload;
+    }
+    if (key === 'can_create_folder') {
+      return legacyUpload;
+    }
+  }
+
+  return legacyCollaboratorUploadAccess({ dataroom, user });
+}
+
 export function canModifyDataroomItem({ item, user, dataroom }) {
   if (!item || !user || !dataroom) {
     return false;
@@ -46,15 +107,40 @@ export function canModifyDataroomItem({ item, user, dataroom }) {
   return resolveItemCreatorId(item) === user.id;
 }
 
+/** @deprecated Use canUploadFilesToDataroom or specific upload helpers. */
 export function canUploadToDataroom({ dataroom, user, folderItem }) {
-  if (!user || !dataroom) return false;
-  if (folderItem?.permissions && typeof folderItem.permissions.can_upload === 'boolean') {
-    return folderItem.permissions.can_upload;
-  }
-  if (dataroom.current_user_permissions && typeof dataroom.current_user_permissions.can_upload === 'boolean') {
-    return dataroom.current_user_permissions.can_upload;
-  }
-  return isDataroomOwner(dataroom, user) || user.role === 'admin' || isDataroomCollaborator(dataroom, user);
+  return canUploadFilesToDataroom({ dataroom, user, folderItem });
+}
+
+export function canUploadFilesToDataroom({ dataroom, user, folderItem }) {
+  return resolveDataroomPerm({ dataroom, user, folderItem, key: 'can_upload_files' });
+}
+
+export function canUploadFolderToDataroom({ dataroom, user, folderItem }) {
+  return resolveDataroomPerm({ dataroom, user, folderItem, key: 'can_upload_folder' });
+}
+
+export function canAddContentToDataroom({ dataroom, user, folderItem }) {
+  return resolveDataroomPerm({ dataroom, user, folderItem, key: 'can_upload_add_from_content' });
+}
+
+export function canCreateFolderInDataroom({ dataroom, user, folderItem }) {
+  return resolveDataroomPerm({ dataroom, user, folderItem, key: 'can_create_folder' });
+}
+
+export function canShowDataroomUploadDropdown({ dataroom, user, folderItem }) {
+  return (
+    canUploadFilesToDataroom({ dataroom, user, folderItem })
+    || canUploadFolderToDataroom({ dataroom, user, folderItem })
+  );
+}
+
+export function canShowDataroomDocumentsToolbar({ dataroom, user, folderItem }) {
+  return (
+    canShowDataroomUploadDropdown({ dataroom, user, folderItem })
+    || canAddContentToDataroom({ dataroom, user, folderItem })
+    || canCreateFolderInDataroom({ dataroom, user, folderItem })
+  );
 }
 
 export function selectionIncludesNonModifiableItems({
