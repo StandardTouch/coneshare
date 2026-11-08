@@ -340,6 +340,22 @@ def is_folder_view_only_for_role(folder: DataroomFolder, role: DataroomRole) -> 
 
 
 def filter_dataroom_documents_for_user(qs, user, dataroom: Dataroom):
+    from datarooms.utils import is_dataroom_owner_or_admin
+
+    if is_dataroom_owner_or_admin(user, dataroom):
+        return qs
+    role = get_collaborator_dataroom_role(user, dataroom)
+    if role is None:
+        return qs.none()
+    grants = _load_role_grants(role)
+    if PERM_FILE_VIEW not in grants:
+        return qs.none()
+    scope = _effective_scope(grants[PERM_FILE_VIEW], PERM_FILE_VIEW)
+    hidden = hidden_folder_ids_for_user(user, dataroom)
+    if hidden:
+        qs = qs.exclude(folder_id__in=hidden)
+    if scope == SCOPE_OWN:
+        qs = qs.filter(document__created_by=user)
     return qs
 
 
@@ -491,6 +507,36 @@ def assert_user_may_create_dataroom(user) -> None:
     if has_site_perm(user, PERM_DATAROOM_CREATE):
         return
     raise PermissionDenied(DATAROOM_CREATE_DENIED_DETAIL)
+
+
+def collaborator_viewable_document_ids(user) -> Set[str]:
+    """Document IDs a collaborator may open via dataroom file_view (incl. own/any scope)."""
+    from datarooms.views import get_dataroom_queryset_for_user
+
+    doc_ids: Set[str] = set()
+    rooms = (
+        get_dataroom_queryset_for_user(user)
+        .filter(collaborators__user=user)
+        .distinct()
+    )
+    for room in rooms:
+        dd_qs = DataroomDocument.objects.filter(dataroom=room)
+        dd_qs = filter_dataroom_documents_for_user(dd_qs, user, room)
+        doc_ids.update(str(doc_id) for doc_id in dd_qs.values_list('document_id', flat=True))
+    return doc_ids
+
+
+def user_can_view_document_via_dataroom(user, document_id: str) -> bool:
+    if user is None or not getattr(user, 'is_authenticated', False):
+        return False
+    viewable = collaborator_viewable_document_ids(user)
+    if str(document_id) in viewable:
+        return True
+    return DataroomDocument.objects.filter(
+        document_id=document_id,
+        dataroom__created_by_id=user.id,
+        dataroom__organization_id=user.organization_id,
+    ).exists()
 
 
 def user_dataroom_capabilities(user, dataroom: Dataroom) -> Dict[str, bool]:

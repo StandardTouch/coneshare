@@ -50,6 +50,20 @@ describe('AdminRoleEditPage', () => {
             supports_scope: false,
             category: 'content',
           },
+          {
+            codename: 'file_view',
+            label: 'View',
+            supports_scope: true,
+            category: 'dataroom_file',
+            group: 'Datarooms — File Permission',
+          },
+          {
+            codename: 'file_rename',
+            label: 'Rename',
+            supports_scope: true,
+            category: 'dataroom_file',
+            group: 'Datarooms — File Permission',
+          },
         ],
       },
     });
@@ -84,5 +98,33 @@ describe('AdminRoleEditPage', () => {
     });
     expect(screen.getByRole('heading', { name: 'Datarooms — Global Settings' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'content' })).toBeInTheDocument();
+  });
+
+  it('shows own/any scope selector for file_view when enabled', async () => {
+    api.getAdminRbacRole.mockResolvedValue({
+      data: {
+        id: 'role-1',
+        name: 'Contributor',
+        slug: 'contributor',
+        is_system: true,
+        permission_grants: [{ permission: 'file_view', scope: 'any' }],
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/admin/roles/role-1']}>
+        <Routes>
+          <Route path="/admin/roles/:roleId" element={<AdminRoleEditPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('file_view')).toBeInTheDocument();
+    });
+
+    const scopeSelect = screen.getByDisplayValue('Any');
+    expect(scopeSelect).toBeInTheDocument();
+    expect(scopeSelect.querySelectorAll('option').length).toBeGreaterThanOrEqual(2);
   });
 });

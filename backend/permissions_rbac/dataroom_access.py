@@ -157,6 +157,31 @@ def assert_destination_folder_allowed(
         raise PermissionDenied('You do not have permission to perform this action in this folder.')
 
 
+def assert_document_view_allowed(user, document) -> None:
+    if not document:
+        raise NotFound()
+    personal_only = not DataroomDocument.objects.filter(document=document).exists()
+    if personal_only:
+        return
+    ddocs = DataroomDocument.objects.filter(document=document).select_related('dataroom', 'folder')
+    accessible = _accessible_datarooms_for_user(user)
+    relevant = [d for d in ddocs if accessible.filter(id=d.dataroom_id).exists()]
+    if not relevant:
+        raise NotFound()
+    for ddoc in relevant:
+        if is_dataroom_owner_or_admin(user, ddoc.dataroom):
+            if has_perm(user, PERM_VIEW, ddoc.dataroom, ddoc, 'document'):
+                return
+            continue
+        try:
+            get_visible_dataroom_document_or_404(user, str(ddoc.id))
+        except NotFound:
+            continue
+        if has_perm(user, PERM_VIEW, ddoc.dataroom, ddoc, 'document'):
+            return
+    raise NotFound()
+
+
 def assert_document_download_allowed(user, document) -> None:
     ddocs = DataroomDocument.objects.filter(document=document).select_related('dataroom', 'folder')
     accessible = _accessible_datarooms_for_user(user)

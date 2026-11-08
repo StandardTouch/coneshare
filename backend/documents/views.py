@@ -65,10 +65,16 @@ def get_document_queryset_for_user(user):
     if getattr(user, 'role', '') == 'admin':
         return base_qs
 
+    from permissions_rbac.services import collaborator_viewable_document_ids
+
+    viewable_via_dataroom = collaborator_viewable_document_ids(user)
     qs = base_qs.filter(
         Q(created_by=user) |
-        Q(dataroomdocument__dataroom__organization=user.organization, dataroomdocument__dataroom__collaborators__user=user) |
-        Q(dataroomdocument__dataroom__organization=user.organization, dataroomdocument__dataroom__created_by=user)
+        Q(id__in=viewable_via_dataroom) |
+        Q(
+            dataroomdocument__dataroom__organization=user.organization,
+            dataroomdocument__dataroom__created_by=user,
+        )
     ).distinct()
     from permissions_rbac.dataroom_access import exclude_vault_documents_in_hidden_folders
 
@@ -696,7 +702,7 @@ class DocumentPreviewDataView(APIView):
         responses={200: DocumentPreviewResponseSerializer, 400: dict, 404: dict},
     )
     def get(self, request, document_id, *args, **kwargs):
-        from permissions_rbac.dataroom_access import assert_document_download_allowed
+        from permissions_rbac.dataroom_access import assert_document_view_allowed
 
         # Authentication & Authorization is handled by DRF + this query
         try:
@@ -707,7 +713,7 @@ class DocumentPreviewDataView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
         try:
-            assert_document_download_allowed(request.user, document)
+            assert_document_view_allowed(request.user, document)
         except NotFound:
             return Response(
                 {"detail": "Access denied or document not found."},
