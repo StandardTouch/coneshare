@@ -159,6 +159,37 @@ describe('DataroomPage', () => {
         expect(await screen.findByText('Sub Folder')).toBeInTheDocument();
     });
 
+    it('searches files inside folders and shows the containing folder', async () => {
+        const user = userEvent.setup();
+        api.searchDataroomContent.mockResolvedValue({
+            data: {
+                items: [
+                    { id: 'folder1', type: 'folder', name: 'Sub Folder', updated_at: '2023-01-01T12:00:00Z' },
+                    {
+                        id: 'ddoc2',
+                        type: 'document',
+                        document_id: 'doc2',
+                        name: 'Nested Document',
+                        location: 'Sub Folder',
+                        folder: 'folder1',
+                        updated_at: '2023-01-02T12:00:00Z',
+                    },
+                ],
+            },
+        });
+        renderComponent();
+        expect(await screen.findByText('Root Document')).toBeInTheDocument();
+
+        await user.type(screen.getByRole('textbox', { name: 'Search files and folders' }), 'Nested');
+
+        await waitFor(() => {
+            expect(api.searchDataroomContent).toHaveBeenCalledWith('dr123', 'Nested');
+        });
+        expect(await screen.findByText('Nested Document')).toBeInTheDocument();
+        expect(screen.getAllByText('Sub Folder').length).toBeGreaterThan(0);
+        expect(screen.queryByText('Root Document')).not.toBeInTheDocument();
+    });
+
     describe('Error and Empty States', () => {
         it('should display not found message if dataroom fails to load', async () => {
             api.getDataroom.mockRejectedValue({ response: { status: 404 } });

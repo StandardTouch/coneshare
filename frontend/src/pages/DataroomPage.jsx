@@ -2,8 +2,9 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useSortedList } from '../hooks/useSortedList';
+import { useDebounce } from '../hooks/useDebounce';
 import { useItemSelection } from '../hooks/useItemSelection';
-import { ShareIcon, Star, ArrowLeft, ChevronDown, FolderUp, Plus, Loader2, AlertTriangle, Crown, Users, Sparkles, Cloud } from 'lucide-react';
+import { ShareIcon, Star, ArrowLeft, ChevronDown, FolderUp, Plus, Loader2, AlertTriangle, Crown, Users, Sparkles, Cloud, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatBytes } from '../lib/formatters';
 import { isDataroomOwner, isDataroomCollaborator, canShareDataroom, canRenameDataroom, canDeleteDataroom } from '../utils/formatters';
@@ -19,7 +20,7 @@ import {
   selectionIncludesNonModifiableItems,
   scopeIncludesNonModifiableItems,
 } from '../utils/dataroomItemPermissions';
-import { getDataroom, addContentToDataroom, createDataroomFolder, moveDataroomContent, getDataroomFolderContents, getShareLinksForDataroom, deleteShareLink, getDataroomViewSessions, getDataroomStats, removeContentFromDataroom, updateDataroomFolder, updateDataroomDocument, updateDataroomBranding, reorderDataroomItems, deleteDataroom, ensureDataroomFolderPaths, uploadDataroomDocument, upgradeDataroomStorage, getDataroomBannerImages, getCloudProviders, getCloudConnections, getDropboxConnectUrl, getGoogleDriveConnectUrl, getNextcloudConnectUrl, importCloudFile, attachCloudImportToDataroom } from '../services/api';
+import { getDataroom, addContentToDataroom, createDataroomFolder, moveDataroomContent, getDataroomFolderContents, getShareLinksForDataroom, deleteShareLink, getDataroomViewSessions, getDataroomStats, removeContentFromDataroom, updateDataroomFolder, updateDataroomDocument, updateDataroomBranding, reorderDataroomItems, deleteDataroom, ensureDataroomFolderPaths, uploadDataroomDocument, upgradeDataroomStorage, getDataroomBannerImages, getCloudProviders, getCloudConnections, getDropboxConnectUrl, getGoogleDriveConnectUrl, getNextcloudConnectUrl, importCloudFile, attachCloudImportToDataroom, searchDataroomContent } from '../services/api';
 import { useBreadcrumb } from '../components/layout/BreadcrumbProvider';
 import { useUpload } from '../contexts/UploadProvider';
 import { useUser } from '../contexts/UserProvider';
@@ -101,6 +102,10 @@ export function DataroomPage() {
   const [currentFolderId, setCurrentFolderId] = useState(() => searchParams.get('folder'));
   const [currentDataroomFolder, setCurrentDataroomFolder] = useState(null);
   const [items, setItems] = useState([]);
+  const [contentSearch, setContentSearch] = useState('');
+  const debouncedContentSearch = useDebounce(contentSearch, 300);
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearchingContent, setIsSearchingContent] = useState(false);
   const [links, setLinks] = useState([]);
   const [isLinkSheetOpen, setIsLinkSheetOpen] = useState(false);
   const [editingLink, setEditingLink] = useState(null);
@@ -343,6 +348,34 @@ export function DataroomPage() {
       setIsLoading(false);
     }
   }, [dataroomId, currentFolderId]);
+
+  useEffect(() => {
+    setContentSearch('');
+  }, [currentFolderId]);
+
+  useEffect(() => {
+    const query = debouncedContentSearch.trim();
+    if (!query || !dataroomId) {
+      setSearchResults([]);
+      setIsSearchingContent(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setIsSearchingContent(true);
+    searchDataroomContent(dataroomId, query)
+      .then((response) => {
+        if (!cancelled) setSearchResults(response.data.items || []);
+      })
+      .catch(() => {
+        if (!cancelled) setSearchResults([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsSearchingContent(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [dataroomId, debouncedContentSearch]);
     
   const fetchLinks = useCallback(async (_options = {}) => {
     try {
@@ -377,12 +410,14 @@ export function DataroomPage() {
     }
   }, [dataroomId, viewsCurrentPage]);
     
-  const folders = useMemo(() => items.filter((item) => item.type === 'folder'), [items]);
-  const documents = useMemo(() => items.filter((item) => item.type === 'document'), [items]);
+  const contentQuery = debouncedContentSearch.trim();
+  const listedItems = contentQuery ? searchResults : items;
+  const folders = useMemo(() => listedItems.filter((item) => item.type === 'folder'), [listedItems]);
+  const documents = useMemo(() => listedItems.filter((item) => item.type === 'document'), [listedItems]);
 
   const unsortedItems = useMemo(() => {
     if (!dataroom) return [];
-    const normalized = items.map((item) => ({
+    const normalized = listedItems.map((item) => ({
       ...item,
       id: item.id,
       document_id: item.document_id,
@@ -395,7 +430,7 @@ export function DataroomPage() {
       return normalized.filter((item) => item.is_starred);
     }
     return normalized;
-  }, [dataroom, items, showStarredOnly]);
+  }, [dataroom, listedItems, showStarredOnly]);
 
   const reorderableItems = useMemo(() => {
     return (items || []).map((item) => ({
@@ -598,6 +633,7 @@ export function DataroomPage() {
 
   const handleItemClick = (item, type) => {
     if (type === 'folder') {
+      setContentSearch('');
       setSearchParams(prev => {
         prev.set('folder', item.id);
         return prev;
@@ -605,7 +641,7 @@ export function DataroomPage() {
     } else {
       // For documents, we pass along the dataroom context via query params
       // so the document page can render the correct breadcrumbs.
-      const fromFolder = currentFolderId || '';
+      const fromFolder = item.folder || currentFolderId || '';
       navigate(`/documents/${item.document_id}?from_dataroom=${dataroomId}&from_folder=${fromFolder}`);
     }
   };
@@ -1295,6 +1331,16 @@ export function DataroomPage() {
         </TabsList>
         <TabsContent value="documents" className="mt-6">
           <div className="mb-4">
+            <div className="relative mb-3 w-full sm:max-w-sm">
+              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={contentSearch}
+                onChange={(e) => setContentSearch(e.target.value)}
+                placeholder={t('datarooms.searchContent')}
+                aria-label={t('datarooms.searchContent')}
+                className="pl-9"
+              />
+            </div>
             <div className="mb-2 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 {currentFolderId && (
@@ -1338,7 +1384,7 @@ export function DataroomPage() {
                   size="sm"
                   className="ml-2"
                   onClick={() => setIsReorderDialogOpen(true)}
-                  disabled={!hasContent || reorderBlocked}
+                  disabled={!hasContent || reorderBlocked || Boolean(contentQuery)}
                 >
                   {t('datarooms.reorderItems')}
                 </Button>
@@ -1347,7 +1393,7 @@ export function DataroomPage() {
           </div>
             <DocumentsList
               allItems={allItems}
-              loading={isLoading}
+              loading={isLoading || (Boolean(contentQuery) && isSearchingContent)}
               isReadOnly={false}
               showActions={true}
               themed={true}
@@ -1367,15 +1413,21 @@ export function DataroomPage() {
               emptyState={
                 <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted bg-muted/20 p-12 text-center my-4">
                   <h3 className="text-xl font-semibold tracking-tight">
-                    {currentDataroomFolder ? t('datarooms.folderEmpty') : t('datarooms.dataroomEmpty')}
+                    {contentQuery
+                      ? t('datarooms.noContentMatches')
+                      : currentDataroomFolder ? t('datarooms.folderEmpty') : t('datarooms.dataroomEmpty')}
                   </h3>
-                  <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto">
-                    {t('datarooms.emptyStateNotice')}
-                  </p>
-                  <Button className="mt-4" variant="outline" onClick={() => setIsAddContentOpen(true)} disabled={!canAddContent}>
-                    <DocumentPlusIcon className="mr-2 h-4 w-4" />
-                    {t('datarooms.addContent')}
-                  </Button>
+                  {!contentQuery && (
+                    <>
+                      <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto">
+                        {t('datarooms.emptyStateNotice')}
+                      </p>
+                      <Button className="mt-4" variant="outline" onClick={() => setIsAddContentOpen(true)} disabled={!canAddContent}>
+                        <DocumentPlusIcon className="mr-2 h-4 w-4" />
+                        {t('datarooms.addContent')}
+                      </Button>
+                    </>
+                  )}
                 </div>
               }
             />

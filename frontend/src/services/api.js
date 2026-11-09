@@ -564,6 +564,7 @@ export const importCloudVersion = (documentId, { connectionId, fileId, fileName,
 
 // Datarooms
 export const getDatarooms = (params) => api.get('/datarooms/', { params });
+export const searchDataroomContent = (dataroomId, query) => api.get(`/datarooms/${dataroomId}/search/`, { params: { q: query } });
 export const getDataroom = (id, params) => api.get(`/datarooms/${id}/`, { params });
 export const createDataroom = (data) => api.post('/datarooms/', data);
 export const createDataroomFolder = (data) => api.post('/dataroom-folders/', data);
