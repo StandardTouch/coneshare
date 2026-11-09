@@ -550,7 +550,7 @@ export function DocumentPage() {
         onVersionHistory={() => navigate(`/documents/${documentId}/versions`)}
         onDelete={handleDelete}
         onRenameDocument={handleRenameDocument}
-        onRequestSignature={document?.type === 'pdf' && canManageWorkspace ? () => setIsCreateRequestOpen(true) : undefined}
+        onRequestSignature={document?.type === 'pdf' && canAccessSignatures ? () => setIsCreateRequestOpen(true) : undefined}
         isProcessing={isProcessing}
         cloudProviders={cloudProviders}
         canManage={canManageWorkspace}

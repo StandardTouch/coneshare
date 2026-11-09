@@ -20,13 +20,16 @@ import { DocumentPage } from '../../pages/DocumentPage';
 
 // Mock child components to isolate the page
 vi.mock('../../components/documents/DocumentHeader', () => ({
-  DocumentHeader: ({ onUploadNewVersion, onDownload, onDelete, onRenameDocument }) => (
+  DocumentHeader: ({ onUploadNewVersion, onDownload, onDelete, onRenameDocument, onRequestSignature }) => (
     <div>
       <span>Document Header</span>
       <button onClick={onUploadNewVersion}>Upload New Version</button>
       <button onClick={onDownload}>Download</button>
       <button onClick={onDelete}>Delete</button>
       <button onClick={() => onRenameDocument('New Document Name')}>Rename</button>
+      {onRequestSignature && (
+        <button onClick={onRequestSignature}>Request Signature</button>
+      )}
     </div>
   ),
 }));
@@ -126,6 +129,35 @@ describe('DocumentPage', () => {
     });
     expect(api.getDocumentViews).not.toHaveBeenCalled();
     expect(api.getDocumentStats).not.toHaveBeenCalled();
+  });
+
+  it('shows request signature for a dataroom pdf when signature access is enabled', async () => {
+    mockCurrentUser = { id: 'admin1', role: 'admin' };
+    api.getDocumentDetails.mockResolvedValue({
+      data: {
+        ...mockDocument,
+        type: 'pdf',
+        created_by: 'someone-else',
+        dataroom_context_permissions: {
+          can_see_analytics: true,
+          can_create_share_link: true,
+        },
+      },
+    });
+    api.getDocumentStats.mockResolvedValue({ data: mockStats });
+    api.getDocumentViews.mockResolvedValue({ data: { count: 0, results: [] } });
+
+    render(
+      <MemoryRouter initialEntries={['/documents/doc123?from_dataroom=dr1']}>
+        <BreadcrumbProvider>
+          <Routes>
+            <Route path="/documents/:documentId" element={<DocumentPage />} />
+          </Routes>
+        </BreadcrumbProvider>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByRole('button', { name: 'Request Signature' })).toBeInTheDocument();
   });
 
   it('handles pagination for view sessions table', async () => {
