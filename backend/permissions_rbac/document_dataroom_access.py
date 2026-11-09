@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Optional
 
 from django.shortcuts import get_object_or_404
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import NotFound, PermissionDenied
 
 from datarooms.models import Dataroom, DataroomDocument
 from documents.models import Document
@@ -66,6 +66,8 @@ def ensure_document_viewset_dataroom_access(view, user) -> None:
     document_id = view.kwargs.get(lookup_url_kwarg or 'pk')
     if document_id and user_can_access_document_viewset_action(user, action, document_id):
         return
+    if action in _DATAROOM_DOCUMENT_VIEWSET_ACTIONS:
+        raise NotFound()
     raise PermissionDenied('You do not have permission to perform this action.')
 
 
@@ -76,8 +78,6 @@ def user_can_view_document_analytics(user, document: Document) -> bool:
         return True
     if document.created_by_id == user.id and documents_enabled_for_user(user):
         return True
-    if documents_enabled_for_user(user):
-        return document.created_by_id == user.id
     return user_has_dataroom_document_permission(user, str(document.id), PERM_FILE_VIEW)
 
 
@@ -88,8 +88,6 @@ def user_can_manage_document_share_links(user, document: Document) -> bool:
         return True
     if document.created_by_id == user.id and documents_enabled_for_user(user):
         return True
-    if documents_enabled_for_user(user):
-        return document.created_by_id == user.id
     return user_has_dataroom_document_permission(
         user, str(document.id), PERM_FILE_CREATE_SHARE_LINK
     )
@@ -102,8 +100,6 @@ def user_can_access_dataroom_qna_for_document(user, document: Document, dataroom
         return True
     if document.created_by_id == user.id and documents_enabled_for_user(user):
         return True
-    if documents_enabled_for_user(user):
-        return document.created_by_id == user.id
 
     pairs = _accessible_dataroom_document_pairs(user, str(document.id))
     if dataroom_id:

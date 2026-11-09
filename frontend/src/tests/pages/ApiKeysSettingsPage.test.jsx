@@ -11,6 +11,17 @@ vi.mock("../../services/api", () => ({
   deleteApiKey: vi.fn(),
 }));
 
+vi.mock("../../contexts/UserProvider", () => ({
+  useUser: () => ({ user: { id: "u1", role: "admin" } }),
+}));
+
+vi.mock("../../featuregates/useFeatureGates", () => ({
+  useFeatureGates: () => ({
+    canAccessMcpSetup: true,
+    canAccessApiKeys: true,
+  }),
+}));
+
 vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),

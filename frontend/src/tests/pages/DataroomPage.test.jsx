@@ -80,6 +80,8 @@ describe('DataroomPage', () => {
     const mockDataroomRoot = {
         id: 'dr123',
         name: 'Test Dataroom',
+        created_by: { id: 'u1', email: 'test@example.com', name: 'Test' },
+        current_user_role: 'owner',
         items: [
             { id: 'folder1', type: 'folder', name: 'Sub Folder', updated_at: '2023-01-01T12:00:00Z', ancestors: [] },
             { id: 'ddoc1', type: 'document', document_id: 'doc1', name: 'Root Document', updated_at: '2023-01-01T12:00:00Z' },
