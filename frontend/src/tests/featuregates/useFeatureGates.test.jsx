@@ -22,6 +22,7 @@ describe('useFeatureGates', () => {
       fileRequestsEnabled: true,
       documentsEnabled: true,
       trashEnabled: true,
+      signatureEnabled: true,
       esignEnabled: true,
     });
     useUser.mockReturnValue({ user: { role: 'admin' } });
@@ -44,6 +45,7 @@ describe('useFeatureGates', () => {
       fileRequestsEnabled: true,
       documentsEnabled: true,
       trashEnabled: true,
+      signatureEnabled: true,
       esignEnabled: false,
     });
     useUser.mockReturnValue({ user: { role: 'member' } });
@@ -64,6 +66,7 @@ describe('useFeatureGates', () => {
       fileRequestsEnabled: true,
       documentsEnabled: true,
       trashEnabled: true,
+      signatureEnabled: true,
       esignEnabled: true,
     });
     useUser.mockReturnValue({ user: { role: 'admin' } });

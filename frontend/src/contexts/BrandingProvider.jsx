@@ -20,6 +20,7 @@ export function BrandingProvider({ children }) {
     fileRequestsEnabled: true,
     documentsEnabled: true,
     trashEnabled: true,
+    signatureEnabled: true,
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -44,6 +45,7 @@ export function BrandingProvider({ children }) {
         fileRequestsEnabled: data?.file_requests_enabled !== false,
         documentsEnabled: data?.documents_enabled !== false,
         trashEnabled: data?.trash_enabled !== false,
+        signatureEnabled: data?.signature_enabled !== false,
       });
     } catch (error) {
       console.error("Failed to fetch public settings/branding:", error);
@@ -101,6 +103,7 @@ export function useBranding() {
       fileRequestsEnabled: true,
       documentsEnabled: true,
       trashEnabled: true,
+      signatureEnabled: true,
       isLoading: false,
       refetchBranding: async () => {},
     };

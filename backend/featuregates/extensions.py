@@ -19,12 +19,17 @@ from rest_framework.exceptions import PermissionDenied
 from .services import (
     api_keys_enabled_for_user,
     automation_enabled_for_user,
+    documents_enabled_for_user,
     ensure_admin_user,
     ensure_api_keys_enabled_for_user,
     ensure_automation_enabled_for_user,
+    ensure_documents_enabled_for_user,
     ensure_file_requests_enabled_for_user,
+    ensure_trash_enabled_for_user,
     file_requests_enabled_for_user,
+    signature_enabled_for_user,
     swagger_enabled_for_user,
+    trash_enabled_for_user,
 )
 
 
@@ -106,11 +111,17 @@ def _patched_public_settings_get(self, request):
         response.data['automation_enabled'] = automation_enabled_for_user(user)
         response.data['api_keys_enabled'] = api_keys_enabled_for_user(user)
         response.data['file_requests_enabled'] = file_requests_enabled_for_user(user)
+        response.data['documents_enabled'] = documents_enabled_for_user(user)
+        response.data['trash_enabled'] = trash_enabled_for_user(user)
+        response.data['signature_enabled'] = signature_enabled_for_user(user)
     else:
         response.data['swagger_enabled'] = False
         response.data['automation_enabled'] = False
         response.data['api_keys_enabled'] = False
         response.data['file_requests_enabled'] = False
+        response.data['documents_enabled'] = False
+        response.data['trash_enabled'] = False
+        response.data['signature_enabled'] = False
     response.data['role_labels_enabled'] = True
     return response
 
@@ -119,7 +130,6 @@ PublicSettingsView.get = _patched_public_settings_get
 
 from documents.views import DocumentViewSet, TrashViewSet
 
-from .services import documents_enabled_for_user, ensure_trash_enabled_for_user
 
 def _ensure_document_viewset_access(view, user):
     from permissions_rbac.document_dataroom_access import ensure_document_viewset_dataroom_access
@@ -139,3 +149,20 @@ def _wrap_document_viewset(viewset_cls):
 
 _wrap_document_viewset(DocumentViewSet)
 _wrap_feature_only(TrashViewSet, ensure_trash_enabled_for_user)
+
+from analytics.views import (
+    AllLinksView,
+    AllViewSessionsView,
+    DailyVisitsView,
+    DashboardSummaryView,
+    ViewSessionDetailView,
+)
+
+for _analytics_view in (
+    DashboardSummaryView,
+    DailyVisitsView,
+    AllLinksView,
+    AllViewSessionsView,
+    ViewSessionDetailView,
+):
+    _wrap_api_view_feature(_analytics_view, ensure_documents_enabled_for_user)

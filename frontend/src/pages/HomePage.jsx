@@ -9,6 +9,7 @@ import { Button } from '../components/ui/Button';
 import { ArrowRight } from 'lucide-react';
 import { ViewSessionsTable } from '../components/documents/ViewSessionsTable';
 import { LinksTable } from '../components/documents/LinksTable';
+import { useFeatureGates } from '../featuregates/useFeatureGates';
 
 function DailyVisitsChart({ data, loading }) {
   const { t } = useTranslation();
@@ -31,11 +32,18 @@ function DailyVisitsChart({ data, loading }) {
 
 function HomePage() {
   const { t } = useTranslation();
+  const { canAccessDocuments } = useFeatureGates();
   const [summaryData, setSummaryData] = useState(null);
   const [visitsData, setVisitsData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!canAccessDocuments) {
+      setSummaryData(null);
+      setVisitsData([]);
+      setLoading(false);
+      return undefined;
+    }
     async function fetchData() {
       try {
         setLoading(true);
@@ -52,12 +60,14 @@ function HomePage() {
       }
     }
     fetchData();
-  }, []);
+  }, [canAccessDocuments]);
 
   return (
     <div className="space-y-8 p-4 sm:p-6">
       <h1 className="text-3xl font-bold">{t('dashboard.title')}</h1>
 
+      {!canAccessDocuments ? null : (
+      <>
       <div className="rounded-lg border bg-white p-6 shadow-sm dark:bg-gray-900">
         <h2 className="mb-4 text-xl font-semibold">{t('dashboard.dailyVisits')}</h2>
         <DailyVisitsChart data={visitsData} loading={loading} />
@@ -107,6 +117,8 @@ function HomePage() {
           </div>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

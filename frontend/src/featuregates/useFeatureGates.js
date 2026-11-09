@@ -10,6 +10,7 @@ export function useFeatureGates() {
     esignEnabled,
     documentsEnabled,
     trashEnabled,
+    signatureEnabled,
   } = useBranding();
   const { user } = useUser();
 
@@ -23,6 +24,6 @@ export function useFeatureGates() {
     canAccessApiDocs: isAuthenticated && swaggerEnabled !== false,
     canAccessDocuments: isAuthenticated && documentsEnabled !== false,
     canAccessTrash: isAuthenticated && trashEnabled !== false,
-    canAccessSignatures: esignEnabled !== false,
+    canAccessSignatures: isAuthenticated && esignEnabled !== false && signatureEnabled !== false,
   };
 }
