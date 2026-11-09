@@ -1393,5 +1393,10 @@
     "parseFailed": "Échec de l'analyse du contenu Markdown.",
     "unsupportedFormat": "Le document n'est pas un fichier Markdown.",
     "notFound": "URL d'aperçu Markdown introuvable."
+  },
+  "esign": {
+    "viewer": {
+      "resizeField": "Redimensionner le champ"
+    }
   }
 }

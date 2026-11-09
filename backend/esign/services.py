@@ -146,6 +146,59 @@ def _field_rect_from_top_left_percent(
     return x, y, width, height
 
 
+def _field_rect_for_page(
+    page,
+    x_percent: float,
+    y_percent: float,
+    width_percent: float,
+    height_percent: float,
+) -> tuple:
+    """Map a top-left percentage of the rendered page into PDF user space.
+
+    pdf.js shows the crop box, rotated by ``page.rotation``, with y growing
+    downward. The overlay is merged in unrotated user space, so the box is
+    converted back before it is drawn. Returns bottom-left ``(x, y, width, height)``.
+    """
+    crop = page.cropbox
+    left = float(crop.left)
+    bottom = float(crop.bottom)
+    right = float(crop.right)
+    top = float(crop.top)
+    crop_w = right - left
+    crop_h = top - bottom
+    rotation = int(page.rotation or 0) % 360
+
+    if rotation in (90, 270):
+        disp_w, disp_h = crop_h, crop_w
+    else:
+        disp_w, disp_h = crop_w, crop_h
+
+    vx = (x_percent / 100.0) * disp_w
+    vy = (y_percent / 100.0) * disp_h
+    vw = (width_percent / 100.0) * disp_w
+    vh = (height_percent / 100.0) * disp_h
+
+    if rotation == 90:
+        # Visual +x grows up the unrotated page; visual +y grows to the right.
+        pdf_x = left + vy
+        pdf_y = bottom + vx
+        box_w, box_h = vh, vw
+    elif rotation == 180:
+        pdf_x = right - vx - vw
+        pdf_y = bottom + vy
+        box_w, box_h = vw, vh
+    elif rotation == 270:
+        pdf_x = right - vy - vh
+        pdf_y = top - vx - vw
+        box_w, box_h = vh, vw
+    else:
+        pdf_x = left + vx
+        pdf_y = top - vy - vh
+        box_w, box_h = vw, vh
+
+    return pdf_x, pdf_y, box_w, box_h
+
+
 def create_text_overlay_pdf(
     text: str,
     page_width: float,
@@ -156,16 +209,20 @@ def create_text_overlay_pdf(
     height_percent: float,
     font_name: str = 'DancingScript',
     font_size: int = 14,
-    is_arabic: bool = False
+    is_arabic: bool = False,
+    rect=None,
 ) -> bytes:
     """
     Create a transparent PDF with text at specified position.
     Coordinates are in percentages from the top-left of the page.
     Uses DancingScript for Latin text and Amiri for Arabic text.
     """
-    x, y, width, height = _field_rect_from_top_left_percent(
-        page_width, page_height, x_percent, y_percent, width_percent, height_percent
-    )
+    if rect is None:
+        x, y, width, height = _field_rect_from_top_left_percent(
+            page_width, page_height, x_percent, y_percent, width_percent, height_percent
+        )
+    else:
+        x, y, width, height = rect
     
     # Create PDF in memory
     buffer = io.BytesIO()
@@ -195,8 +252,8 @@ def create_text_overlay_pdf(
             logger.warning(f"{font_name} not available, falling back to Helvetica")
             c.setFont('Helvetica', font_size)
     
-    # Draw text (centered in box, RTL for Arabic)
-    text_y = y + (height / 2)
+    # Baseline sits slightly below the box center so the glyphs stay inside it.
+    text_y = y + (height / 2) - (font_size * 0.35)
     if has_arabic:
         # Right-aligned for Arabic
         c.drawRightString(x + width, text_y, display_text)
@@ -215,7 +272,8 @@ def create_signature_image_overlay_pdf(
     x_percent: float,
     y_percent: float,
     width_percent: float,
-    height_percent: float
+    height_percent: float,
+    rect=None,
 ) -> bytes:
     """
     Create a transparent PDF with image (signature drawing) at specified position.
@@ -230,9 +288,12 @@ def create_signature_image_overlay_pdf(
     header, encoded = image_data_url.split(',', 1)
     image_bytes = base64.b64decode(encoded)
     
-    x, y, width, height = _field_rect_from_top_left_percent(
-        page_width, page_height, x_percent, y_percent, width_percent, height_percent
-    )
+    if rect is None:
+        x, y, width, height = _field_rect_from_top_left_percent(
+            page_width, page_height, x_percent, y_percent, width_percent, height_percent
+        )
+    else:
+        x, y, width, height = rect
     
     # Load image
     img = Image.open(io.BytesIO(image_bytes))
@@ -246,6 +307,7 @@ def create_signature_image_overlay_pdf(
         ImageReader(img),
         x, y, width, height,
         preserveAspectRatio=True,
+        anchor='c',
         mask='auto'
     )
     
@@ -286,13 +348,17 @@ def flatten_signature_fields(
         for field in page_fields:
             try:
                 if field.field_type in ['signature', 'initials']:
+                    rect = _field_rect_for_page(
+                        page, field.x, field.y, field.width, field.height
+                    )
                     # Signature/initials are drawn or typed
                     if field.value.startswith('data:image'):
                         # Drawn signature
                         overlay_pdf = create_signature_image_overlay_pdf(
                             field.value,
                             page_width, page_height,
-                            field.x, field.y, field.width, field.height
+                            field.x, field.y, field.width, field.height,
+                            rect=rect,
                         )
                     else:
                         # Typed signature (render as text in handwriting-style font)
@@ -303,19 +369,23 @@ def flatten_signature_fields(
                             field.x, field.y, field.width, field.height,
                             font_name='Helvetica-Oblique',  # Closest to handwriting in standard fonts
                             font_size=16 if field.field_type == 'signature' else 12,
-                            is_arabic='arabic' in getattr(settings, 'LANGUAGE_CODE', 'en').lower()
+                            is_arabic='arabic' in getattr(settings, 'LANGUAGE_CODE', 'en').lower(),
+                            rect=rect,
                         )
                     
                     overlay_reader = pypdf.PdfReader(io.BytesIO(overlay_pdf))
                     page.merge_page(overlay_reader.pages[0])
                 
                 elif field.field_type in ['date_signed', 'full_name', 'text']:
-                    # Text fields
+                    rect = _field_rect_for_page(
+                        page, field.x, field.y, field.width, field.height
+                    )
                     overlay_pdf = create_text_overlay_pdf(
                         field.value,
                         page_width, page_height,
                         field.x, field.y, field.width, field.height,
-                        font_size=10
+                        font_size=10,
+                        rect=rect,
                     )
                     overlay_reader = pypdf.PdfReader(io.BytesIO(overlay_pdf))
                     page.merge_page(overlay_reader.pages[0])

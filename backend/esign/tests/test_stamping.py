@@ -8,7 +8,10 @@ from PIL import Image
 from reportlab.pdfgen import canvas as pdf_canvas
 
 from esign.models import SignatureField
+from pypdf.generic import RectangleObject
+
 from esign.services import (
+    _field_rect_for_page,
     _field_rect_from_top_left_percent,
     append_certificate_to_pdf,
     flatten_signature_fields,
@@ -68,6 +71,30 @@ def signer(signature_request):
 
 @pytest.mark.django_db
 class TestStampingCoordinates:
+    def test_rendered_page_box_matches_percent_helper(self):
+        page = pypdf.PdfReader(io.BytesIO(_build_single_page_pdf())).pages[0]
+        rect = _field_rect_for_page(page, 10, 20, 30, 8)
+        expected = _field_rect_from_top_left_percent(612, 792, 10, 20, 30, 8)
+        assert rect == pytest.approx(expected)
+
+    def test_crop_box_is_the_visible_placement_space(self):
+        reader = pypdf.PdfReader(io.BytesIO(_build_single_page_pdf()))
+        page = reader.pages[0]
+        page.cropbox = RectangleObject([36, 36, 576, 756])
+
+        full = _field_rect_for_page(page, 0, 0, 100, 100)
+        assert full == pytest.approx((36, 36, 540, 720))
+
+        corner = _field_rect_for_page(page, 0, 0, 10, 10)
+        assert corner == pytest.approx((36, 684, 54, 72))
+
+    def test_rotated_page_maps_visual_box_back_to_user_space(self):
+        page = pypdf.PdfReader(io.BytesIO(_build_single_page_pdf())).pages[0]
+        page.rotation = 90
+
+        assert _field_rect_for_page(page, 0, 0, 100, 100) == pytest.approx((0, 0, 612, 792))
+        assert _field_rect_for_page(page, 0, 0, 10, 10) == pytest.approx((0, 0, 61.2, 79.2))
+
     def test_field_on_last_page(self, signature_request, signer):
         num_pages = 5
         original_bytes = _build_multipage_pdf(num_pages)

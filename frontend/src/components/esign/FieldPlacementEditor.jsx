@@ -4,7 +4,7 @@ import { Button } from '../ui/Button';
 import { Type, Edit, Calendar, User, FileText } from 'lucide-react';
 import { getEsignDocumentPdfUrl } from '../../services/esign';
 import { EsignPdfViewer } from './EsignPdfViewer';
-import { clientPointToFieldPercent, clampPercent, defaultFieldSize } from './fieldPlacementUtils';
+import { clampFieldBox, defaultFieldSize, placeFieldAtClient } from './fieldPlacementUtils';
 
 const FIELD_TYPES = [
   { type: 'signature', icon: Edit, label: 'Signature', color: 'bg-blue-100 border-blue-300' },
@@ -28,18 +28,18 @@ export function FieldPlacementEditor({ documentId, signers, users, onSave, onCan
 
     const pageEl = e.currentTarget;
     const rect = pageEl.getBoundingClientRect();
-    const { x, y } = clientPointToFieldPercent(rect, e.clientX, e.clientY);
     const size = defaultFieldSize(draggedField);
+    const placed = placeFieldAtClient(rect, e.clientX, e.clientY, size);
 
     const newField = {
       id: `temp-${Date.now()}`,
       signer_id: activeSigner.id,
       field_type: draggedField,
       page_number: pageNumber,
-      x: clampPercent(x, 90),
-      y: clampPercent(y, 90),
-      width: size.width,
-      height: size.height,
+      x: placed.x,
+      y: placed.y,
+      width: placed.width,
+      height: placed.height,
       required: true,
     };
 
@@ -48,13 +48,11 @@ export function FieldPlacementEditor({ documentId, signers, users, onSave, onCan
   };
 
   const handleFieldMove = (fieldId, patch) => {
-    setFields((prev) =>
-      prev.map((f) =>
-        f.id === fieldId
-          ? { ...f, x: clampPercent(patch.x, 90), y: clampPercent(patch.y, 90) }
-          : f
-      )
-    );
+    setFields((prev) => prev.map((field) => {
+      if (field.id !== fieldId) return field;
+      const next = { ...field, ...patch };
+      return { ...next, ...clampFieldBox(next) };
+    }));
   };
 
   const handleDeleteField = (fieldId) => {

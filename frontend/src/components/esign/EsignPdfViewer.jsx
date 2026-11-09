@@ -12,10 +12,11 @@ import { useEsignPdfDocument } from '../../hooks/useEsignPdfDocument';
 import { PdfPage } from '../documents/PdfPage';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { clientPointToFieldPercent, signerOverlayColor } from './fieldPlacementUtils';
+import { fieldOriginFromClient, fieldSizeFromCorner, signerOverlayColor } from './fieldPlacementUtils';
 import { EsignPdfThumbnailSidebar } from './EsignPdfThumbnailSidebar';
 
-const VIEWER_SCALE = 1;
+const MIN_PAGE_SCALE = 0.6;
+const MAX_PAGE_SCALE = 1.35;
 
 /**
  * Shared pdf.js viewer for e-sign placement and signing flows.
@@ -45,7 +46,9 @@ export const EsignPdfViewer = forwardRef(function EsignPdfViewer(
   const [scrollContainer, setScrollContainer] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageInput, setPageInput] = useState('1');
+  const [pageScale, setPageScale] = useState(1);
   const pageRefs = useRef(new Map());
+  const interactionRef = useRef(null);
 
   const scrollContainerRef = useCallback((node) => {
     if (node) {
@@ -76,6 +79,22 @@ export const EsignPdfViewer = forwardRef(function EsignPdfViewer(
     scrollContainer.scrollTop = 0;
     setCurrentPage(1);
     setPageInput('1');
+  }, [pdfDoc, scrollContainer]);
+
+  useEffect(() => {
+    if (!scrollContainer || !pdfDoc) return undefined;
+    let cancelled = false;
+    pdfDoc.getPage(1).then((page) => {
+      if (cancelled) return;
+      const viewport = page.getViewport({ scale: 1 });
+      if (!viewport.width) return;
+      const available = Math.max(280, scrollContainer.clientWidth - 48);
+      const fitted = available / viewport.width;
+      setPageScale(Math.min(MAX_PAGE_SCALE, Math.max(MIN_PAGE_SCALE, fitted)));
+    }).catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [pdfDoc, scrollContainer]);
 
   useEffect(() => {
@@ -160,6 +179,26 @@ export const EsignPdfViewer = forwardRef(function EsignPdfViewer(
     );
   }
 
+  const applyInteraction = (clientX, clientY) => {
+    const interaction = interactionRef.current;
+    if (!interaction || !onFieldMove) return;
+    const rect = interaction.pageEl.getBoundingClientRect();
+    if (interaction.kind === 'resize') {
+      onFieldMove(interaction.id, fieldSizeFromCorner(interaction.origin, rect, clientX, clientY));
+      return;
+    }
+    onFieldMove(
+      interaction.id,
+      fieldOriginFromClient(
+        rect,
+        clientX - interaction.dx,
+        clientY - interaction.dy,
+        interaction.width,
+        interaction.height,
+      ),
+    );
+  };
+
   const renderFieldOverlay = (field) => {
     const isOwnField = currentUserSignerId != null && field.signer_id === currentUserSignerId;
     const isActiveSigner = activeSignerId != null && field.signer_id === activeSignerId;
@@ -180,22 +219,39 @@ export const EsignPdfViewer = forwardRef(function EsignPdfViewer(
       <Wrapper
         key={field.id}
         type={Wrapper === 'button' ? 'button' : undefined}
-        draggable={mode === 'placement'}
         disabled={readOnly}
         onClick={() => {
           if (mode === 'signing' && !readOnly && onFieldClick) {
             onFieldClick(field);
           }
         }}
-        onDragEnd={(e) => {
+        onPointerDown={(e) => {
           if (mode !== 'placement' || !onFieldMove) return;
+          if (e.target.closest('[data-esign-resize], [data-esign-delete]')) return;
           const pageEl = e.currentTarget.closest('[data-page-number]');
           if (!pageEl) return;
-          const rect = pageEl.getBoundingClientRect();
-          const { x, y } = clientPointToFieldPercent(rect, e.clientX, e.clientY);
-          onFieldMove(field.id, { x, y });
+          const fieldRect = e.currentTarget.getBoundingClientRect();
+          interactionRef.current = {
+            kind: 'move',
+            id: field.id,
+            pageEl,
+            dx: e.clientX - fieldRect.left,
+            dy: e.clientY - fieldRect.top,
+            width: field.width,
+            height: field.height,
+          };
+          e.currentTarget.setPointerCapture(e.pointerId);
         }}
-        className={`absolute border-2 text-left text-xs px-1 py-0.5 overflow-hidden group ${colorClass} ${ringClass} ${
+        onPointerMove={(e) => {
+          if (interactionRef.current?.kind !== 'move' || interactionRef.current.id !== field.id) return;
+          applyInteraction(e.clientX, e.clientY);
+        }}
+        onPointerUp={() => {
+          if (interactionRef.current?.id === field.id) {
+            interactionRef.current = null;
+          }
+        }}
+        className={`absolute border-2 text-left text-xs px-1 py-0.5 overflow-hidden group touch-none ${colorClass} ${ringClass} ${
           readOnly ? 'cursor-default opacity-70' : mode === 'signing' ? 'cursor-pointer hover:brightness-95' : 'cursor-move'
         }`}
         style={{
@@ -210,7 +266,9 @@ export const EsignPdfViewer = forwardRef(function EsignPdfViewer(
         {mode === 'placement' && onFieldDelete && (
           <button
             type="button"
+            data-esign-delete
             className="absolute top-0 right-0 hidden group-hover:block bg-red-600 text-white text-[10px] leading-none px-1 rounded-bl"
+            onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
               onFieldDelete(field.id);
@@ -218,6 +276,36 @@ export const EsignPdfViewer = forwardRef(function EsignPdfViewer(
           >
             ×
           </button>
+        )}
+        {mode === 'placement' && onFieldMove && (
+          <button
+            type="button"
+            data-esign-resize
+            aria-label={t('esign.viewer.resizeField')}
+            className="absolute bottom-0 right-0 h-3 w-3 cursor-se-resize bg-blue-600"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              const pageEl = e.currentTarget.closest('[data-page-number]');
+              if (!pageEl) return;
+              interactionRef.current = {
+                kind: 'resize',
+                id: field.id,
+                pageEl,
+                origin: { x: field.x, y: field.y },
+              };
+              e.currentTarget.setPointerCapture(e.pointerId);
+            }}
+            onPointerMove={(e) => {
+              if (interactionRef.current?.kind !== 'resize' || interactionRef.current.id !== field.id) return;
+              applyInteraction(e.clientX, e.clientY);
+            }}
+            onPointerUp={() => {
+              if (interactionRef.current?.id === field.id) {
+                interactionRef.current = null;
+              }
+            }}
+          />
         )}
       </Wrapper>
     );
@@ -256,9 +344,10 @@ export const EsignPdfViewer = forwardRef(function EsignPdfViewer(
             <PdfPage
               pdfDoc={pdfDoc}
               pageNumber={pageNumber}
-              scale={VIEWER_SCALE}
+              scale={pageScale}
               scrollContainer={scrollContainer}
               dimensions={null}
+              lockToCanvas
             />
             {pageFields.map(renderFieldOverlay)}
           </div>

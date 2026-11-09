@@ -1307,7 +1307,8 @@
       "loadFailed": "Could not load the PDF document",
       "pageJump": "Page number",
       "go": "Go",
-      "jumpToLastPage": "Jump to last page"
+      "jumpToLastPage": "Jump to last page",
+      "resizeField": "Resize field"
     },
     "fields": {
       "toSign": "Fields to Sign",

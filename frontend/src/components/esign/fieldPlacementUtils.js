@@ -8,14 +8,56 @@ export function clientPointToFieldPercent(rect, clientX, clientY) {
   }
   const x = ((clientX - rect.left) / rect.width) * 100;
   const y = ((clientY - rect.top) / rect.height) * 100;
-  return {
-    x: clampPercent(x),
-    y: clampPercent(y),
-  };
+  return { x, y };
 }
 
 export function clampPercent(value, max = 95) {
   return Math.max(0, Math.min(value, max));
+}
+
+/**
+ * Keep a field box fully on the page. x/y are the top-left, in percent.
+ */
+export function clampFieldBox({ x, y, width, height }) {
+  const safeWidth = Math.min(100, Math.max(4, width));
+  const safeHeight = Math.min(100, Math.max(2, height));
+  return {
+    x: clampPercent(x, Math.max(0, 100 - safeWidth)),
+    y: clampPercent(y, Math.max(0, 100 - safeHeight)),
+    width: safeWidth,
+    height: safeHeight,
+  };
+}
+
+/** Place a new field so its center sits on the pointer, then keep it on the page. */
+export function placeFieldAtClient(rect, clientX, clientY, size) {
+  const point = clientPointToFieldPercent(rect, clientX, clientY);
+  return clampFieldBox({
+    x: point.x - size.width / 2,
+    y: point.y - size.height / 2,
+    width: size.width,
+    height: size.height,
+  });
+}
+
+/**
+ * Move a field so its top-left follows a screen point.
+ * Pass the pointer minus the grab offset so the box does not jump.
+ */
+export function fieldOriginFromClient(rect, clientX, clientY, width, height) {
+  const point = clientPointToFieldPercent(rect, clientX, clientY);
+  return clampFieldBox({ x: point.x, y: point.y, width, height });
+}
+
+/** Resize from a fixed top-left so the bottom-right corner follows the pointer. */
+export function fieldSizeFromCorner(origin, rect, clientX, clientY) {
+  const point = clientPointToFieldPercent(rect, clientX, clientY);
+  return clampFieldBox({
+    x: origin.x,
+    y: origin.y,
+    width: point.x - origin.x,
+    height: point.y - origin.y,
+  });
 }
 
 export function defaultFieldSize(fieldType) {

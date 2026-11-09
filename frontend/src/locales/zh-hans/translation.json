@@ -1244,5 +1244,10 @@
     "parseFailed": "解析 Markdown 内容失败。",
     "unsupportedFormat": "文档不是 Markdown 文件。",
     "notFound": "未找到 Markdown 预览链接。"
+  },
+  "esign": {
+    "viewer": {
+      "resizeField": "调整字段大小"
+    }
   }
 }

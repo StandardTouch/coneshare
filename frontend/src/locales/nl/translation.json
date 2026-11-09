@@ -1243,5 +1243,10 @@
     "parseFailed": "Markdown-content verwerken mislukt.",
     "unsupportedFormat": "Het document is geen markdownbestand.",
     "notFound": "Markdown-voorbeeld-URL niet gevonden."
+  },
+  "esign": {
+    "viewer": {
+      "resizeField": "Veldgrootte wijzigen"
+    }
   }
 }

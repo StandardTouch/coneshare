@@ -17,10 +17,11 @@ import { Skeleton } from '../ui/Skeleton';
 // Fallback A4 page height/width ratio if dimensions aren't loaded yet
 const DEFAULT_ASPECT_RATIO = 1.414; // A4 height / width
 
-export function PdfPage({ pdfDoc, pageNumber, scale, scrollContainer, dimensions }) {
+export function PdfPage({ pdfDoc, pageNumber, scale, scrollContainer, dimensions, lockToCanvas = false }) {
   const [isVisible, setIsVisible] = useState(false);
   const [page, setPage] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [cssSize, setCssSize] = useState(null);
   
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
@@ -85,6 +86,20 @@ export function PdfPage({ pdfDoc, pageNumber, scale, scrollContainer, dimensions
     };
   }, [pdfDoc, pageNumber, isVisible]);
 
+  // Size the page box to the rendered canvas so overlays share the same rectangle.
+  useEffect(() => {
+    if (!lockToCanvas || !pdfDoc) return undefined;
+    let cancelled = false;
+    pdfDoc.getPage(pageNumber).then((pageProxy) => {
+      if (cancelled) return;
+      const viewport = pageProxy.getViewport({ scale });
+      setCssSize({ width: viewport.width, height: viewport.height });
+    }).catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [lockToCanvas, pdfDoc, pageNumber, scale]);
+
   // 3. Render page to canvas when page proxy or scale changes
   useEffect(() => {
     if (!page || !isVisible) return;
@@ -142,6 +157,12 @@ export function PdfPage({ pdfDoc, pageNumber, scale, scrollContainer, dimensions
 
   // Calculate style dimensions based on pre-fetched page sizes and current scale
   const getPlaceholderStyle = () => {
+    if (lockToCanvas && cssSize) {
+      return {
+        width: `${cssSize.width}px`,
+        height: `${cssSize.height}px`,
+      };
+    }
     const baseWidth = dimensions?.width || 792;
     const baseHeight = dimensions?.height || (baseWidth * DEFAULT_ASPECT_RATIO);
     
@@ -167,7 +188,7 @@ export function PdfPage({ pdfDoc, pageNumber, scale, scrollContainer, dimensions
       {isVisible && page ? (
         <canvas
           ref={canvasRef}
-          className="mx-auto block rounded-md"
+          className={lockToCanvas ? 'block h-full w-full' : 'mx-auto block rounded-md'}
         />
       ) : (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-700">

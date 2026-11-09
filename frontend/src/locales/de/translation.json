@@ -1269,5 +1269,10 @@
     "parseFailed": "Fehler beim Parsen des Markdown-Inhalts.",
     "unsupportedFormat": "Das Dokument ist keine Markdown-Datei.",
     "notFound": "Markdown-Vorschau-URL nicht gefunden."
+  },
+  "esign": {
+    "viewer": {
+      "resizeField": "Feldgröße ändern"
+    }
   }
 }
