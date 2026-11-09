@@ -3,6 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import api from '../../services/api';
+import {
+  buildGoogleDriveFolderDestinationView,
+  buildGoogleDriveImportViews,
+} from './googleDrivePickerViews';
 
 let pickerApiLoaded = false;
 let googleApiLoaded = false;
@@ -32,7 +36,9 @@ export function useGoogleDrivePicker(connection, onFilesPicked) {
     }
   }, []);
 
-  const openPicker = async (pickFolders = false) => {
+  const openPicker = async (pickFoldersArg = false) => {
+    // React passes the click event as the first arg when handlers use onClick={openPicker}.
+    const pickFolders = pickFoldersArg === true;
     if (!connection) {
       toast.error(t('cloudImport.noConnection'));
       return;
@@ -70,17 +76,12 @@ export function useGoogleDrivePicker(connection, onFilesPicked) {
         });
 
       if (pickFolders) {
-        const folderView = new google.picker.DocsView(google.picker.ViewId.FOLDERS)
-          .setSelectFolderEnabled(true)
-          .setMimeTypes('application/vnd.google-apps.folder')
-          .setIncludeFolders(true);
-        picker.addView(folderView);
+        picker.addView(buildGoogleDriveFolderDestinationView(google));
         picker.setTitle(t('cloudExport.selectFolder'));
       } else {
-        const docsView = new google.picker.DocsView(google.picker.ViewId.DOCS)
-          .setIncludeFolders(true)
-          .setEnableTeamDrives(true);
-        picker.addView(docsView);
+        const { myDriveView, sharedView } = buildGoogleDriveImportViews(google);
+        picker.addView(myDriveView);
+        picker.addView(sharedView);
         picker.setTitle(t('cloudImport.selectFile'));
         picker.enableFeature(google.picker.Feature.SUPPORT_TEAM_DRIVES);
       }
