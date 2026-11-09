@@ -12,6 +12,7 @@ from permissions_rbac.catalogue import (
     PERM_UPLOAD_ADD_FROM_CONTENT,
     PERM_UPLOAD_FILES,
     PERM_UPLOAD_FOLDER,
+    PERM_UPLOAD_FROM_DRIVE,
 )
 from permissions_rbac.models import DataroomRole, DataroomRolePermission
 from permissions_rbac.seed import ensure_default_roles_for_organization
@@ -67,6 +68,7 @@ class TestGranularUploadCapabilities:
         assert caps['can_upload_files'] is True
         assert caps['can_upload_folder'] is False
         assert caps['can_upload_add_from_content'] is False
+        assert caps['can_upload_from_drive'] is False
         assert caps['can_create_folder'] is False
         assert caps['can_upload'] is True
 
@@ -88,6 +90,7 @@ class TestGranularUploadCapabilities:
         assert perms['can_upload_files'] is True
         assert perms['can_upload_folder'] is False
         assert perms['can_upload_add_from_content'] is False
+        assert perms['can_upload_from_drive'] is False
         assert perms['can_create_folder'] is False
 
 
@@ -182,3 +185,26 @@ class TestGranularUploadEndpointEnforcement:
             format='json',
         )
         assert response.status_code == status.HTTP_200_OK
+
+    def test_upload_from_drive_requires_grant(
+        self, api_client, user, user2, organization, dataroom, document
+    ):
+        role = _role_with_grants(organization, [PERM_UPLOAD_FILES])
+        _add_collaborator(dataroom, user2, role, user)
+        document.created_by = user2
+        document.save(update_fields=['created_by'])
+        version = document.versions.get(is_primary=True)
+        version.metadata = {'cloud_import': {'provider': 'google_drive', 'file_id': 'file-1'}}
+        version.save(update_fields=['metadata'])
+        api_client.force_authenticate(user=user2)
+        url = f'/api/v1/datarooms/{dataroom.id}/attach-cloud-import/'
+        denied = api_client.post(url, {'document_id': str(document.id)}, format='json')
+        assert denied.status_code == status.HTTP_403_FORBIDDEN
+
+        drive_role = _role_with_grants(organization, [PERM_UPLOAD_FROM_DRIVE])
+        user2.organization_role = drive_role
+        user2.save(update_fields=['organization_role'])
+        invalidate_organization_rbac_cache(str(organization.id))
+        allowed = api_client.post(url, {'document_id': str(document.id)}, format='json')
+        assert allowed.status_code == status.HTTP_201_CREATED
+        assert dataroom.documents.filter(document=document).exists()

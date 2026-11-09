@@ -26,6 +26,7 @@ from permissions_rbac.catalogue import (
     PERM_EDIT_DATAROOM_SETTINGS,
     PERM_FILE_CREATE_SHARE_LINK,
     PERM_FILE_DOWNLOAD,
+    PERM_FILE_DELETE,
     PERM_FILE_RENAME,
     PERM_FILE_VIEW,
     PERM_FOLDER_CREATE,
@@ -39,6 +40,7 @@ from permissions_rbac.catalogue import (
     PERM_UPLOAD_ADD_FROM_CONTENT,
     PERM_UPLOAD_FILES,
     PERM_UPLOAD_FOLDER,
+    PERM_UPLOAD_FROM_DRIVE,
     PERM_VIEW,
     ROLE_SLUG_ADMIN,
     SCOPE_ANY,
@@ -229,6 +231,8 @@ def _resolve_action_codename(action: str, item_type: Optional[str] = None) -> st
             return PERM_FILE_RENAME
         return PERM_FOLDER_RENAME
     if action in (PERM_DELETE, 'delete'):
+        if item_type == 'document':
+            return PERM_FILE_DELETE
         return PERM_FOLDER_DELETE
     return action
 
@@ -390,6 +394,7 @@ def item_permissions_for_user(user, dataroom: Dataroom, item_type: str, item) ->
             'can_upload_files': True,
             'can_upload_folder': True,
             'can_upload_add_from_content': True,
+            'can_upload_from_drive': True,
             'can_create_folder': True,
             'can_upload': True,
         }
@@ -408,6 +413,9 @@ def item_permissions_for_user(user, dataroom: Dataroom, item_type: str, item) ->
         'can_upload_folder': has_perm(user, PERM_UPLOAD_FOLDER, dataroom, item, item_type),
         'can_upload_add_from_content': has_perm(
             user, PERM_UPLOAD_ADD_FROM_CONTENT, dataroom, item, item_type
+        ),
+        'can_upload_from_drive': has_perm(
+            user, PERM_UPLOAD_FROM_DRIVE, dataroom, item, item_type
         ),
         'can_create_folder': has_perm(user, PERM_FOLDER_CREATE, dataroom, item, item_type),
         'can_upload': has_perm(user, PERM_UPLOAD_FILES, dataroom, item, item_type),
@@ -462,15 +470,13 @@ def assert_user_may_remove_dataroom_content(
         for folder in DataroomFolder.objects.filter(id__in=all_folder_ids, dataroom=dataroom):
             assert_dataroom_perm(user, PERM_DELETE, dataroom, folder, 'folder')
 
-    ddocs_qs = DataroomDocument.objects.filter(
-        Q(id__in=dataroom_doc_ids)
-        | Q(document_id__in=dataroom_doc_ids)
-        | Q(folder_id__in=all_folder_ids),
-        dataroom=dataroom,
-    ).select_related('document')
-
-    for ddoc in ddocs_qs:
-        assert_dataroom_perm(user, PERM_DELETE, dataroom, ddoc, 'document')
+    if dataroom_doc_ids:
+        ddocs_qs = DataroomDocument.objects.filter(
+            Q(id__in=dataroom_doc_ids) | Q(document_id__in=dataroom_doc_ids),
+            dataroom=dataroom,
+        ).select_related('document')
+        for ddoc in ddocs_qs:
+            assert_dataroom_perm(user, PERM_DELETE, dataroom, ddoc, 'document')
 
 
 def assert_user_may_modify_dataroom_document(user, dataroom_document: DataroomDocument) -> None:
@@ -502,6 +508,7 @@ def user_can_delete_dataroom_item(user, dataroom: Dataroom, item_type: str, item
 
 SHARE_DATAROOM_DENIED_DETAIL = 'You do not have permission to share this dataroom.'
 DATAROOM_RENAME_DENIED_DETAIL = 'You do not have permission to rename this dataroom.'
+DATAROOM_DELETE_DENIED_DETAIL = 'You do not have permission to delete this dataroom.'
 
 
 def user_may_rename_dataroom(user, dataroom) -> bool:
@@ -530,6 +537,34 @@ def assert_user_may_rename_dataroom(user, dataroom) -> None:
     if user_may_rename_dataroom(user, dataroom):
         return
     raise PermissionDenied(DATAROOM_RENAME_DENIED_DETAIL)
+
+
+def user_may_delete_dataroom(user, dataroom) -> bool:
+    """
+    Owners may delete their dataroom.
+    A collaborator may delete it only when their role grants dataroom_delete with scope any.
+    """
+    if user is None or not getattr(user, 'is_authenticated', False) or dataroom is None:
+        return False
+    if getattr(dataroom, 'organization_id', None) != getattr(user, 'organization_id', None):
+        return False
+    if getattr(dataroom, 'created_by_id', None) == user.id:
+        return True
+    role = get_collaborator_dataroom_role(user, dataroom)
+    if role is None:
+        return False
+    grants = _load_role_grants(role)
+    if PERM_DATAROOM_DELETE not in grants:
+        return False
+    return _effective_scope(grants[PERM_DATAROOM_DELETE], PERM_DATAROOM_DELETE) == SCOPE_ANY
+
+
+def assert_user_may_delete_dataroom(user, dataroom) -> None:
+    from rest_framework.exceptions import PermissionDenied
+
+    if user_may_delete_dataroom(user, dataroom):
+        return
+    raise PermissionDenied(DATAROOM_DELETE_DENIED_DETAIL)
 
 
 def user_has_dataroom_share_grant(user) -> bool:
@@ -635,6 +670,7 @@ def user_dataroom_capabilities(user, dataroom: Dataroom) -> Dict[str, bool]:
         'can_upload_add_from_content': full or has_perm(
             user, PERM_UPLOAD_ADD_FROM_CONTENT, dataroom
         ),
+        'can_upload_from_drive': full or has_perm(user, PERM_UPLOAD_FROM_DRIVE, dataroom),
         'can_create_folder': full or has_perm(user, PERM_FOLDER_CREATE, dataroom),
         'can_upload': can_upload_files or can_upload_folder,
         'can_edit_dataroom_settings': full or has_perm(user, PERM_EDIT_DATAROOM_SETTINGS, dataroom),

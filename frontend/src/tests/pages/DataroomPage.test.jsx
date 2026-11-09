@@ -892,6 +892,58 @@ describe('DataroomPage', () => {
             expect(container.querySelector('input[type="file"][multiple]')).toBeInTheDocument();
             expect(container.querySelector('input[webkitdirectory]')).not.toBeInTheDocument();
         });
+
+        it('shows Google Drive in the upload menu only when upload from drive is granted', async () => {
+            api.getCloudProviders.mockResolvedValue({
+                data: [{ name: 'google_drive', display_name: 'Google Drive', is_connected: true }],
+            });
+            api.getCloudConnections.mockResolvedValue({ data: [] });
+            api.getDataroom.mockResolvedValue({
+                data: {
+                    ...mockDataroomRoot,
+                    created_by: { id: 'owner' },
+                    collaborators: [{ user: { id: 'u1' } }],
+                    current_user_permissions: {
+                        can_upload_files: true,
+                        can_upload_folder: false,
+                        can_upload_add_from_content: false,
+                        can_upload_from_drive: true,
+                        can_create_folder: false,
+                    },
+                },
+            });
+            const user = userEvent.setup();
+            renderComponent();
+            expect(await screen.findByRole('heading', { name: 'Test Dataroom' })).toBeInTheDocument();
+            await user.click(screen.getByRole('button', { name: /upload/i }));
+            expect(await screen.findByText('Google Drive')).toBeInTheDocument();
+        });
+
+        it('hides Google Drive when upload from drive is not granted', async () => {
+            api.getCloudProviders.mockResolvedValue({
+                data: [{ name: 'google_drive', display_name: 'Google Drive', is_connected: true }],
+            });
+            api.getDataroom.mockResolvedValue({
+                data: {
+                    ...mockDataroomRoot,
+                    created_by: { id: 'owner' },
+                    collaborators: [{ user: { id: 'u1' } }],
+                    current_user_permissions: {
+                        can_upload_files: true,
+                        can_upload_folder: true,
+                        can_upload_add_from_content: true,
+                        can_upload_from_drive: false,
+                        can_create_folder: false,
+                    },
+                },
+            });
+            const user = userEvent.setup();
+            renderComponent();
+            expect(await screen.findByRole('heading', { name: 'Test Dataroom' })).toBeInTheDocument();
+            await user.click(screen.getByRole('button', { name: /upload/i }));
+            expect(await screen.findByText('Files')).toBeInTheDocument();
+            expect(screen.queryByText('Google Drive')).not.toBeInTheDocument();
+        });
     });
 
     describe('Direct Uploads', () => {

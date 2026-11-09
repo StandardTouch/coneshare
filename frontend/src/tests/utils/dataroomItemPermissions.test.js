@@ -5,6 +5,7 @@ import {
   canShowDataroomUploadDropdown,
   canUploadFilesToDataroom,
   canUploadFolderToDataroom,
+  canUploadFromDriveToDataroom,
 } from '../../utils/dataroomItemPermissions';
 
 const user = { id: 'u1', role: 'member' };
@@ -57,6 +58,21 @@ describe('dataroomItemPermissions granular upload', () => {
 
     expect(canUploadFilesToDataroom(ctx)).toBe(false);
     expect(canUploadFolderToDataroom(ctx)).toBe(true);
+    expect(canShowDataroomUploadDropdown(ctx)).toBe(true);
+  });
+
+  it('shows the upload menu for drive import without file or folder upload', () => {
+    const dataroom = dataroomWithPerms({
+      can_upload_files: false,
+      can_upload_folder: false,
+      can_upload_add_from_content: false,
+      can_upload_from_drive: true,
+      can_create_folder: false,
+    });
+    const ctx = { dataroom, user, folderItem: null };
+
+    expect(canUploadFromDriveToDataroom(ctx)).toBe(true);
+    expect(canUploadFilesToDataroom(ctx)).toBe(false);
     expect(canShowDataroomUploadDropdown(ctx)).toBe(true);
   });
 });

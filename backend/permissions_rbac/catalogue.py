@@ -4,9 +4,8 @@ Central catalogue of system and dataroom permissions.
 Scoped permissions use ``any`` (all items in the dataroom) or ``own`` (items the user
 created or uploaded). Non-scoped permissions ignore scope.
 
-**File delete / move / reorder:** enforced with ``folder_delete`` and scoped rename
-permissions — documents use ``file_rename`` / ``folder_delete`` (file delete does not
-get a separate codename).
+**File delete** is ``file_delete`` (Own or Any). Folder delete stays ``folder_delete``.
+Move and reorder follow the scoped rename permissions.
 """
 from __future__ import annotations
 
@@ -56,11 +55,13 @@ PERM_FOLDER_DELETE = 'folder_delete'
 PERM_UPLOAD_FILES = 'upload_files'
 PERM_UPLOAD_FOLDER = 'upload_folder'
 PERM_UPLOAD_ADD_FROM_CONTENT = 'upload_add_from_content'
+PERM_UPLOAD_FROM_DRIVE = 'upload_from_drive'
 
 # --- Dataroom: file ---
 PERM_FILE_VIEW = 'file_view'
 PERM_FILE_DOWNLOAD = 'file_download'
 PERM_FILE_RENAME = 'file_rename'
+PERM_FILE_DELETE = 'file_delete'
 PERM_FILE_CREATE_SHARE_LINK = 'file_create_share_link'
 
 # Legacy aliases (runtime action names used across the codebase)
@@ -92,9 +93,11 @@ ALL_DATAROOM_PERMISSIONS: List[str] = [
     PERM_UPLOAD_FILES,
     PERM_UPLOAD_FOLDER,
     PERM_UPLOAD_ADD_FROM_CONTENT,
+    PERM_UPLOAD_FROM_DRIVE,
     PERM_FILE_VIEW,
     PERM_FILE_DOWNLOAD,
     PERM_FILE_RENAME,
+    PERM_FILE_DELETE,
     PERM_FILE_CREATE_SHARE_LINK,
 ]
 
@@ -119,6 +122,8 @@ SCOPED_DATAROOM_PERMISSIONS: Set[str] = {
     PERM_FOLDER_RENAME,
     PERM_FOLDER_DELETE,
     PERM_FILE_RENAME,
+    PERM_FILE_DELETE,
+    PERM_FILE_CREATE_SHARE_LINK,
     PERM_FILE_VIEW,
 }
 
@@ -144,12 +149,12 @@ RETIRED_GLOBAL_FEATURE_KEYS = (
 LEGACY_PERMISSION_MAP: Dict[str, List[str]] = {
     'view': [PERM_FILE_VIEW],
     'download': [PERM_FILE_DOWNLOAD],
-    'upload': [PERM_UPLOAD_FILES, PERM_UPLOAD_FOLDER, PERM_UPLOAD_ADD_FROM_CONTENT],
+    'upload': [PERM_UPLOAD_FILES, PERM_UPLOAD_FOLDER, PERM_UPLOAD_ADD_FROM_CONTENT, PERM_UPLOAD_FROM_DRIVE],
     'create_folder': [PERM_FOLDER_CREATE],
     'rename': [PERM_FOLDER_RENAME, PERM_FILE_RENAME],
     'move': [PERM_FOLDER_RENAME, PERM_FILE_RENAME],
     'reorder': [PERM_FOLDER_RENAME, PERM_FILE_RENAME],
-    'delete': [PERM_FOLDER_DELETE],
+    'delete': [PERM_FOLDER_DELETE, PERM_FILE_DELETE],
     'manage_share_settings': [PERM_FILE_CREATE_SHARE_LINK],
     'edit_dataroom_settings': [PERM_DATAROOM_SETTINGS_TAB, PERM_DATAROOM_EDIT],
     'delete_dataroom': [PERM_DATAROOM_DELETE],
@@ -218,6 +223,9 @@ PERMISSION_DEFINITIONS: Dict[str, PermissionDefinition] = {
     PERM_UPLOAD_ADD_FROM_CONTENT: PermissionDefinition(
         PERM_UPLOAD_ADD_FROM_CONTENT, 'Add From Content', False, 'dataroom_upload', 'Datarooms — Upload'
     ),
+    PERM_UPLOAD_FROM_DRIVE: PermissionDefinition(
+        PERM_UPLOAD_FROM_DRIVE, 'Upload from Drive', False, 'dataroom_upload', 'Datarooms — Upload'
+    ),
     PERM_FILE_VIEW: PermissionDefinition(PERM_FILE_VIEW, 'View', True, 'dataroom_file', 'Datarooms — File Permission'),
     PERM_FILE_DOWNLOAD: PermissionDefinition(
         PERM_FILE_DOWNLOAD, 'Download', False, 'dataroom_file', 'Datarooms — File Permission'
@@ -225,8 +233,11 @@ PERMISSION_DEFINITIONS: Dict[str, PermissionDefinition] = {
     PERM_FILE_RENAME: PermissionDefinition(
         PERM_FILE_RENAME, 'Rename', True, 'dataroom_file', 'Datarooms — File Permission'
     ),
+    PERM_FILE_DELETE: PermissionDefinition(
+        PERM_FILE_DELETE, 'Delete', True, 'dataroom_file', 'Datarooms — File Permission'
+    ),
     PERM_FILE_CREATE_SHARE_LINK: PermissionDefinition(
-        PERM_FILE_CREATE_SHARE_LINK, 'Create Share Link', False, 'dataroom_file', 'Datarooms — File Permission'
+        PERM_FILE_CREATE_SHARE_LINK, 'Create Share Link', True, 'dataroom_file', 'Datarooms — File Permission'
     ),
 }
 

@@ -76,6 +76,15 @@ export function getAvatarInitial(name, email) {
   return '?';
 }
 
+export function canDeleteDataroom(dataroom, user) {
+  if (!dataroom) return false;
+  if (typeof dataroom.can_delete === 'boolean') return dataroom.can_delete;
+  if (typeof dataroom.current_user_permissions?.can_delete_dataroom === 'boolean') {
+    return dataroom.current_user_permissions.can_delete_dataroom;
+  }
+  return isDataroomOwner(dataroom, user) || user?.role === 'admin';
+}
+
 /**
  * Rename is allowed for the owner, or when the API says the role's Edit grant covers this room.
  */

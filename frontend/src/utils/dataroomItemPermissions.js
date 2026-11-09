@@ -39,6 +39,7 @@ function roomHasGranularUploadPerms(dataroom) {
     'can_upload_files' in perms
     || 'can_upload_folder' in perms
     || 'can_upload_add_from_content' in perms
+    || 'can_upload_from_drive' in perms
     || 'can_create_folder' in perms
   );
 }
@@ -124,6 +125,10 @@ export function canAddContentToDataroom({ dataroom, user, folderItem }) {
   return resolveDataroomPerm({ dataroom, user, folderItem, key: 'can_upload_add_from_content' });
 }
 
+export function canUploadFromDriveToDataroom({ dataroom, user, folderItem }) {
+  return resolveDataroomPerm({ dataroom, user, folderItem, key: 'can_upload_from_drive' });
+}
+
 export function canCreateFolderInDataroom({ dataroom, user, folderItem }) {
   return resolveDataroomPerm({ dataroom, user, folderItem, key: 'can_create_folder' });
 }
@@ -132,6 +137,7 @@ export function canShowDataroomUploadDropdown({ dataroom, user, folderItem }) {
   return (
     canUploadFilesToDataroom({ dataroom, user, folderItem })
     || canUploadFolderToDataroom({ dataroom, user, folderItem })
+    || canUploadFromDriveToDataroom({ dataroom, user, folderItem })
   );
 }
 

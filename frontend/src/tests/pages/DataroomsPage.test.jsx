@@ -153,6 +153,26 @@ describe('DataroomsPage', () => {
             expect(screen.getByText(/Leave Dataroom/i)).toBeInTheDocument();
         });
 
+        it('shows delete for a collaborator when delete any is granted', async () => {
+            mockCurrentUser = { id: 'u1', email: 'test@example.com', role: 'member' };
+            api.getDatarooms.mockResolvedValue({
+                data: [{
+                    id: 'dr_shared',
+                    name: 'Team Project Room',
+                    created_by: 'other_user',
+                    current_user_role: 'collaborator',
+                    can_delete: true,
+                    created_at: '2023-01-01T12:00:00Z',
+                }],
+            });
+            const user = userEvent.setup();
+            renderComponent();
+            const card = (await screen.findByText('Team Project Room')).closest('div.group');
+            await user.click(await within(card).findByRole('button', { name: 'Actions' }));
+            expect(screen.getByText('Delete')).toBeInTheDocument();
+            expect(screen.queryByText(/Leave Dataroom/i)).not.toBeInTheDocument();
+        });
+
         it('should create a new dataroom and refresh the list', async () => {
             const user = userEvent.setup();
             renderComponent();

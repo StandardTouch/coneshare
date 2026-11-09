@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useUser } from '../contexts/UserProvider';
-import { useBranding } from '../contexts/BrandingProvider';
+import { useFeatureGates } from '../featuregates/useFeatureGates';
 import { toast } from 'sonner';
 import { useBreadcrumb } from '../components/layout/BreadcrumbProvider';
 import { Loader2, AlertTriangle, Shield } from 'lucide-react';
@@ -28,7 +28,7 @@ export function DocumentPage() {
   const userContext = useUser();
   const user = userContext?.user;
   const refreshUser = userContext?.refreshUser;
-  const { esignEnabled } = useBranding();
+  const { canAccessSignatures } = useFeatureGates();
   const navigate = useNavigate();
   const [document, setDocument] = useState(null);
   const [stats, setStats] = useState(null);
@@ -86,10 +86,10 @@ export function DocumentPage() {
         console.error("Failed to fetch org users:", error);
       }
     };
-    if (esignEnabled) {
+    if (canAccessSignatures) {
       fetchOrgUsers();
     }
-  }, [esignEnabled]);
+  }, [canAccessSignatures]);
 
   useEffect(() => {
     const action = searchParams.get('action');
@@ -651,7 +651,7 @@ export function DocumentPage() {
         onImport={handleImportCloudVersion}
       />
       
-      {esignEnabled && document?.type === 'pdf' && (
+      {canAccessSignatures && document?.type === 'pdf' && (
         <CreateRequestDialog
           isOpen={isCreateRequestOpen}
           onOpenChange={setIsCreateRequestOpen}

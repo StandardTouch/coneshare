@@ -6,6 +6,7 @@ from datarooms.models import Dataroom, DataroomCollaborator, DataroomDocument
 from documents.models import Document, DocumentVersion
 from permissions_rbac.catalogue import (
     PERM_DATAROOM_CREATE,
+    PERM_FILE_DELETE,
     PERM_FILE_RENAME,
     PERM_FILE_VIEW,
     PERM_FOLDER_CREATE,
@@ -25,6 +26,7 @@ def _legacy_editor_grants():
         PERM_UPLOAD_FILES: '',
         PERM_FOLDER_CREATE: '',
         PERM_FILE_RENAME: SCOPE_OWN,
+        PERM_FILE_DELETE: SCOPE_OWN,
         'folder_rename': SCOPE_OWN,
         PERM_FOLDER_DELETE: SCOPE_OWN,
     }

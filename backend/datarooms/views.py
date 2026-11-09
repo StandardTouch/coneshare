@@ -15,7 +15,7 @@ from drf_spectacular.types import OpenApiTypes
 
 from backend.utils import get_unique_name
 from core.models import User
-from documents.models import Document, Folder
+from documents.models import Document, DocumentVersion, Folder
 from core.pagination import StandardResultsSetPagination
 from documents.services import (
     delete_folder_and_contents,
@@ -57,11 +57,12 @@ from .collaborator_delete_permissions import (
     assert_user_may_reorder_dataroom_items,
 )
 from .dataroom_create_policy import assert_user_may_create_dataroom
-from permissions_rbac.catalogue import PERM_DELETE_DATAROOM, ROLE_SLUG_EDITOR
+from permissions_rbac.catalogue import ROLE_SLUG_EDITOR
 from permissions_rbac.models import DataroomRole
 from permissions_rbac.seed import ensure_default_roles_for_organization
 from permissions_rbac.services import (
     assert_dataroom_perm,
+    assert_user_may_delete_dataroom,
     assert_user_may_rename_dataroom,
     filter_dataroom_documents_for_user,
     filter_dataroom_folders_for_user,
@@ -155,8 +156,7 @@ class DataroomViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance):
-        if not has_perm(self.request.user, PERM_DELETE_DATAROOM, instance):
-            raise PermissionDenied("Only the dataroom owner or an organization admin can delete this dataroom.")
+        assert_user_may_delete_dataroom(self.request.user, instance)
         delete_dataroom(instance)
 
     def perform_update(self, serializer):
@@ -360,6 +360,80 @@ class DataroomViewSet(viewsets.ModelViewSet):
             return Response({
                 "detail": "An internal server error occurred while adding content."
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'], url_path='attach-cloud-import')
+    def attach_cloud_import(self, request, pk=None):
+        from permissions_rbac.catalogue import PERM_UPLOAD_FROM_DRIVE
+
+        dataroom = self.get_object()
+        if not has_perm(request.user, PERM_UPLOAD_FROM_DRIVE, dataroom):
+            raise PermissionDenied('You do not have permission to upload from a drive in this dataroom.')
+
+        document_id = request.data.get('document_id')
+        if not document_id:
+            return Response({'detail': 'document_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        document = Document.objects.active().filter(id=document_id, created_by=request.user).first()
+        if document is None:
+            raise PermissionDenied('You do not have permission to add this document.')
+
+        version = (
+            DocumentVersion.objects.filter(document=document, is_primary=True).first()
+            or DocumentVersion.objects.filter(document=document).order_by('-version_number').first()
+        )
+        cloud_import = (version.metadata or {}).get('cloud_import') if version and version.metadata else None
+        if not isinstance(cloud_import, dict) or not cloud_import.get('provider'):
+            raise PermissionDenied('Only a file imported from a connected drive can be added this way.')
+
+        dest_folder_id = request.data.get('destination_folder_id')
+        destination_folder = None
+        if dest_folder_id:
+            destination_folder = get_object_or_404(DataroomFolder, id=dest_folder_id, dataroom=dataroom)
+        assert_destination_folder_allowed(
+            request.user, dataroom, destination_folder, for_upload=True, upload_mode='drive'
+        )
+
+        with transaction.atomic():
+            locked_dataroom = Dataroom.objects.select_for_update().get(id=dataroom.id)
+            if locked_dataroom.storage_quota_mb and locked_dataroom.storage_quota_mb > 0:
+                existing = DataroomDocument.objects.filter(
+                    dataroom=locked_dataroom, document=document
+                ).exists()
+                additional_bytes = 0 if existing else (document.file_size or 0)
+                current_usage = get_dataroom_storage_used_bytes(locked_dataroom)
+                room_quota_bytes = locked_dataroom.storage_quota_mb * 1024 * 1024
+                if current_usage + additional_bytes > room_quota_bytes:
+                    return Response(
+                        {
+                            'detail': (
+                                f"Adding this file would exceed the Dataroom storage limit of "
+                                f"{locked_dataroom.storage_quota_mb} MB."
+                            )
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            unique_name = self._get_unique_dataroom_document_name(
+                dataroom, destination_folder, document.name
+            )
+            created_doc = DataroomDocument.objects.create(
+                dataroom=dataroom,
+                document=document,
+                folder=destination_folder,
+                name=unique_name,
+                is_direct_upload=False,
+            )
+            if dataroom.show_file_index and self._scope_has_item_order_rows(dataroom, destination_folder):
+                self._append_item_order(
+                    dataroom=dataroom,
+                    parent_folder=destination_folder,
+                    item_type=DataroomItemOrder.ITEM_TYPE_DOCUMENT,
+                    dataroom_document=created_doc,
+                )
+            if destination_folder:
+                touch_dataroom_folder_ancestors(destination_folder)
+
+        return Response({'id': str(created_doc.id)}, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'], url_path='remove-content')
     def remove_content(self, request, pk=None):

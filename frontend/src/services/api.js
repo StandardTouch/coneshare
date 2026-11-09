@@ -655,6 +655,7 @@ export const reorderDataroomBannerImages = (dataroomId, items) =>
 export const deleteDataroom = (id) => api.delete(`/datarooms/${id}/`);
 export const upgradeDataroomStorage = (id) => api.post(`/datarooms/${id}/upgrade-storage/`);
 export const addContentToDataroom = (id, data) => api.post(`/datarooms/${id}/add-content/`, data);
+export const attachCloudImportToDataroom = (id, data) => api.post(`/datarooms/${id}/attach-cloud-import/`, data);
 export const removeContentFromDataroom = (id, data) => api.post(`/datarooms/${id}/remove-content/`, data);
 export const moveDataroomContent = (id, data) => api.post(`/datarooms/${id}/move-content/`, data);
 export const reorderDataroomItems = (id, data) => api.post(`/datarooms/${id}/reorder-items/`, data);

@@ -197,6 +197,43 @@ class TestDataroomFileViewWithoutSystemDocuments:
 
 
 @pytest.mark.django_db
+def test_file_share_link_scope_own_any_and_owner(api_client, user, organization, dataroom_viewer):
+    room = Dataroom.objects.create(name='Share Scope', organization=organization, created_by=user)
+    DataroomCollaborator.objects.create(dataroom=room, user=dataroom_viewer, invited_by=user)
+    owner_doc = _ready_doc('owner-file.pdf', user, organization)
+    own_doc = _ready_doc('viewer-file.pdf', dataroom_viewer, organization)
+    DataroomDocument.objects.create(dataroom=room, document=owner_doc, name=owner_doc.name)
+    DataroomDocument.objects.create(dataroom=room, document=own_doc, name=own_doc.name)
+
+    role = _role_with_grants(organization, {PERM_FILE_CREATE_SHARE_LINK: SCOPE_OWN, PERM_FILE_VIEW: SCOPE_ANY})
+    dataroom_viewer.organization_role = role
+    dataroom_viewer.save(update_fields=['organization_role'])
+    api_client.force_authenticate(user=dataroom_viewer)
+
+    listed = api_client.get(f'/api/v1/datarooms/{room.id}/')
+    items = {item['document_id']: item for item in listed.data['items'] if item.get('type') == 'document'}
+    assert items[str(own_doc.id)]['permissions']['can_manage_share_settings'] is True
+    assert items[str(owner_doc.id)]['permissions']['can_manage_share_settings'] is False
+
+    own_link = api_client.post('/api/v1/share-links/', {'document': str(own_doc.id), 'name': 'Mine'}, format='json')
+    assert own_link.status_code == status.HTTP_201_CREATED
+    other_link = api_client.post('/api/v1/share-links/', {'document': str(owner_doc.id), 'name': 'Theirs'}, format='json')
+    assert other_link.status_code == status.HTTP_400_BAD_REQUEST
+
+    grant = DataroomRolePermission.objects.get(role=role, permission=PERM_FILE_CREATE_SHARE_LINK)
+    grant.scope = ''
+    grant.save(update_fields=['scope'])
+    invalidate_organization_rbac_cache(str(organization.id))
+
+    any_link = api_client.post('/api/v1/share-links/', {'document': str(owner_doc.id), 'name': 'Any Scope'}, format='json')
+    assert any_link.status_code == status.HTTP_201_CREATED
+
+    api_client.force_authenticate(user=user)
+    owner_link = api_client.post('/api/v1/share-links/', {'document': str(own_doc.id), 'name': 'Owner Link'}, format='json')
+    assert owner_link.status_code == status.HTTP_201_CREATED
+
+
+@pytest.mark.django_db
 def test_migration_file_view_scope_defaults_to_any(organization):
     role = DataroomRole.objects.create(
         organization=organization, slug='legacy-view', name='Legacy', is_system=False

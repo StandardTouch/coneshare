@@ -16,7 +16,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../com
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/Tabs';
 import { getDatarooms, deleteDataroom, removeDataroomCollaborator } from '../services/api';
 import { useUser } from '../contexts/UserProvider';
-import { formatDate, getAvatarInitial, isDataroomOwner, isDataroomCollaborator, canShareDataroom, canRenameDataroom } from '../utils/formatters';
+import { formatDate, getAvatarInitial, isDataroomOwner, isDataroomCollaborator, canShareDataroom, canRenameDataroom, canDeleteDataroom } from '../utils/formatters';
 
 function DataroomCardIcon({ dataroom }) {
   const [hasError, setHasError] = useState(false);
@@ -118,7 +118,6 @@ export function DataroomsPage() {
   };
 
   const canCreateDataroom = Boolean(currentUser?.can_create_dataroom);
-  const isOrgAdmin = currentUser?.role === 'admin';
 
   return (
     <TooltipProvider>
@@ -195,7 +194,7 @@ export function DataroomsPage() {
           {datarooms.map((dataroom) => {
             const isOwner = isDataroomOwner(dataroom, currentUser);
             const isCollaborator = isDataroomCollaborator(dataroom, currentUser);
-            const canDelete = isOwner || isOrgAdmin;
+            const canDelete = canDeleteDataroom(dataroom, currentUser);
             const canRename = canRenameDataroom(dataroom, currentUser);
             const canShare = canShareDataroom(dataroom, currentUser);
 

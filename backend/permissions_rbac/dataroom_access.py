@@ -132,6 +132,7 @@ def assert_destination_folder_allowed(
         PERM_UPLOAD_ADD_FROM_CONTENT,
         PERM_UPLOAD_FILES,
         PERM_UPLOAD_FOLDER,
+        PERM_UPLOAD_FROM_DRIVE,
     )
 
     if for_upload:
@@ -139,6 +140,8 @@ def assert_destination_folder_allowed(
             action = PERM_UPLOAD_ADD_FROM_CONTENT
         elif upload_mode == 'folder':
             action = PERM_UPLOAD_FOLDER
+        elif upload_mode == 'drive':
+            action = PERM_UPLOAD_FROM_DRIVE
         else:
             action = PERM_UPLOAD_FILES
     else:

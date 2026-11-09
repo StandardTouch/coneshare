@@ -5,10 +5,9 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from datarooms.models import Dataroom
-from permissions_rbac.catalogue import PERM_DATAROOM_DELETE, PERM_FOLDER_DELETE
+from permissions_rbac.catalogue import PERM_FILE_DELETE, PERM_FOLDER_DELETE, SCOPE_ANY
 from permissions_rbac.models import DataroomRolePermission
 from permissions_rbac.services import invalidate_organization_rbac_cache
-from permissions_rbac.catalogue import SCOPE_ANY
 from django.contrib.auth import get_user_model
 from tests.datarooms.rbac_test_helpers import editor_role, make_shared_dataroom
 
@@ -79,7 +78,7 @@ class CollaboratorDeletePermissionsTests(APITestCase):
         editor_rbac = editor_role(self.owner.organization)
         DataroomRolePermission.objects.filter(
             role=editor_rbac,
-            permission=PERM_FOLDER_DELETE,
+            permission=PERM_FILE_DELETE,
         ).update(scope=SCOPE_ANY)
         invalidate_organization_rbac_cache(str(self.owner.organization_id))
 
@@ -90,3 +89,24 @@ class CollaboratorDeletePermissionsTests(APITestCase):
             format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_folder_delete_does_not_remove_a_file(self):
+        editor_rbac = editor_role(self.owner.organization)
+        DataroomRolePermission.objects.filter(
+            role=editor_rbac,
+            permission=PERM_FILE_DELETE,
+        ).delete()
+        DataroomRolePermission.objects.filter(
+            role=editor_rbac,
+            permission=PERM_FOLDER_DELETE,
+        ).update(scope=SCOPE_ANY)
+        invalidate_organization_rbac_cache(str(self.owner.organization_id))
+
+        self.client.force_authenticate(user=self.editor)
+        response = self.client.post(
+            self._remove_content_url(),
+            {'dataroom_document_ids': [str(self.editor_dd.pk)]},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(self.editor_dd.__class__.objects.filter(pk=self.editor_dd.pk).exists())

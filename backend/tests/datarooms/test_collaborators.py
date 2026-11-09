@@ -402,6 +402,73 @@ class TestDataroomCollaborators:
         )
         assert renamed.status_code == status.HTTP_200_OK
 
+    def _role_with_delete(self, organization, scope):
+        from permissions_rbac.catalogue import PERM_DATAROOM_DELETE
+        from permissions_rbac.models import DataroomRole, DataroomRolePermission
+        from permissions_rbac.services import invalidate_organization_rbac_cache
+
+        role = DataroomRole.objects.create(
+            organization=organization,
+            slug=f'delete-{scope or "blank"}',
+            name=f'Delete {scope or "blank"}',
+            is_system=False,
+        )
+        DataroomRolePermission.objects.create(role=role, permission=PERM_DATAROOM_DELETE, scope=scope)
+        invalidate_organization_rbac_cache(str(organization.id))
+        return role
+
+    def test_collaborator_cannot_delete_without_delete_grant(self, api_client, dataroom, user, organization):
+        collab = User.objects.create_user(
+            email="nodelete@test.com", username="nodelete@test.com", password="password", organization=organization,
+        )
+        DataroomCollaborator.objects.create(dataroom=dataroom, user=collab, invited_by=user)
+        api_client.force_authenticate(user=collab)
+
+        listed = api_client.get('/api/v1/datarooms/')
+        row = next(item for item in listed.data if item['id'] == str(dataroom.id))
+        assert row['can_delete'] is False
+        deleted = api_client.delete(f'/api/v1/datarooms/{dataroom.id}/')
+        assert deleted.status_code == status.HTTP_403_FORBIDDEN
+        assert Dataroom.objects.filter(id=dataroom.id).exists()
+
+    def test_collaborator_with_delete_own_cannot_delete_another_users_dataroom(self, api_client, dataroom, user, organization):
+        role = self._role_with_delete(organization, 'own')
+        collab = User.objects.create_user(
+            email="deleteown@test.com", username="deleteown@test.com", password="password",
+            organization=organization, organization_role=role,
+        )
+        DataroomCollaborator.objects.create(dataroom=dataroom, user=collab, invited_by=user)
+        api_client.force_authenticate(user=collab)
+
+        listed = api_client.get('/api/v1/datarooms/')
+        row = next(item for item in listed.data if item['id'] == str(dataroom.id))
+        assert row['can_delete'] is False
+        deleted = api_client.delete(f'/api/v1/datarooms/{dataroom.id}/')
+        assert deleted.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_collaborator_with_delete_any_can_delete(self, api_client, dataroom, user, organization):
+        role = self._role_with_delete(organization, '')
+        collab = User.objects.create_user(
+            email="deleteany@test.com", username="deleteany@test.com", password="password",
+            organization=organization, organization_role=role,
+        )
+        DataroomCollaborator.objects.create(dataroom=dataroom, user=collab, invited_by=user)
+        api_client.force_authenticate(user=collab)
+
+        listed = api_client.get('/api/v1/datarooms/')
+        row = next(item for item in listed.data if item['id'] == str(dataroom.id))
+        assert row['can_delete'] is True
+        deleted = api_client.delete(f'/api/v1/datarooms/{dataroom.id}/')
+        assert deleted.status_code == status.HTTP_204_NO_CONTENT
+        assert not Dataroom.objects.filter(id=dataroom.id).exists()
+
+    def test_owner_can_delete_without_delete_grant(self, api_client, dataroom):
+        listed = api_client.get('/api/v1/datarooms/')
+        row = next(item for item in listed.data if item['id'] == str(dataroom.id))
+        assert row['can_delete'] is True
+        deleted = api_client.delete(f'/api/v1/datarooms/{dataroom.id}/')
+        assert deleted.status_code == status.HTTP_204_NO_CONTENT
+
     def test_owner_can_share_dataroom_without_role_grant(self, api_client, dataroom):
         response = api_client.post('/api/v1/share-links/', {
             'dataroom': str(dataroom.id),

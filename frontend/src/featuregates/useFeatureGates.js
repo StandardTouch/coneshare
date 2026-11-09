@@ -7,7 +7,6 @@ export function useFeatureGates() {
     apiKeysEnabled,
     automationEnabled,
     fileRequestsEnabled,
-    esignEnabled,
     documentsEnabled,
     trashEnabled,
     signatureEnabled,
@@ -24,6 +23,6 @@ export function useFeatureGates() {
     canAccessApiDocs: isAuthenticated && swaggerEnabled !== false,
     canAccessDocuments: isAuthenticated && documentsEnabled !== false,
     canAccessTrash: isAuthenticated && trashEnabled !== false,
-    canAccessSignatures: isAuthenticated && esignEnabled !== false && signatureEnabled !== false,
+    canAccessSignatures: isAuthenticated && signatureEnabled !== false,
   };
 }

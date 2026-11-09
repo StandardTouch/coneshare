@@ -55,6 +55,23 @@ describe('useFeatureGates', () => {
     expect(result.current.canAccessAutomations).toBe(true);
     expect(result.current.canAccessApiDocs).toBe(true);
     expect(result.current.canAccessFileRequests).toBe(true);
+    expect(result.current.canAccessSignatures).toBe(true);
+  });
+
+  it('hides signatures when the role does not have the signature permission', () => {
+    useBranding.mockReturnValue({
+      swaggerEnabled: true,
+      apiKeysEnabled: true,
+      automationEnabled: true,
+      fileRequestsEnabled: true,
+      documentsEnabled: true,
+      trashEnabled: true,
+      signatureEnabled: false,
+      esignEnabled: true,
+    });
+    useUser.mockReturnValue({ user: { role: 'admin' } });
+
+    const { result } = renderHook(() => useFeatureGates());
     expect(result.current.canAccessSignatures).toBe(false);
   });
 

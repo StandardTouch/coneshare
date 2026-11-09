@@ -3,10 +3,10 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useSortedList } from '../hooks/useSortedList';
 import { useItemSelection } from '../hooks/useItemSelection';
-import { ShareIcon, Star, ArrowLeft, ChevronDown, FolderUp, Plus, Loader2, AlertTriangle, Crown, Users, Sparkles } from 'lucide-react';
+import { ShareIcon, Star, ArrowLeft, ChevronDown, FolderUp, Plus, Loader2, AlertTriangle, Crown, Users, Sparkles, Cloud } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatBytes } from '../lib/formatters';
-import { isDataroomOwner, isDataroomCollaborator, canShareDataroom, canRenameDataroom } from '../utils/formatters';
+import { isDataroomOwner, isDataroomCollaborator, canShareDataroom, canRenameDataroom, canDeleteDataroom } from '../utils/formatters';
 import { selectionIncludesNonDeletableItems } from '../utils/dataroomDeletePermissions';
 import {
   canAddContentToDataroom,
@@ -15,10 +15,11 @@ import {
   canShowDataroomUploadDropdown,
   canUploadFilesToDataroom,
   canUploadFolderToDataroom,
+  canUploadFromDriveToDataroom,
   selectionIncludesNonModifiableItems,
   scopeIncludesNonModifiableItems,
 } from '../utils/dataroomItemPermissions';
-import { getDataroom, addContentToDataroom, createDataroomFolder, moveDataroomContent, getDataroomFolderContents, getShareLinksForDataroom, deleteShareLink, getDataroomViewSessions, getDataroomStats, removeContentFromDataroom, updateDataroomFolder, updateDataroomDocument, updateDataroomBranding, reorderDataroomItems, deleteDataroom, ensureDataroomFolderPaths, uploadDataroomDocument, upgradeDataroomStorage, getDataroomBannerImages } from '../services/api';
+import { getDataroom, addContentToDataroom, createDataroomFolder, moveDataroomContent, getDataroomFolderContents, getShareLinksForDataroom, deleteShareLink, getDataroomViewSessions, getDataroomStats, removeContentFromDataroom, updateDataroomFolder, updateDataroomDocument, updateDataroomBranding, reorderDataroomItems, deleteDataroom, ensureDataroomFolderPaths, uploadDataroomDocument, upgradeDataroomStorage, getDataroomBannerImages, getCloudProviders, getCloudConnections, getDropboxConnectUrl, getGoogleDriveConnectUrl, getNextcloudConnectUrl, importCloudFile, attachCloudImportToDataroom } from '../services/api';
 import { useBreadcrumb } from '../components/layout/BreadcrumbProvider';
 import { useUpload } from '../contexts/UploadProvider';
 import { useUser } from '../contexts/UserProvider';
@@ -27,6 +28,7 @@ import { Button } from '../components/ui/Button';
 import { DocumentPlusIcon } from '../components/icons/DocumentPlusIcon';
 import { FolderPlusIcon } from '../components/icons/FolderPlusIcon';
 import { AddContentDialog } from '../components/dialogs/AddContentDialog';
+import { CloudImportDialog } from '../components/dialogs/CloudImportDialog';
 import { AddFolderDialog } from '../components/dialogs/AddFolderDialog';
 import { DataroomMoveItemsDialog } from '../components/dialogs/DataroomMoveItemsDialog';
 import { DataroomReorderItemsDialog } from '../components/dialogs/DataroomReorderItemsDialog';
@@ -89,6 +91,10 @@ export function DataroomPage() {
   const [dataroomName, setDataroomName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isAddContentOpen, setIsAddContentOpen] = useState(false);
+  const [cloudProviders, setCloudProviders] = useState([]);
+  const [cloudConnections, setCloudConnections] = useState([]);
+  const [isCloudImportOpen, setIsCloudImportOpen] = useState(false);
+  const [activeCloudImport, setActiveCloudImport] = useState(null);
   const [isAddFolderOpen, setIsAddFolderOpen] = useState(false);
   const [isMoveItemsOpen, setIsMoveItemsOpen] = useState(false);
   const [isReorderDialogOpen, setIsReorderDialogOpen] = useState(false);
@@ -156,6 +162,46 @@ export function DataroomPage() {
 
   const handleFolderSelect = () => {
     folderInputRef.current.click();
+  };
+
+  const handleCloudProviderClick = async (provider) => {
+    if (provider.is_connected) {
+      const connection = cloudConnections.find((item) => item.provider === provider.name);
+      if (!connection) {
+        toast.error(t('cloudImport.reconnectRequired'));
+        return;
+      }
+      setActiveCloudImport({ provider, connection });
+      setIsCloudImportOpen(true);
+      return;
+    }
+    try {
+      let response;
+      if (provider.name === 'dropbox') {
+        response = await getDropboxConnectUrl();
+      } else if (provider.name === 'google_drive') {
+        response = await getGoogleDriveConnectUrl();
+      } else if (provider.name === 'nextcloud') {
+        response = await getNextcloudConnectUrl();
+      } else {
+        toast.error(t('cloudImport.pickerFailed'));
+        return;
+      }
+      window.location.href = response.data.authorization_url;
+    } catch (error) {
+      console.error(`Failed to get ${provider.display_name} connect URL:`, error);
+    }
+  };
+
+  const handleCloudImport = async (connectionId, file) => {
+    const imported = await importCloudFile(connectionId, file);
+    const documentId = imported?.data?.id;
+    if (!documentId) return;
+    await attachCloudImportToDataroom(dataroomId, {
+      document_id: documentId,
+      destination_folder_id: currentFolderId || null,
+    });
+    toast.success(t('cloudImport.importStarted', { name: file.fileName }));
   };
 
   const handleFileUploads = async (files) => {
@@ -933,6 +979,39 @@ export function DataroomPage() {
   };
 
   useEffect(() => {
+    const allowed = canUploadFromDriveToDataroom({
+      dataroom,
+      user,
+      folderItem: currentDataroomFolder,
+    });
+    if (!dataroom || !allowed) {
+      setCloudProviders((current) => (current.length === 0 ? current : []));
+      setCloudConnections((current) => (current.length === 0 ? current : []));
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const [providersRes, connectionsRes] = await Promise.all([
+          getCloudProviders(),
+          getCloudConnections(),
+        ]);
+        if (cancelled) return;
+        setCloudProviders(providersRes?.data || []);
+        setCloudConnections(connectionsRes?.data || []);
+      } catch (error) {
+        if (!cancelled) {
+          setCloudProviders([]);
+          setCloudConnections([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [dataroom, user?.id, user?.role, currentDataroomFolder]);
+
+  useEffect(() => {
     if (!dataroom) return;
     const isOwner = isDataroomOwner(dataroom, user);
     const canManage = isOwner || user?.role === 'admin';
@@ -1005,11 +1084,13 @@ export function DataroomPage() {
   const canSeeSettingsTab = roomPermissions.can_see_settings_tab ?? canManage;
   const canEditDataroom = roomPermissions.can_edit_dataroom ?? canManage;
   const canRenameDataroomName = canRenameDataroom(dataroom, user);
+  const canDeleteRoom = canDeleteDataroom(dataroom, user);
   const canManageCollaborators = canManage;
 
   const uploadPermContext = { dataroom, user, folderItem: currentDataroomFolder };
   const canUploadFiles = canUploadFilesToDataroom(uploadPermContext);
   const canUploadFolder = canUploadFolderToDataroom(uploadPermContext);
+  const canUploadFromDrive = canUploadFromDriveToDataroom(uploadPermContext);
   const canAddContent = canAddContentToDataroom(uploadPermContext);
   const canCreateFolder = canCreateFolderInDataroom(uploadPermContext);
   const canShowUploadDropdown = canShowDataroomUploadDropdown(uploadPermContext);
@@ -1144,7 +1225,7 @@ export function DataroomPage() {
                   </DropdownMenu.Trigger>
                   <DropdownMenu.Portal>
                     <DropdownMenu.Content
-                      className="z-[9999] w-40 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none dark:bg-gray-800"
+                      className="z-[9999] w-56 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none dark:bg-gray-800"
                       sideOffset={8}
                     >
                       {canUploadFiles && (
@@ -1165,6 +1246,19 @@ export function DataroomPage() {
                           <span>{t('documents.folder')}</span>
                         </DropdownMenu.Item>
                       )}
+                      {canUploadFromDrive && cloudProviders.length > 0 && (canUploadFiles || canUploadFolder) && (
+                        <DropdownMenu.Separator className="my-1 h-px bg-gray-200 dark:bg-gray-700" />
+                      )}
+                      {canUploadFromDrive && cloudProviders.map((provider) => (
+                        <DropdownMenu.Item
+                          key={provider.name}
+                          onSelect={() => handleCloudProviderClick(provider)}
+                          className="flex w-full cursor-pointer items-center gap-x-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none dark:text-gray-200 hover:dark:bg-gray-700 focus:dark:bg-gray-700"
+                        >
+                          <Cloud className="h-5 w-5" aria-hidden="true" />
+                          <span>{provider.display_name}</span>
+                        </DropdownMenu.Item>
+                      ))}
                     </DropdownMenu.Content>
                   </DropdownMenu.Portal>
                 </DropdownMenu.Root>
@@ -1915,11 +2009,11 @@ export function DataroomPage() {
               </div>
             </div>
 
-            {canManage && (
+            {(canManage || canDeleteRoom) && (
               <div className="rounded-lg border border-red-200 bg-red-50/60 p-5 dark:border-red-900/60 dark:bg-red-950/20 space-y-4">
                 <h3 className="text-sm font-semibold text-red-800 dark:text-red-300">{t('datarooms.dangerZone')}</h3>
 
-                {/* Transfer Ownership Row */}
+                {canManage && (
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-red-200/80 dark:border-red-900/40">
                   <div className="space-y-0.5">
                     <p className="text-sm font-medium text-red-900 dark:text-red-200">{t('datarooms.transferOwnership')}</p>
@@ -1937,8 +2031,9 @@ export function DataroomPage() {
                     {t('datarooms.transferOwnership')}
                   </Button>
                 </div>
+                )}
 
-                {/* Delete Dataroom Row */}
+                {canDeleteRoom && (
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-red-200/80 dark:border-red-900/40">
                   <div className="space-y-0.5">
                     <p className="text-sm font-medium text-red-900 dark:text-red-200">{t('datarooms.deleteDataroomTitle')}</p>
@@ -1956,6 +2051,7 @@ export function DataroomPage() {
                     {t('datarooms.deleteDataroomTitle')}
                   </Button>
                 </div>
+                )}
               </div>
             )}
           </section>
@@ -2000,6 +2096,16 @@ export function DataroomPage() {
         onOpenChange={setIsAddContentOpen}
         onConfirm={handleAddContent}
       />
+      {isCloudImportOpen && (
+        <CloudImportDialog
+          isOpen={isCloudImportOpen}
+          onOpenChange={setIsCloudImportOpen}
+          provider={activeCloudImport?.provider}
+          connection={activeCloudImport?.connection}
+          onImport={handleCloudImport}
+          onImportSuccess={fetchContent}
+        />
+      )}
       <AddFolderDialog
         isOpen={isAddFolderOpen}
         onOpenChange={setIsAddFolderOpen}
