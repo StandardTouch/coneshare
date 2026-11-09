@@ -7,6 +7,8 @@ from core.authentication import generate_raw_api_key
 from core.models import APIKey
 from permissions_rbac.catalogue import (
     PERM_FILE_VIEW,
+    PERM_SYSTEM_DOCUMENTS,
+    PERM_SYSTEM_TRASH,
     PERM_SYSTEM_API_KEYS,
     PERM_SYSTEM_AUTOMATION,
     PERM_SYSTEM_DOCUMENTS,
@@ -193,7 +195,23 @@ class TestPublicSettingsFeatureFlags:
         assert response.data.get('api_keys_enabled') is False
         assert response.data.get('file_requests_enabled') is False
         assert response.data.get('swagger_enabled') is False
+        assert response.data.get('documents_enabled') is False
+        assert response.data.get('trash_enabled') is False
+        assert response.data.get('signature_enabled') is False
         assert response.data.get('role_labels_enabled') is True
+
+    def test_public_settings_documents_trash_follow_role(self, organization, gated_member, member_client):
+        role = _role_without(organization=organization, exclude={PERM_SYSTEM_DOCUMENTS, PERM_SYSTEM_TRASH})
+        DataroomRolePermission.objects.update_or_create(
+            role=role, permission=PERM_FILE_VIEW, defaults={'scope': 'any'}
+        )
+        invalidate_organization_rbac_cache(str(organization.id))
+        gated_member.organization_role = role
+        gated_member.save(update_fields=['organization_role'])
+        response = member_client.get('/api/v1/public/settings/')
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data.get('documents_enabled') is False
+        assert response.data.get('trash_enabled') is False
 
 
 @pytest.mark.django_db

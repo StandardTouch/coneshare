@@ -27,6 +27,7 @@
     "src/tests/pages/ApiKeysSettingsPage.test.jsx",
     "src/tests/featuregates/useFeatureGates.test.jsx",
     "src/tests/featuregates/SidebarFooterApiDocs.test.jsx",
+    "src/tests/featuregates/SidebarSystemPermissions.test.jsx",
     "src/tests/i18n.test.jsx",
     "src/tests/components/esign/CreateRequestDialog.test.jsx",
     "src/tests/components/esign/fieldPlacementUtils.test.js",

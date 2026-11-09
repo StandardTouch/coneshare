@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useBranding } from '../../contexts/BrandingProvider';
+import { useFeatureGates } from '../../featuregates/useFeatureGates';
 import { formatDate } from '../../utils/formatters';
 import { Eye, Upload, RefreshCw, Pencil } from 'lucide-react';
 import { Badge } from '../ui/Badge';
@@ -45,7 +45,7 @@ export function DocumentHeader({
   const canDownloadDoc = canDownload ?? canManage;
   const canWorkspace = canWorkspaceManage ?? canManage;
   const { t } = useTranslation();
-  const { esignEnabled } = useBranding();
+  const { canAccessSignatures } = useFeatureGates();
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(document.name);
 
@@ -254,7 +254,7 @@ export function DocumentHeader({
             </Button>
           )}
           
-          {onRequestSignature && esignEnabled && (
+          {onRequestSignature && canAccessSignatures && (
             <Button
               variant="outline"
               className="mr-2"

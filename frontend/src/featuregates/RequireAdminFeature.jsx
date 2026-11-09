@@ -29,3 +29,44 @@ export function RequireFileRequestsFeature({ children }) {
 
   return children;
 }
+
+/** Route guard: documents workspace (list/trash routes). Detail pages use dataroom grants separately. */
+export function RequireDocumentsFeature({ children }) {
+  const { canAccessDocuments } = useFeatureGates();
+
+  if (!canAccessDocuments) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
+
+export function RequireTrashFeature({ children }) {
+  const { canAccessTrash } = useFeatureGates();
+
+  if (!canAccessTrash) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
+
+export function RequireDocumentAnalyticsFeature({ children }) {
+  const { canAccessDocuments } = useFeatureGates();
+
+  if (!canAccessDocuments) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
+
+export function RequireSignaturesFeature({ children }) {
+  const { canAccessSignatures } = useFeatureGates();
+
+  if (!canAccessSignatures) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}

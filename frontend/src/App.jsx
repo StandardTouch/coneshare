@@ -4,7 +4,13 @@ import { Toaster } from 'sonner';
 import './App.css';
 import MainLayout from './components/layout/MainLayout';
 import RequireAuth from './components/auth/RequireAuth';
-import RequireAdminFeature, { RequireFileRequestsFeature } from './featuregates/RequireAdminFeature';
+import RequireAdminFeature, {
+  RequireDocumentAnalyticsFeature,
+  RequireDocumentsFeature,
+  RequireFileRequestsFeature,
+  RequireSignaturesFeature,
+  RequireTrashFeature,
+} from './featuregates/RequireAdminFeature';
 import { UploadProvider } from './contexts/UploadProvider';
 import { UserProvider } from './contexts/UserProvider';
 import { BrandingProvider } from './contexts/BrandingProvider';
@@ -97,12 +103,33 @@ function App() {
                 </Route>
                 <Route element={<RequireAuth><MainLayout /></RequireAuth>}>
                   <Route path="/" element={<HomePage />} />
-                  <Route path="/documents" element={<DocumentsPage />} />
-                  <Route path="/documents/folders/:folderId" element={<DocumentsPage />} />
+                  <Route
+                    path="/documents"
+                    element={
+                      <RequireDocumentsFeature>
+                        <DocumentsPage />
+                      </RequireDocumentsFeature>
+                    }
+                  />
+                  <Route
+                    path="/documents/folders/:folderId"
+                    element={
+                      <RequireDocumentsFeature>
+                        <DocumentsPage />
+                      </RequireDocumentsFeature>
+                    }
+                  />
                   <Route path="/documents/:documentId" element={<DocumentPage />} />
                   <Route path="/documents/:documentId/versions" element={<DocumentVersionsPage />} />
                   <Route path="/documents/:documentId/links/:linkId" element={<ShareLinkAnalyticsPage />} />
-                  <Route path="/trash" element={<TrashPage />} />
+                  <Route
+                    path="/trash"
+                    element={
+                      <RequireTrashFeature>
+                        <TrashPage />
+                      </RequireTrashFeature>
+                    }
+                  />
                   <Route path="/datarooms" element={<DataroomsPage />} />
                   <Route path="/datarooms/:dataroomId" element={<DataroomPage />} />
                   <Route
@@ -121,8 +148,22 @@ function App() {
                       </RequireFileRequestsFeature>
                     }
                   />
-                  <Route path="/analytics/links" element={<AllLinksPage />} />
-                  <Route path="/analytics/view-sessions" element={<AllViewSessionsPage />} />
+                  <Route
+                    path="/analytics/links"
+                    element={
+                      <RequireDocumentAnalyticsFeature>
+                        <AllLinksPage />
+                      </RequireDocumentAnalyticsFeature>
+                    }
+                  />
+                  <Route
+                    path="/analytics/view-sessions"
+                    element={
+                      <RequireDocumentAnalyticsFeature>
+                        <AllViewSessionsPage />
+                      </RequireDocumentAnalyticsFeature>
+                    }
+                  />
                   <Route
                     path="/automations"
                     element={
@@ -131,8 +172,22 @@ function App() {
                       </RequireAdminFeature>
                     }
                   />
-                  <Route path="/signatures" element={<SignatureRequestsPage />} />
-                  <Route path="/signatures/:requestId" element={<SignatureRequestDetailPage />} />
+                  <Route
+                    path="/signatures"
+                    element={
+                      <RequireSignaturesFeature>
+                        <SignatureRequestsPage />
+                      </RequireSignaturesFeature>
+                    }
+                  />
+                  <Route
+                    path="/signatures/:requestId"
+                    element={
+                      <RequireSignaturesFeature>
+                        <SignatureRequestDetailPage />
+                      </RequireSignaturesFeature>
+                    }
+                  />
                   <Route path="/settings" element={<UserSettingsPage />} />
                   <Route path="/settings/password" element={<PasswordSettingsPage />} />
                   <Route path="/settings/integrations" element={<IntegrationsSettingsPage />} />
