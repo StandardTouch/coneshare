@@ -8,11 +8,17 @@ import '../../i18n';
 
 vi.mock('../../services/api', () => ({
   getAdminUsers: vi.fn(),
+  getAdminRbacRoles: vi.fn(),
   createAdminUser: vi.fn(),
   updateAdminUser: vi.fn(),
   deleteAdminUser: vi.fn(),
   exportAdminUsers: vi.fn(),
 }));
+
+const mockOrgRoles = [
+  { id: 'role-manager', slug: 'manager', name: 'Manager', is_system: true },
+  { id: 'role-admin', slug: 'admin', name: 'Admin', is_system: true },
+];
 
 vi.mock('../../components/ui/Pagination', () => ({
   Pagination: ({ currentPage, totalPages, onPageChange }) =>
@@ -75,6 +81,7 @@ describe('AdminUsersPage', () => {
     api.getAdminUsers.mockResolvedValue({
       data: mockPaginatedResponse,
     });
+    api.getAdminRbacRoles.mockResolvedValue({ data: { results: mockOrgRoles } });
   });
 
   it('renders users table with custom and global storage quotas', async () => {
@@ -265,6 +272,8 @@ describe('AdminUsersPage', () => {
         role: 'member',
         is_active: true,
         custom_file_size_quota_mb: 250,
+        organization_role_id: null,
+        role_label_id: null,
       });
       expect(toast.success).toHaveBeenCalledWith('User updated successfully.');
     });
@@ -303,6 +312,8 @@ describe('AdminUsersPage', () => {
         role: 'member',
         is_active: true,
         custom_file_size_quota_mb: null,
+        organization_role_id: null,
+        role_label_id: null,
       });
       expect(toast.success).toHaveBeenCalledWith('User updated successfully.');
     });
@@ -355,6 +366,9 @@ describe('AdminUsersPage', () => {
         password: 'supersecret',
         role: 'member',
         custom_file_size_quota_mb: 300,
+        organization_role_id: 'role-manager',
+        role_label_id: null,
+        send_invite: false,
       });
       expect(toast.success).toHaveBeenCalledWith("User 'Charlie Brown' created successfully.");
     });

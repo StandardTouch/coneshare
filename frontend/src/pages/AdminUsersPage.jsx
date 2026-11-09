@@ -53,9 +53,9 @@ function AddUserForm({
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    const viewer = orgRoles.find((r) => r.slug === 'viewer');
-    if (viewer) {
-      setFormData((prev) => (prev.roleSelection ? prev : { ...prev, roleSelection: viewer.id }));
+    const manager = orgRoles.find((r) => r.slug === 'manager');
+    if (manager) {
+      setFormData((prev) => (prev.roleSelection ? prev : { ...prev, roleSelection: manager.id }));
     }
   }, [orgRoles]);
 
