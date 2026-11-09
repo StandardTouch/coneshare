@@ -501,6 +501,35 @@ def user_can_delete_dataroom_item(user, dataroom: Dataroom, item_type: str, item
 
 
 SHARE_DATAROOM_DENIED_DETAIL = 'You do not have permission to share this dataroom.'
+DATAROOM_RENAME_DENIED_DETAIL = 'You do not have permission to rename this dataroom.'
+
+
+def user_may_rename_dataroom(user, dataroom) -> bool:
+    """
+    Owners may rename their dataroom.
+    A collaborator may rename it only when their role grants dataroom_edit with scope any.
+    """
+    if user is None or not getattr(user, 'is_authenticated', False) or dataroom is None:
+        return False
+    if getattr(dataroom, 'organization_id', None) != getattr(user, 'organization_id', None):
+        return False
+    if getattr(dataroom, 'created_by_id', None) == user.id:
+        return True
+    role = get_collaborator_dataroom_role(user, dataroom)
+    if role is None:
+        return False
+    grants = _load_role_grants(role)
+    if PERM_DATAROOM_EDIT not in grants:
+        return False
+    return _effective_scope(grants[PERM_DATAROOM_EDIT], PERM_DATAROOM_EDIT) == SCOPE_ANY
+
+
+def assert_user_may_rename_dataroom(user, dataroom) -> None:
+    from rest_framework.exceptions import PermissionDenied
+
+    if user_may_rename_dataroom(user, dataroom):
+        return
+    raise PermissionDenied(DATAROOM_RENAME_DENIED_DETAIL)
 
 
 def user_has_dataroom_share_grant(user) -> bool:

@@ -62,6 +62,7 @@ from permissions_rbac.models import DataroomRole
 from permissions_rbac.seed import ensure_default_roles_for_organization
 from permissions_rbac.services import (
     assert_dataroom_perm,
+    assert_user_may_rename_dataroom,
     filter_dataroom_documents_for_user,
     filter_dataroom_folders_for_user,
     has_perm,
@@ -160,7 +161,6 @@ class DataroomViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         from permissions_rbac.catalogue import PERM_DATAROOM_EDIT, PERM_DATAROOM_SETTINGS_TAB
-        from permissions_rbac.services import assert_dataroom_perm, has_perm
 
         instance = self.get_object()
         user = self.request.user
@@ -182,7 +182,7 @@ class DataroomViewSet(viewsets.ModelViewSet):
             'nda_version',
         }
         if 'name' in validated and validated['name'] != instance.name:
-            assert_dataroom_perm(user, PERM_DATAROOM_EDIT, instance)
+            assert_user_may_rename_dataroom(user, instance)
         if any(field in validated for field in settings_fields):
             if not has_perm(user, PERM_DATAROOM_SETTINGS_TAB, instance):
                 raise PermissionDenied('You do not have permission to edit dataroom settings.')

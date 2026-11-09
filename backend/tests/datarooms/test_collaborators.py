@@ -324,6 +324,84 @@ class TestDataroomCollaborators:
         listed = api_client.get(f'/api/v1/share-links/?dataroom_id={dataroom.id}')
         assert listed.status_code == status.HTTP_403_FORBIDDEN
 
+    def _role_with_edit(self, organization, scope):
+        from permissions_rbac.catalogue import PERM_DATAROOM_EDIT
+        from permissions_rbac.models import DataroomRole, DataroomRolePermission
+        from permissions_rbac.services import invalidate_organization_rbac_cache
+
+        role = DataroomRole.objects.create(
+            organization=organization,
+            slug=f'edit-{scope or "none"}',
+            name=f'Edit {scope or "none"}',
+            is_system=False,
+        )
+        if scope is not None:
+            DataroomRolePermission.objects.create(role=role, permission=PERM_DATAROOM_EDIT, scope=scope)
+        invalidate_organization_rbac_cache(str(organization.id))
+        return role
+
+    def test_collaborator_cannot_rename_without_edit_any(self, api_client, dataroom, user, organization):
+        collab = User.objects.create_user(
+            email="norename@test.com", username="norename@test.com", password="password", organization=organization,
+        )
+        DataroomCollaborator.objects.create(dataroom=dataroom, user=collab, invited_by=user)
+        api_client.force_authenticate(user=collab)
+
+        listed = api_client.get('/api/v1/datarooms/')
+        assert listed.status_code == status.HTTP_200_OK
+        row = next(item for item in listed.data if item['id'] == str(dataroom.id))
+        assert row['can_rename'] is False
+
+        renamed = api_client.patch(
+            f'/api/v1/datarooms/{dataroom.id}/', {'name': 'Should Not Rename'}, format='json',
+        )
+        assert renamed.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_collaborator_with_edit_own_cannot_rename_another_users_dataroom(self, api_client, dataroom, user, organization):
+        role = self._role_with_edit(organization, 'own')
+        collab = User.objects.create_user(
+            email="editown@test.com", username="editown@test.com", password="password",
+            organization=organization, organization_role=role,
+        )
+        DataroomCollaborator.objects.create(dataroom=dataroom, user=collab, invited_by=user)
+        api_client.force_authenticate(user=collab)
+
+        listed = api_client.get('/api/v1/datarooms/')
+        row = next(item for item in listed.data if item['id'] == str(dataroom.id))
+        assert row['can_rename'] is False
+        renamed = api_client.patch(
+            f'/api/v1/datarooms/{dataroom.id}/', {'name': 'Own Scope Rename'}, format='json',
+        )
+        assert renamed.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_collaborator_with_edit_any_can_rename(self, api_client, dataroom, user, organization):
+        role = self._role_with_edit(organization, 'any')
+        collab = User.objects.create_user(
+            email="editany@test.com", username="editany@test.com", password="password",
+            organization=organization, organization_role=role,
+        )
+        DataroomCollaborator.objects.create(dataroom=dataroom, user=collab, invited_by=user)
+        api_client.force_authenticate(user=collab)
+
+        listed = api_client.get('/api/v1/datarooms/')
+        row = next(item for item in listed.data if item['id'] == str(dataroom.id))
+        assert row['can_rename'] is True
+        renamed = api_client.patch(
+            f'/api/v1/datarooms/{dataroom.id}/', {'name': 'Renamed By Editor'}, format='json',
+        )
+        assert renamed.status_code == status.HTTP_200_OK
+        dataroom.refresh_from_db()
+        assert dataroom.name == 'Renamed By Editor'
+
+    def test_owner_can_rename_without_edit_grant(self, api_client, dataroom):
+        listed = api_client.get('/api/v1/datarooms/')
+        row = next(item for item in listed.data if item['id'] == str(dataroom.id))
+        assert row['can_rename'] is True
+        renamed = api_client.patch(
+            f'/api/v1/datarooms/{dataroom.id}/', {'name': 'Owner Renamed Room'}, format='json',
+        )
+        assert renamed.status_code == status.HTTP_200_OK
+
     def test_owner_can_share_dataroom_without_role_grant(self, api_client, dataroom):
         response = api_client.post('/api/v1/share-links/', {
             'dataroom': str(dataroom.id),

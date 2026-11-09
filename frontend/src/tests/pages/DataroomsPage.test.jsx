@@ -28,8 +28,8 @@ vi.mock('react-router-dom', async () => {
 
 describe('DataroomsPage', () => {
     const mockDatarooms = [
-        { id: 'dr1', name: 'Dataroom One', created_at: '2023-01-01T12:00:00Z' },
-        { id: 'dr2', name: 'Dataroom Two', created_at: '2023-01-02T12:00:00Z' },
+        { id: 'dr1', name: 'Dataroom One', created_at: '2023-01-01T12:00:00Z', can_rename: true },
+        { id: 'dr2', name: 'Dataroom Two', created_at: '2023-01-02T12:00:00Z', can_rename: true },
     ];
 
     beforeEach(() => {
@@ -149,7 +149,8 @@ describe('DataroomsPage', () => {
             const card = (await screen.findByText('Team Project Room')).closest('div.group');
             await user.click(await within(card).findByRole('button', { name: 'Actions' }));
             expect(screen.queryByText('Share')).not.toBeInTheDocument();
-            expect(screen.getByText('Rename')).toBeInTheDocument();
+            expect(screen.queryByText('Rename')).not.toBeInTheDocument();
+            expect(screen.getByText(/Leave Dataroom/i)).toBeInTheDocument();
         });
 
         it('should create a new dataroom and refresh the list', async () => {

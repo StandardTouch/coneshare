@@ -16,7 +16,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../com
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/Tabs';
 import { getDatarooms, deleteDataroom, removeDataroomCollaborator } from '../services/api';
 import { useUser } from '../contexts/UserProvider';
-import { formatDate, getAvatarInitial, isDataroomOwner, isDataroomCollaborator, canShareDataroom } from '../utils/formatters';
+import { formatDate, getAvatarInitial, isDataroomOwner, isDataroomCollaborator, canShareDataroom, canRenameDataroom } from '../utils/formatters';
 
 function DataroomCardIcon({ dataroom }) {
   const [hasError, setHasError] = useState(false);
@@ -196,6 +196,8 @@ export function DataroomsPage() {
             const isOwner = isDataroomOwner(dataroom, currentUser);
             const isCollaborator = isDataroomCollaborator(dataroom, currentUser);
             const canDelete = isOwner || isOrgAdmin;
+            const canRename = canRenameDataroom(dataroom, currentUser);
+            const canShare = canShareDataroom(dataroom, currentUser);
 
             return (
               <div
@@ -240,6 +242,7 @@ export function DataroomsPage() {
                           align="end"
                           onClick={(e) => e.stopPropagation()}
                         >
+                          {canRename && (
                           <DropdownMenu.Item
                             onClick={() => setDataroomToRename(dataroom)}
                             className="flex w-full cursor-pointer items-center gap-x-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none dark:text-gray-200 hover:dark:bg-gray-700 focus:dark:bg-gray-700"
@@ -247,7 +250,8 @@ export function DataroomsPage() {
                             <Pencil className="h-4 w-4" />
                             <span>{t('documents.rename')}</span>
                           </DropdownMenu.Item>
-                          {canShareDataroom(dataroom, currentUser) && (
+                          )}
+                          {canShare && (
                           <DropdownMenu.Item
                             onClick={() => navigate(`/datarooms/${dataroom.id}?tab=links&openCreateLink=true`)}
                             className="flex w-full cursor-pointer items-center gap-x-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none dark:text-gray-200 hover:dark:bg-gray-700 focus:dark:bg-gray-700"
@@ -257,7 +261,9 @@ export function DataroomsPage() {
                           </DropdownMenu.Item>
                           )}
 
+                          {(canRename || canShare) && (
                           <DropdownMenu.Separator className="my-1 h-px bg-gray-200 dark:bg-gray-700" />
+                          )}
 
                           {canDelete ? (
                             <DropdownMenu.Item

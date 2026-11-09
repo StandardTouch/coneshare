@@ -6,7 +6,7 @@ import { useItemSelection } from '../hooks/useItemSelection';
 import { ShareIcon, Star, ArrowLeft, ChevronDown, FolderUp, Plus, Loader2, AlertTriangle, Crown, Users, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatBytes } from '../lib/formatters';
-import { isDataroomOwner, isDataroomCollaborator, canShareDataroom } from '../utils/formatters';
+import { isDataroomOwner, isDataroomCollaborator, canShareDataroom, canRenameDataroom } from '../utils/formatters';
 import { selectionIncludesNonDeletableItems } from '../utils/dataroomDeletePermissions';
 import {
   canAddContentToDataroom,
@@ -1004,6 +1004,7 @@ export function DataroomPage() {
   const canSeeQnaTab = roomPermissions.can_see_qna_tab ?? canManage;
   const canSeeSettingsTab = roomPermissions.can_see_settings_tab ?? canManage;
   const canEditDataroom = roomPermissions.can_edit_dataroom ?? canManage;
+  const canRenameDataroomName = canRenameDataroom(dataroom, user);
   const canManageCollaborators = canManage;
 
   const uploadPermContext = { dataroom, user, folderItem: currentDataroomFolder };
@@ -1317,6 +1318,7 @@ export function DataroomPage() {
         </TabsContent>
         <TabsContent value="settings" className="mt-6">
           <section className="space-y-8">
+            {canRenameDataroomName && (
             <div className="pb-6 border-b border-gray-200 dark:border-gray-800">
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-sm font-semibold">{t('datarooms.generalSettings')}</h3>
@@ -1335,6 +1337,7 @@ export function DataroomPage() {
                 />
               </div>
             </div>
+            )}
 
             {/* Logo Settings Section */}
             <div className="pb-6 border-b border-gray-200 dark:border-gray-800">

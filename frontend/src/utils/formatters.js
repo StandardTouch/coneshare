@@ -77,8 +77,17 @@ export function getAvatarInitial(name, email) {
 }
 
 /**
- * Whether the user may share this dataroom. Prefers the API flag, then ownership.
+ * Rename is allowed for the owner, or when the API says the role's Edit grant covers this room.
  */
+export function canRenameDataroom(dataroom, user) {
+  if (!dataroom) return false;
+  if (typeof dataroom.can_rename === 'boolean') return dataroom.can_rename;
+  if (typeof dataroom.current_user_permissions?.can_rename_dataroom === 'boolean') {
+    return dataroom.current_user_permissions.can_rename_dataroom;
+  }
+  return isDataroomOwner(dataroom, user);
+}
+
 export function canShareDataroom(dataroom, user) {
   if (!dataroom) return false;
   if (typeof dataroom.can_share === 'boolean') return dataroom.can_share;

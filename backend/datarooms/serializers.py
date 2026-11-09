@@ -29,6 +29,7 @@ from permissions_rbac.services import (
     has_perm,
     item_permissions_for_user,
     user_dataroom_capabilities,
+    user_may_rename_dataroom,
     user_may_share_dataroom,
 )
 from permissions_rbac.models import DataroomRole
@@ -196,6 +197,7 @@ class DataroomSerializer(serializers.ModelSerializer):
     current_user_role = serializers.SerializerMethodField()
     collaborator_count = serializers.SerializerMethodField()
     can_share = serializers.SerializerMethodField()
+    can_rename = serializers.SerializerMethodField()
 
     def _get_branding_banner_url(self, obj):
         if not obj.branding_banner:
@@ -282,6 +284,14 @@ class DataroomSerializer(serializers.ModelSerializer):
             return False
         return user_may_share_dataroom(user, obj)
 
+    @extend_schema_field(serializers.BooleanField())
+    def get_can_rename(self, obj) -> bool:
+        request = self.context.get('request')
+        user = getattr(request, 'user', None) if request else None
+        if not user or not getattr(user, 'is_authenticated', False):
+            return False
+        return user_may_rename_dataroom(user, obj)
+
     @extend_schema_field(serializers.CharField())
     def get_current_user_role(self, obj) -> str:
         request = self.context.get('request')
@@ -335,7 +345,7 @@ class DataroomSerializer(serializers.ModelSerializer):
         model = Dataroom
         fields = [
             'id', 'name', 'organization', 'created_at', 'updated_at', 'created_by',
-            'owner', 'current_user_role', 'collaborator_count', 'can_share',
+            'owner', 'current_user_role', 'collaborator_count', 'can_share', 'can_rename',
             'storage_quota_mb', 'storage_used_bytes', 'storage_version',
             'show_file_index',
             'enable_qna',
@@ -345,7 +355,7 @@ class DataroomSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'id', 'organization', 'created_at', 'updated_at', 'created_by',
-            'owner', 'current_user_role', 'collaborator_count', 'can_share',
+            'owner', 'current_user_role', 'collaborator_count', 'can_share', 'can_rename',
             'storage_used_bytes', 'storage_version'
         ]
 
@@ -619,6 +629,7 @@ class DataroomDetailSerializer(serializers.ModelSerializer):
             'can_see_settings_tab': caps['can_see_settings_tab'],
             'can_edit_dataroom': caps['can_edit_dataroom'],
             'can_share_dataroom': user_may_share_dataroom(user, obj),
+            'can_rename_dataroom': user_may_rename_dataroom(user, obj),
         }
 
     @extend_schema_field(serializers.IntegerField())
