@@ -445,6 +445,8 @@
     "noDatarooms": "Noch keine Datenräume erstellt",
     "noDataroomsFound": "Keine Datenräume gefunden.",
     "getStartedNotice": "Erstellen Sie Ihren ersten Datenraum, um zu beginnen.",
+    "noCreatePermissionNotice": "Sie haben keine Berechtigung, einen Datenraum zu erstellen.",
+    "listDescriptionNoCreate": "Datenräume, denen Sie angehören, werden hier aufgelistet.",
     "createdOn": "Erstellt am {{date}}",
     "deleteConfirmTitle": "„{{name}}“ löschen?",
     "deleteConfirmDescription": "Diese Aktion kann nicht rückgängig gemacht werden. Der Datenraum und alle darin enthaltenen Dateien werden dauerhaft gelöscht.",

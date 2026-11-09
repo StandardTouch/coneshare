@@ -6,7 +6,7 @@ import { useItemSelection } from '../hooks/useItemSelection';
 import { ShareIcon, Star, ArrowLeft, ChevronDown, FolderUp, Plus, Loader2, AlertTriangle, Crown, Users, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatBytes } from '../lib/formatters';
-import { isDataroomOwner, isDataroomCollaborator } from '../utils/formatters';
+import { isDataroomOwner, isDataroomCollaborator, canShareDataroom } from '../utils/formatters';
 import { selectionIncludesNonDeletableItems } from '../utils/dataroomDeletePermissions';
 import {
   canAddContentToDataroom,
@@ -370,22 +370,24 @@ export function DataroomPage() {
   );
   const { selection, setSelection, setLastSelectedItem, handleItemSelect, handleClearSelection } = useItemSelection(allItems);
     
-  useEffect(() => {
-    if (activeTab === 'links' || activeTab === 'qna') {
-      fetchLinks();
-    }
-  }, [activeTab, fetchLinks]);
+  const mayShareDataroom = canShareDataroom(dataroom, user);
 
   useEffect(() => {
-    if (activeTab === 'links') {
+    if (activeTab === 'qna' || (activeTab === 'links' && mayShareDataroom)) {
+      fetchLinks();
+    }
+  }, [activeTab, fetchLinks, mayShareDataroom]);
+
+  useEffect(() => {
+    if (activeTab === 'links' && mayShareDataroom) {
       fetchViews();
       fetchStats();
     }
-  }, [activeTab, fetchViews, fetchStats]);  
+  }, [activeTab, fetchViews, fetchStats, mayShareDataroom]);  
 
   useEffect(() => {
     const shouldOpenCreateLink = searchParams.get('openCreateLink') === 'true';
-    if (!shouldOpenCreateLink || activeTab !== 'links') {
+    if (!shouldOpenCreateLink || activeTab !== 'links' || !mayShareDataroom) {
       return;
     }
 
@@ -397,7 +399,7 @@ export function DataroomPage() {
       next.delete('openCreateLink');
       return next;
     }, { replace: true });
-  }, [activeTab, searchParams, setSearchParams]);
+  }, [activeTab, searchParams, setSearchParams, mayShareDataroom]);
     
   useEffect(() => {
     // Reset selection when folder changes
@@ -943,6 +945,10 @@ export function DataroomPage() {
     }
     if (activeTab === 'settings' && !seeSettings) {
       updateSearchParam('tab', 'documents');
+      return;
+    }
+    if (activeTab === 'links' && !canShareDataroom(dataroom, user)) {
+      updateSearchParam('tab', 'documents');
     }
   }, [activeTab, dataroom, user, updateSearchParam]);
 
@@ -1164,7 +1170,7 @@ export function DataroomPage() {
               )}
             </>
           )}
-          {activeTab === 'links' && (
+          {activeTab === 'links' && mayShareDataroom && (
             <Button onClick={handleCreateLink}>
               <ShareIcon className="mr-2 h-4 w-4" />
               {t('links.createLink')}
@@ -1188,7 +1194,7 @@ export function DataroomPage() {
       <Tabs value={activeTab} onValueChange={(tab) => updateSearchParam('tab', tab)} className="mt-4">
         <TabsList>
           <TabsTrigger value="documents">{t('datarooms.tabDocuments')}</TabsTrigger>
-          <TabsTrigger value="links">{t('datarooms.tabLinks')}</TabsTrigger>
+          {mayShareDataroom && <TabsTrigger value="links">{t('datarooms.tabLinks')}</TabsTrigger>}
           {canSeeQnaTab && <TabsTrigger value="qna">{t('datarooms.tabQna')}</TabsTrigger>}
           {canSeeSettingsTab && <TabsTrigger value="settings">{t('datarooms.tabSettings')}</TabsTrigger>}
         </TabsList>

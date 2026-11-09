@@ -19,6 +19,7 @@ from permissions_rbac.catalogue import (
     PERM_DATAROOM_EDIT,
     PERM_DATAROOM_QNA_TAB,
     PERM_DATAROOM_SETTINGS_TAB,
+    PERM_DATAROOM_SHARE,
     PERM_DELETE,
     PERM_DELETE_DATAROOM,
     PERM_DOWNLOAD,
@@ -497,6 +498,61 @@ def user_can_modify_dataroom_item(user, dataroom: Dataroom, item_type: str, item
 
 def user_can_delete_dataroom_item(user, dataroom: Dataroom, item_type: str, item) -> bool:
     return has_perm(user, PERM_DELETE, dataroom, item, item_type)
+
+
+SHARE_DATAROOM_DENIED_DETAIL = 'You do not have permission to share this dataroom.'
+
+
+def user_has_dataroom_share_grant(user) -> bool:
+    """Organization-role grant for sharing datarooms. Owners are not implied here."""
+    if user is None or not getattr(user, 'is_authenticated', False):
+        return False
+    role = resolve_organization_role(user)
+    if role is None:
+        return False
+    return PERM_DATAROOM_SHARE in _load_role_grants(role)
+
+
+def user_may_share_dataroom(user, dataroom) -> bool:
+    """
+    Dataroom owners may share their rooms.
+    Everyone else, including organization admins, needs ``dataroom_share`` on their role
+    and must already be an organization admin or a collaborator on that room.
+    """
+    if user is None or not getattr(user, 'is_authenticated', False) or dataroom is None:
+        return False
+    if getattr(dataroom, 'organization_id', None) != getattr(user, 'organization_id', None):
+        return False
+    if getattr(dataroom, 'created_by_id', None) == user.id:
+        return True
+    if not user_has_dataroom_share_grant(user):
+        return False
+    if getattr(user, 'role', '') == 'admin':
+        return True
+    return DataroomCollaborator.objects.filter(dataroom=dataroom, user=user).exists()
+
+
+def user_may_mutate_dataroom_share_link(user, share_link) -> bool:
+    """Update or delete a dataroom share link: owner, granted admin, or the link's creator."""
+    dataroom = getattr(share_link, 'dataroom', None)
+    if dataroom is None or not user_may_share_dataroom(user, dataroom):
+        return False
+    if dataroom.created_by_id == user.id:
+        return True
+    if getattr(user, 'role', '') == 'admin' and dataroom.organization_id == user.organization_id:
+        return True
+    return (
+        share_link.created_by_id == user.id
+        and DataroomCollaborator.objects.filter(dataroom=dataroom, user=user).exists()
+    )
+
+
+def assert_user_may_share_dataroom(user, dataroom) -> None:
+    from rest_framework.exceptions import PermissionDenied
+
+    if user_may_share_dataroom(user, dataroom):
+        return
+    raise PermissionDenied(SHARE_DATAROOM_DENIED_DETAIL)
 
 
 def assert_user_may_create_dataroom(user) -> None:

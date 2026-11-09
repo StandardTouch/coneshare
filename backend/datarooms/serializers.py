@@ -25,7 +25,12 @@ from .models import (
 )
 from .collaborator_delete_permissions import user_can_delete_dataroom_item, user_can_modify_dataroom_item
 from permissions_rbac.catalogue import PERM_UPLOAD
-from permissions_rbac.services import has_perm, item_permissions_for_user, user_dataroom_capabilities
+from permissions_rbac.services import (
+    has_perm,
+    item_permissions_for_user,
+    user_dataroom_capabilities,
+    user_may_share_dataroom,
+)
 from permissions_rbac.models import DataroomRole
 from permissions_rbac.dataroom_access import filter_ancestor_chain_for_user
 from .utils import build_ordered_dataroom_items, is_dataroom_owner_or_admin
@@ -190,6 +195,7 @@ class DataroomSerializer(serializers.ModelSerializer):
     owner = serializers.SerializerMethodField()
     current_user_role = serializers.SerializerMethodField()
     collaborator_count = serializers.SerializerMethodField()
+    can_share = serializers.SerializerMethodField()
 
     def _get_branding_banner_url(self, obj):
         if not obj.branding_banner:
@@ -268,6 +274,14 @@ class DataroomSerializer(serializers.ModelSerializer):
             return DataroomCollaboratorUserSerializer(obj.created_by).data
         return None
 
+    @extend_schema_field(serializers.BooleanField())
+    def get_can_share(self, obj) -> bool:
+        request = self.context.get('request')
+        user = getattr(request, 'user', None) if request else None
+        if not user or not getattr(user, 'is_authenticated', False):
+            return False
+        return user_may_share_dataroom(user, obj)
+
     @extend_schema_field(serializers.CharField())
     def get_current_user_role(self, obj) -> str:
         request = self.context.get('request')
@@ -321,7 +335,7 @@ class DataroomSerializer(serializers.ModelSerializer):
         model = Dataroom
         fields = [
             'id', 'name', 'organization', 'created_at', 'updated_at', 'created_by',
-            'owner', 'current_user_role', 'collaborator_count',
+            'owner', 'current_user_role', 'collaborator_count', 'can_share',
             'storage_quota_mb', 'storage_used_bytes', 'storage_version',
             'show_file_index',
             'enable_qna',
@@ -331,7 +345,7 @@ class DataroomSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'id', 'organization', 'created_at', 'updated_at', 'created_by',
-            'owner', 'current_user_role', 'collaborator_count',
+            'owner', 'current_user_role', 'collaborator_count', 'can_share',
             'storage_used_bytes', 'storage_version'
         ]
 
@@ -526,6 +540,7 @@ class DataroomDetailSerializer(serializers.ModelSerializer):
     owner = serializers.SerializerMethodField()
     current_user_role = serializers.SerializerMethodField()
     current_user_permissions = serializers.SerializerMethodField()
+    can_share = serializers.SerializerMethodField()
     collaborator_count = serializers.SerializerMethodField()
     collaborators = serializers.SerializerMethodField()
     storage_used_bytes = serializers.SerializerMethodField()
@@ -538,7 +553,7 @@ class DataroomDetailSerializer(serializers.ModelSerializer):
         model = Dataroom
         fields = [
             'id', 'name', 'organization', 'created_at', 'updated_at', 'created_by',
-            'owner', 'current_user_role', 'current_user_permissions', 'collaborator_count', 'collaborators',
+            'owner', 'current_user_role', 'current_user_permissions', 'can_share', 'collaborator_count', 'collaborators',
             'storage_quota_mb', 'storage_used_bytes', 'storage_version',
             'show_file_index',
             'enable_qna',
@@ -578,6 +593,14 @@ class DataroomDetailSerializer(serializers.ModelSerializer):
             return org_role.slug
         return 'none'
 
+    @extend_schema_field(serializers.BooleanField())
+    def get_can_share(self, obj) -> bool:
+        request = self.context.get('request')
+        user = getattr(request, 'user', None) if request else None
+        if not user or not getattr(user, 'is_authenticated', False):
+            return False
+        return user_may_share_dataroom(user, obj)
+
     @extend_schema_field(serializers.DictField())
     def get_current_user_permissions(self, obj):
         request = self.context.get('request')
@@ -595,6 +618,7 @@ class DataroomDetailSerializer(serializers.ModelSerializer):
             'can_see_qna_tab': caps['can_see_qna_tab'],
             'can_see_settings_tab': caps['can_see_settings_tab'],
             'can_edit_dataroom': caps['can_edit_dataroom'],
+            'can_share_dataroom': user_may_share_dataroom(user, obj),
         }
 
     @extend_schema_field(serializers.IntegerField())

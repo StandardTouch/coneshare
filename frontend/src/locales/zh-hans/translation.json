@@ -447,6 +447,8 @@
     "noSharedDatarooms": "暂无与您共享的资料室",
     "noSharedDataroomsNotice": "其他成员或合作伙伴邀请您协同的资料室将显示在此处。",
     "getStartedNotice": "创建您的第一个资料室以开始使用。",
+    "noCreatePermissionNotice": "您没有创建资料室的权限。",
+    "listDescriptionNoCreate": "您所属的资料室会显示在这里。",
     "createdOn": "创建于 {{date}}",
     "deleteConfirmTitle": "删除 \"{{name}}\"？",
     "deleteConfirmDescription": "此操作无法撤销。这将永久删除此资料室及其所有内容。",

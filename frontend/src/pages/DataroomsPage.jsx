@@ -16,7 +16,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../com
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/Tabs';
 import { getDatarooms, deleteDataroom, removeDataroomCollaborator } from '../services/api';
 import { useUser } from '../contexts/UserProvider';
-import { formatDate, getAvatarInitial, isDataroomOwner, isDataroomCollaborator } from '../utils/formatters';
+import { formatDate, getAvatarInitial, isDataroomOwner, isDataroomCollaborator, canShareDataroom } from '../utils/formatters';
 
 function DataroomCardIcon({ dataroom }) {
   const [hasError, setHasError] = useState(false);
@@ -127,7 +127,7 @@ export function DataroomsPage() {
         <div>
           <h1 className="text-2xl font-semibold">{t('datarooms.title')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {t('datarooms.addDescription')}
+            {canCreateDataroom ? t('datarooms.addDescription') : t('datarooms.listDescriptionNoCreate')}
           </p>
         </div>
         {canCreateDataroom && (
@@ -180,12 +180,14 @@ export function DataroomsPage() {
               {currentScope === 'created_by_me' ? t('datarooms.noDatarooms') : t('datarooms.noDataroomsFound')}
             </h3>
             <p className="mt-1.5 text-sm text-muted-foreground max-w-sm">
-              {t('datarooms.getStartedNotice')}
+              {canCreateDataroom ? t('datarooms.getStartedNotice') : t('datarooms.noCreatePermissionNotice')}
             </p>
+            {canCreateDataroom && (
             <Button className="mt-5 gap-2" onClick={() => setIsAddDataroomOpen(true)}>
               <PlusIcon className="h-4 w-4" />
               {t('datarooms.addDataroom')}
             </Button>
+            )}
           </div>
         )
       ) : (
@@ -245,6 +247,7 @@ export function DataroomsPage() {
                             <Pencil className="h-4 w-4" />
                             <span>{t('documents.rename')}</span>
                           </DropdownMenu.Item>
+                          {canShareDataroom(dataroom, currentUser) && (
                           <DropdownMenu.Item
                             onClick={() => navigate(`/datarooms/${dataroom.id}?tab=links&openCreateLink=true`)}
                             className="flex w-full cursor-pointer items-center gap-x-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none dark:text-gray-200 hover:dark:bg-gray-700 focus:dark:bg-gray-700"
@@ -252,6 +255,7 @@ export function DataroomsPage() {
                             <Share2 className="h-4 w-4" />
                             <span>{t('documents.share')}</span>
                           </DropdownMenu.Item>
+                          )}
 
                           <DropdownMenu.Separator className="my-1 h-px bg-gray-200 dark:bg-gray-700" />
 

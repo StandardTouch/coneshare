@@ -701,6 +701,8 @@
     "noSharedDatarooms": "Aucune dataroom partagée",
     "noSharedDataroomsNotice": "Les datarooms partagées avec vous par des collègues ou partenaires apparaîtront ici.",
     "getStartedNotice": "Commencez par créer votre première dataroom.",
+    "noCreatePermissionNotice": "Vous n'avez pas l'autorisation de créer une dataroom.",
+    "listDescriptionNoCreate": "Les datarooms auxquelles vous appartenez sont listées ici.",
     "createdOn": "Créée le {{date}}",
     "deleteConfirmTitle": "Supprimer \"{{name}}\" ?",
     "deleteConfirmDescription": "Cette action est irréversible. La dataroom et l'ensemble de son contenu seront définitivement supprimés.",

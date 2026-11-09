@@ -45,6 +45,7 @@ PERM_DATAROOM_EDIT = 'dataroom_edit'
 PERM_DATAROOM_DELETE = 'dataroom_delete'
 PERM_DATAROOM_QNA_TAB = 'dataroom_qna_tab'
 PERM_DATAROOM_SETTINGS_TAB = 'dataroom_settings_tab'
+PERM_DATAROOM_SHARE = 'dataroom_share'
 
 # --- Dataroom: folder ---
 PERM_FOLDER_CREATE = 'folder_create'
@@ -84,6 +85,7 @@ ALL_DATAROOM_PERMISSIONS: List[str] = [
     PERM_DATAROOM_DELETE,
     PERM_DATAROOM_QNA_TAB,
     PERM_DATAROOM_SETTINGS_TAB,
+    PERM_DATAROOM_SHARE,
     PERM_FOLDER_CREATE,
     PERM_FOLDER_RENAME,
     PERM_FOLDER_DELETE,
@@ -194,6 +196,9 @@ PERMISSION_DEFINITIONS: Dict[str, PermissionDefinition] = {
     ),
     PERM_DATAROOM_SETTINGS_TAB: PermissionDefinition(
         PERM_DATAROOM_SETTINGS_TAB, 'Settings Tab', False, 'dataroom_global', 'Datarooms — Global Settings'
+    ),
+    PERM_DATAROOM_SHARE: PermissionDefinition(
+        PERM_DATAROOM_SHARE, 'Share', False, 'dataroom_global', 'Datarooms — Global Settings'
     ),
     PERM_FOLDER_CREATE: PermissionDefinition(
         PERM_FOLDER_CREATE, 'Create', False, 'dataroom_folder', 'Datarooms — Folder'

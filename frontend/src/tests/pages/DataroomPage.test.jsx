@@ -679,6 +679,22 @@ describe('DataroomPage', () => {
             api.deleteShareLink.mockResolvedValue({});
         });
 
+        it('hides the share links tab when the room cannot be shared', async () => {
+            api.getDataroom.mockResolvedValue({
+                data: {
+                    ...mockDataroomRoot,
+                    created_by: { id: 'someone-else', email: 'owner@example.com', name: 'Owner' },
+                    current_user_role: 'collaborator',
+                    can_share: false,
+                    current_user_permissions: { can_share_dataroom: false },
+                },
+            });
+            renderComponent();
+            expect(await screen.findByRole('heading', { name: 'Test Dataroom' })).toBeInTheDocument();
+            expect(screen.queryByRole('tab', { name: /links|share links/i })).not.toBeInTheDocument();
+            expect(api.getShareLinksForDataroom).not.toHaveBeenCalled();
+        });
+
         it('fetches and displays links and view sessions when tab is clicked', async () => {
             const user = userEvent.setup();
             renderComponent();

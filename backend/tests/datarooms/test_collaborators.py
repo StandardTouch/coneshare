@@ -255,8 +255,23 @@ class TestDataroomCollaborators:
         assert len(r3.data) == 2
 
     def test_collaborator_share_link_co_management(self, api_client, dataroom, user, organization):
-        collab1 = User.objects.create_user(email="c1@test.com", username="c1@test.com", password="password", organization=organization)
-        collab2 = User.objects.create_user(email="c2@test.com", username="c2@test.com", password="password", organization=organization)
+        from permissions_rbac.catalogue import PERM_DATAROOM_SHARE
+        from permissions_rbac.models import DataroomRole, DataroomRolePermission
+        from permissions_rbac.services import invalidate_organization_rbac_cache
+
+        share_role = DataroomRole.objects.create(
+            organization=organization, slug='room-sharer', name='Room Sharer', is_system=False,
+        )
+        DataroomRolePermission.objects.create(role=share_role, permission=PERM_DATAROOM_SHARE, scope='')
+        collab1 = User.objects.create_user(
+            email="c1@test.com", username="c1@test.com", password="password",
+            organization=organization, organization_role=share_role,
+        )
+        collab2 = User.objects.create_user(
+            email="c2@test.com", username="c2@test.com", password="password",
+            organization=organization, organization_role=share_role,
+        )
+        invalidate_organization_rbac_cache(str(organization.id))
         DataroomCollaborator.objects.create(dataroom=dataroom, user=collab1, invited_by=user)
         DataroomCollaborator.objects.create(dataroom=dataroom, user=collab2, invited_by=user)
 
@@ -292,6 +307,55 @@ class TestDataroomCollaborators:
         res_owner_del = api_client.delete(f'/api/v1/share-links/{link1_id}/')
         assert res_owner_del.status_code == status.HTTP_204_NO_CONTENT
         assert not ShareLink.objects.filter(id=link1_id).exists()
+
+    def test_collaborator_without_share_grant_cannot_manage_dataroom_links(self, api_client, dataroom, user, organization):
+        collab = User.objects.create_user(
+            email="noshare@test.com", username="noshare@test.com", password="password", organization=organization,
+        )
+        DataroomCollaborator.objects.create(dataroom=dataroom, user=collab, invited_by=user)
+        api_client.force_authenticate(user=collab)
+
+        created = api_client.post('/api/v1/share-links/', {
+            'dataroom': str(dataroom.id),
+            'name': 'Blocked Link',
+        }, format='json')
+        assert created.status_code == status.HTTP_403_FORBIDDEN
+
+        listed = api_client.get(f'/api/v1/share-links/?dataroom_id={dataroom.id}')
+        assert listed.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_owner_can_share_dataroom_without_role_grant(self, api_client, dataroom):
+        response = api_client.post('/api/v1/share-links/', {
+            'dataroom': str(dataroom.id),
+            'name': 'Owner Link',
+        }, format='json')
+        assert response.status_code == status.HTTP_201_CREATED
+
+    def test_org_admin_share_requires_role_grant(self, api_client, dataroom, admin_user, organization):
+        from permissions_rbac.catalogue import PERM_DATAROOM_SHARE
+        from permissions_rbac.models import DataroomRole, DataroomRolePermission
+        from permissions_rbac.seed import ensure_default_roles_for_organization
+        from permissions_rbac.services import invalidate_organization_rbac_cache
+
+        ensure_default_roles_for_organization(organization)
+        admin_role = DataroomRole.objects.get(organization=organization, slug='admin')
+        admin_role.permission_grants.filter(permission=PERM_DATAROOM_SHARE).delete()
+        invalidate_organization_rbac_cache(str(organization.id))
+
+        api_client.force_authenticate(user=admin_user)
+        denied = api_client.post('/api/v1/share-links/', {
+            'dataroom': str(dataroom.id),
+            'name': 'Admin Blocked',
+        }, format='json')
+        assert denied.status_code == status.HTTP_403_FORBIDDEN
+
+        DataroomRolePermission.objects.create(role=admin_role, permission=PERM_DATAROOM_SHARE, scope='')
+        invalidate_organization_rbac_cache(str(organization.id))
+        allowed = api_client.post('/api/v1/share-links/', {
+            'dataroom': str(dataroom.id),
+            'name': 'Admin Allowed',
+        }, format='json')
+        assert allowed.status_code == status.HTTP_201_CREATED
 
     def test_collaborator_folder_creation_sets_created_by(self, api_client, dataroom, user, organization):
         from permissions_rbac.models import DataroomRole

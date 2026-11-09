@@ -23,7 +23,7 @@ def ensure_default_roles_for_organization(organization) -> Dict[str, DataroomRol
     roles: Dict[str, DataroomRole] = {}
     with transaction.atomic():
         for slug in SYSTEM_ROLE_SLUGS:
-            role, _ = DataroomRole.objects.get_or_create(
+            role, created = DataroomRole.objects.get_or_create(
                 organization=organization,
                 slug=slug,
                 defaults={
@@ -32,12 +32,21 @@ def ensure_default_roles_for_organization(organization) -> Dict[str, DataroomRol
                     'is_system': True,
                 },
             )
+            updates = []
             if role.name != ROLE_DISPLAY_NAMES[slug]:
                 role.name = ROLE_DISPLAY_NAMES[slug]
+                updates.append('name')
+            if not role.is_system:
                 role.is_system = True
-                role.save(update_fields=['name', 'is_system', 'updated_at'])
+                updates.append('is_system')
+            if updates:
+                updates.append('updated_at')
+                role.save(update_fields=updates)
+            # Apply the template only when the role is first created.
+            # Repeating this on every roles-list load wiped saved grants.
+            if created:
+                _apply_role_grants(role, default_grants_for_role_slug(slug))
             roles[slug] = role
-            _apply_role_grants(role, default_grants_for_role_slug(slug))
         _ensure_site_role_grants(organization)
     return roles
 

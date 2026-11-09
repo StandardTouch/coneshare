@@ -122,6 +122,36 @@ describe('DataroomsPage', () => {
             expect(screen.queryByRole('button', { name: /Add Dataroom/i })).not.toBeInTheDocument();
         });
 
+        it('hides the empty-state create action when the user cannot create a dataroom', async () => {
+            mockCurrentUser = { id: 'u2', email: 'member@example.com', role: 'member', can_create_dataroom: false };
+            api.getDatarooms.mockResolvedValue({ data: [] });
+            renderComponent();
+            expect(await screen.findByText('No datarooms found')).toBeInTheDocument();
+            expect(screen.getByText('You do not have permission to create a dataroom.')).toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: /Add Dataroom/i })).not.toBeInTheDocument();
+            expect(screen.queryByText('Get started by creating your first dataroom.')).not.toBeInTheDocument();
+        });
+
+        it('hides share on a dataroom the user cannot share', async () => {
+            mockCurrentUser = { id: 'u1', email: 'test@example.com', role: 'member', can_create_dataroom: true };
+            api.getDatarooms.mockResolvedValue({
+                data: [{
+                    id: 'dr_shared',
+                    name: 'Team Project Room',
+                    created_by: 'other_user',
+                    current_user_role: 'collaborator',
+                    can_share: false,
+                    created_at: '2023-01-01T12:00:00Z',
+                }],
+            });
+            const user = userEvent.setup();
+            renderComponent();
+            const card = (await screen.findByText('Team Project Room')).closest('div.group');
+            await user.click(await within(card).findByRole('button', { name: 'Actions' }));
+            expect(screen.queryByText('Share')).not.toBeInTheDocument();
+            expect(screen.getByText('Rename')).toBeInTheDocument();
+        });
+
         it('should create a new dataroom and refresh the list', async () => {
             const user = userEvent.setup();
             renderComponent();

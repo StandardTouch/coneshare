@@ -6,8 +6,10 @@ from django.conf import settings
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
 
 from core.models import Organization
+from permissions_rbac.services import user_may_share_dataroom
 from datarooms.models import Dataroom
 from .models import (DataroomVisit, PageView, ShareLink,
                      QnAMessage, QnAThread,
@@ -395,10 +397,8 @@ class ShareLinkSerializer(serializers.ModelSerializer):
                                 {'document': 'You do not have permission to share this document.'}
                             )
                 if dataroom:
-                    is_owner = dataroom.created_by_id is not None and dataroom.created_by_id == user.id
-                    is_collaborator = dataroom.collaborators.filter(user=user).exists()
-                    if not (is_owner or is_admin or is_collaborator):
-                        raise serializers.ValidationError({'dataroom': 'You do not have permission to share this dataroom.'})
+                    if not user_may_share_dataroom(user, dataroom):
+                        raise PermissionDenied('You do not have permission to share this dataroom.')
 
         enable_watermark = data.get('enable_watermark', self.instance.enable_watermark if self.instance else False)
         if document:

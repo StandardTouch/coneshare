@@ -453,6 +453,8 @@
     "noSharedDatarooms": "No shared datarooms",
     "noSharedDataroomsNotice": "Datarooms shared with you by teammates or partners will appear here.",
     "getStartedNotice": "Get started by creating your first dataroom.",
+    "noCreatePermissionNotice": "You do not have permission to create a dataroom.",
+    "listDescriptionNoCreate": "Datarooms you belong to are listed here.",
     "createdOn": "Created on {{date}}",
     "deleteConfirmTitle": "Delete \"{{name}}\"?",
     "deleteConfirmDescription": "This action cannot be undone. This will permanently delete the dataroom and all its contents.",

@@ -5,6 +5,8 @@ from permissions_rbac.catalogue import (
     ALL_ROLE_GRANT_PERMISSIONS,
     PERMISSION_DEFINITIONS,
     PERM_DATAROOM_CREATE,
+    PERM_DATAROOM_EDIT,
+    PERM_DATAROOM_SHARE,
     PERM_FILE_DOWNLOAD,
     PERM_FILE_VIEW,
     PERM_SYSTEM_SIGNATURE,
@@ -15,7 +17,7 @@ from permissions_rbac.catalogue import (
     default_grants_for_role_slug,
 )
 from permissions_rbac.models import DataroomRole, DataroomRolePermission
-from permissions_rbac.seed import ensure_default_roles_for_organization
+from permissions_rbac.seed import ensure_default_roles_for_organization, reset_all_system_roles_for_organization
 from permissions_rbac.services import has_perm, has_system_perm
 
 
@@ -59,6 +61,35 @@ def test_manager_template_excludes_system_by_default(organization):
     mgr = DataroomRole.objects.get(organization=organization, slug=ROLE_SLUG_MANAGER)
     granted = {g.permission for g in mgr.permission_grants.all()}
     assert PERM_SYSTEM_SIGNATURE not in granted
+    assert PERM_DATAROOM_CREATE in granted
+    assert PERM_DATAROOM_SHARE in granted
+
+
+@pytest.mark.django_db
+def test_ensure_default_roles_keeps_saved_grants(organization):
+    ensure_default_roles_for_organization(organization)
+    admin = DataroomRole.objects.get(organization=organization, slug=ROLE_SLUG_ADMIN)
+    admin.permission_grants.filter(permission=PERM_DATAROOM_CREATE).delete()
+    admin.permission_grants.filter(permission=PERM_FILE_VIEW).delete()
+
+    ensure_default_roles_for_organization(organization)
+
+    granted = set(admin.permission_grants.values_list('permission', flat=True))
+    assert PERM_DATAROOM_CREATE not in granted
+    assert PERM_FILE_VIEW not in granted
+    assert PERM_DATAROOM_EDIT in granted
+
+
+@pytest.mark.django_db
+def test_reset_system_roles_restores_share_grant(organization):
+    ensure_default_roles_for_organization(organization)
+    admin = DataroomRole.objects.get(organization=organization, slug=ROLE_SLUG_ADMIN)
+    admin.permission_grants.all().delete()
+
+    reset_all_system_roles_for_organization(organization)
+
+    granted = set(admin.permission_grants.values_list('permission', flat=True))
+    assert PERM_DATAROOM_SHARE in granted
     assert PERM_DATAROOM_CREATE in granted
 
 

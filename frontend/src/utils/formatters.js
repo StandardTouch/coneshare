@@ -77,6 +77,18 @@ export function getAvatarInitial(name, email) {
 }
 
 /**
+ * Whether the user may share this dataroom. Prefers the API flag, then ownership.
+ */
+export function canShareDataroom(dataroom, user) {
+  if (!dataroom) return false;
+  if (typeof dataroom.can_share === 'boolean') return dataroom.can_share;
+  if (typeof dataroom.current_user_permissions?.can_share_dataroom === 'boolean') {
+    return dataroom.current_user_permissions.can_share_dataroom;
+  }
+  return isDataroomOwner(dataroom, user);
+}
+
+/**
  * Authoritatively determines if the current user is the owner of a dataroom.
  * Prioritizes server-computed `current_user_role` followed by created_by and owner ID comparisons.
  * @param {Object} dataroom - Dataroom object

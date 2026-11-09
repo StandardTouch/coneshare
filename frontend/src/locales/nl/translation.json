@@ -447,6 +447,8 @@
     "noSharedDatarooms": "Geen gedeelde datarooms",
     "noSharedDataroomsNotice": "Datarooms die teamgenoten of partners met u delen, verschijnen hier.",
     "getStartedNotice": "Begin met het aanmaken van uw eerste dataroom.",
+    "noCreatePermissionNotice": "U hebt geen toestemming om een dataroom aan te maken.",
+    "listDescriptionNoCreate": "Datarooms waarvan u deel uitmaakt, staan hier.",
     "createdOn": "Aangemaakt op {{date}}",
     "deleteConfirmTitle": "\"{{name}}\" verwijderen?",
     "deleteConfirmDescription": "Deze actie kan niet ongedaan worden gemaakt. De dataroom en alle inhoud worden definitief verwijderd.",
