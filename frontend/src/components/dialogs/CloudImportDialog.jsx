@@ -160,7 +160,7 @@ export function CloudImportDialog({ isOpen, onOpenChange, provider, connection, 
             {t('cloudImport.pickerModeNotice')}
           </p>
           <Button
-            onClick={openPicker}
+            onClick={() => openPicker()}
             disabled={pickerLoading || importingFileId !== null}
             size="lg"
           >
