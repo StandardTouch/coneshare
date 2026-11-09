@@ -10,6 +10,7 @@ vi.mock('../../services/api', () => ({
   getAdminUserDetails: vi.fn(),
   getAdminUserShareLinks: vi.fn(),
   getAdminUserDatarooms: vi.fn(),
+  getAdminSettings: vi.fn(),
   recalculateAdminUserQuota: vi.fn(),
   resetAdminUserPassword: vi.fn(),
 }));
@@ -43,6 +44,7 @@ describe('AdminUserDetailPage', () => {
     api.getAdminUserDetails.mockResolvedValue({ data: mockUser });
     api.getAdminUserShareLinks.mockResolvedValue({ data: { results: [] } });
     api.getAdminUserDatarooms.mockResolvedValue({ data: { results: [] } });
+    api.getAdminSettings.mockResolvedValue({ data: [] });
   });
 
   it('renders user details and storage quota info', async () => {

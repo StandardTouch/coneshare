@@ -5,9 +5,39 @@ from rest_framework.test import APIClient
 
 from core.models import User
 from datarooms.models import Dataroom, DataroomCollaborator, DataroomFolder
+from permissions_rbac.catalogue import (
+    PERM_FILE_CREATE_SHARE_LINK,
+    PERM_FILE_VIEW,
+    PERM_FOLDER_CREATE,
+    PERM_UPLOAD_FILES,
+    SCOPE_ANY,
+)
+from permissions_rbac.models import DataroomRole, DataroomRolePermission
+from permissions_rbac.seed import ensure_default_roles_for_organization
+from permissions_rbac.services import invalidate_organization_rbac_cache
 from sharelinks.models import ShareLink
 
 pytest_plugins = "bdd.step_definitions.common_steps"
+
+
+def _collaborator_org_role(organization):
+    ensure_default_roles_for_organization(organization)
+    role, _ = DataroomRole.objects.get_or_create(
+        organization=organization,
+        slug='bdd-collaborator',
+        defaults={'name': 'BDD Collaborator', 'is_system': False},
+    )
+    DataroomRolePermission.objects.filter(role=role).delete()
+    DataroomRolePermission.objects.bulk_create(
+        [
+            DataroomRolePermission(role=role, permission=PERM_FILE_VIEW, scope=SCOPE_ANY),
+            DataroomRolePermission(role=role, permission=PERM_FOLDER_CREATE, scope=''),
+            DataroomRolePermission(role=role, permission=PERM_UPLOAD_FILES, scope=''),
+            DataroomRolePermission(role=role, permission=PERM_FILE_CREATE_SHARE_LINK, scope=''),
+        ]
+    )
+    invalidate_organization_rbac_cache(str(organization.id))
+    return role
 
 
 # Scenarios
@@ -57,6 +87,7 @@ def test_collaborator_cannot_delete_dataroom():
 @given(parsers.parse('a team member "{email}" exists in my organization'), target_fixture="collab_user")
 def collab_user(user_context, email):
     owner = user_context['user']
+    role = _collaborator_org_role(owner.organization)
     user, _ = User.objects.get_or_create(
         email=email,
         defaults={
@@ -66,6 +97,7 @@ def collab_user(user_context, email):
         }
     )
     user.set_password('password123')
+    user.organization_role = role
     user.save()
     user_context['collab_user'] = user
     return user

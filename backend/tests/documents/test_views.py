@@ -1463,7 +1463,7 @@ class TestDocumentViewSet:
         assert doc_resp.status_code == status.HTTP_404_NOT_FOUND
 
         views_resp = api_client.get(f'/api/v1/documents/{document.id}/view-sessions/')
-        assert views_resp.status_code == status.HTTP_403_FORBIDDEN
+        assert views_resp.status_code == status.HTTP_404_NOT_FOUND
 
         # 2. As document owner (user): view-sessions access is permitted (200 OK)
         api_client.force_authenticate(user=user)

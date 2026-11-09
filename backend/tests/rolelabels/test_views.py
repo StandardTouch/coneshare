@@ -6,6 +6,7 @@ from django.core.cache import cache
 from rest_framework import status
 
 from core.models import AppConfiguration, Organization
+from permissions_rbac.catalogue import ROLE_SLUG_MANAGER
 from permissions_rbac.models import DataroomRole
 from permissions_rbac.seed import ensure_default_roles_for_organization
 from rolelabels.models import RoleLabel, UserRoleLabel
@@ -133,22 +134,22 @@ class TestRoleLabelOrgScoping:
 class TestAdminUserRoleLabel:
     def test_member_with_organization_role(self, admin_api_client, user, admin_user):
         ensure_default_roles_for_organization(admin_user.organization)
-        viewer = DataroomRole.objects.get(organization=admin_user.organization, slug='viewer')
+        manager = DataroomRole.objects.get(organization=admin_user.organization, slug=ROLE_SLUG_MANAGER)
         response = admin_api_client.patch(
             f'/api/v1/admin/users/{user.id}/',
-            {'role': 'member', 'organization_role_id': str(viewer.id)},
+            {'role': 'member', 'organization_role_id': str(manager.id)},
             format='json',
         )
         assert response.status_code == status.HTTP_200_OK
         user.refresh_from_db()
         assert user.role == 'member'
-        assert user.organization_role_id == viewer.id
-        assert response.data['organization_role']['id'] == str(viewer.id)
+        assert user.organization_role_id == manager.id
+        assert response.data['organization_role']['id'] == str(manager.id)
 
     def test_admin_role_clears_organization_role(self, admin_api_client, user, admin_user):
         ensure_default_roles_for_organization(admin_user.organization)
-        viewer = DataroomRole.objects.get(organization=admin_user.organization, slug='viewer')
-        user.organization_role = viewer
+        manager = DataroomRole.objects.get(organization=admin_user.organization, slug=ROLE_SLUG_MANAGER)
+        user.organization_role = manager
         user.save(update_fields=['organization_role'])
         response = admin_api_client.patch(
             f'/api/v1/admin/users/{user.id}/',

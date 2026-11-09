@@ -5,17 +5,48 @@ from django.contrib.auth import get_user_model
 
 from datarooms.models import Dataroom, DataroomDocument, DataroomCollaborator
 from documents.models import Document, DocumentVersion
+from permissions_rbac.catalogue import (
+    PERM_FILE_DOWNLOAD,
+    PERM_FILE_VIEW,
+    PERM_SYSTEM_DOCUMENTS,
+    SCOPE_ANY,
+)
+from permissions_rbac.models import DataroomRole, DataroomRolePermission
+from permissions_rbac.seed import ensure_default_roles_for_organization
+from permissions_rbac.services import invalidate_organization_rbac_cache
 
 User = get_user_model()
 
 
 @pytest.fixture
-def other_user(db, organization):
+def collaborator_org_role(organization):
+    """Org role for dataroom collaborators in integration tests (Manager + personal library)."""
+    ensure_default_roles_for_organization(organization)
+    role = DataroomRole.objects.create(
+        organization=organization,
+        slug='collaborator-standard',
+        name='Collaborator Standard',
+        is_system=False,
+    )
+    DataroomRolePermission.objects.bulk_create(
+        [
+            DataroomRolePermission(role=role, permission=PERM_SYSTEM_DOCUMENTS, scope=''),
+            DataroomRolePermission(role=role, permission=PERM_FILE_VIEW, scope=SCOPE_ANY),
+            DataroomRolePermission(role=role, permission=PERM_FILE_DOWNLOAD, scope=SCOPE_ANY),
+        ]
+    )
+    invalidate_organization_rbac_cache(str(organization.id))
+    return role
+
+
+@pytest.fixture
+def other_user(db, organization, collaborator_org_role):
     return User.objects.create_user(
         username="collab@example.com",
         email="collab@example.com",
         password="password123",
         organization=organization,
+        organization_role=collaborator_org_role,
     )
 
 
