@@ -11,6 +11,7 @@ from documents.models import Document, DocumentVersion
 from permissions_rbac.catalogue import (
     PERM_FILE_CREATE_SHARE_LINK,
     PERM_FILE_DOWNLOAD,
+    PERM_FILE_PRINT,
     PERM_FILE_VIEW,
     PERM_UPLOAD_FILES,
     SCOPE_ANY,
@@ -194,6 +195,33 @@ class TestDataroomFileViewWithoutSystemDocuments:
         assert perms.get('can_view') is True
         assert perms.get('can_create_share_link') is True
         assert perms.get('can_download') is False
+        assert perms.get('can_print') is False
+
+
+@pytest.mark.django_db
+def test_file_print_grant_allows_printing_and_owner_always_can(
+    api_client, user, organization, dataroom_viewer, viewer_client
+):
+    room = Dataroom.objects.create(name='Print Room', organization=organization, created_by=user)
+    DataroomCollaborator.objects.create(dataroom=room, user=dataroom_viewer, invited_by=user)
+    doc = _ready_doc('printable.pdf', user, organization)
+    DataroomDocument.objects.create(dataroom=room, document=doc, name=doc.name)
+    role = _role_with_grants(organization, {PERM_FILE_VIEW: SCOPE_ANY})
+    dataroom_viewer.organization_role = role
+    dataroom_viewer.save(update_fields=['organization_role'])
+
+    denied = viewer_client.get(f'/api/v1/documents/{doc.id}/', {'dataroom_id': str(room.id)})
+    assert denied.status_code == status.HTTP_200_OK
+    assert denied.data['dataroom_context_permissions']['can_print'] is False
+
+    DataroomRolePermission.objects.create(role=role, permission=PERM_FILE_PRINT, scope='')
+    invalidate_organization_rbac_cache(str(organization.id))
+
+    allowed = viewer_client.get(f'/api/v1/documents/{doc.id}/', {'dataroom_id': str(room.id)})
+    assert allowed.data['dataroom_context_permissions']['can_print'] is True
+
+    owner = api_client.get(f'/api/v1/documents/{doc.id}/', {'dataroom_id': str(room.id)})
+    assert owner.data['dataroom_context_permissions']['can_print'] is True
 
 
 @pytest.mark.django_db

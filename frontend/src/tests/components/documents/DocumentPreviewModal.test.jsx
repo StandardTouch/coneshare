@@ -2,6 +2,11 @@ import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DocumentPreviewModal } from '../../../components/documents/DocumentPreviewModal';
 import * as api from '../../../services/api';
+import '../../../i18n';
+
+vi.mock('../../../components/documents/PreviewViewer', () => ({
+  PreviewViewer: () => <div>Preview pages</div>,
+}));
 
 // Mock API service
 vi.mock('../../../services/api');
@@ -20,6 +25,30 @@ describe('DocumentPreviewModal', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('hides print when the role does not allow printing', async () => {
+    vi.spyOn(api, 'getDocumentPreviewData').mockResolvedValue({
+      data: {
+        name: 'minutes.pdf',
+        preview_status: 'ready',
+        preview_mode: 'image',
+        pages: [{ url: 'https://example.com/page.png', page_number: 1 }],
+        num_pages: 1,
+      },
+    });
+
+    render(
+      <DocumentPreviewModal
+        documentId="doc1"
+        isOpen={true}
+        allowPrint={false}
+        onOpenChange={vi.fn()}
+      />
+    );
+
+    expect(await screen.findByText('minutes.pdf')).toBeInTheDocument();
+    expect(screen.queryByTitle('Print document')).not.toBeInTheDocument();
   });
 
   it('resets rebuildTriggerCount when context changes to prevent unwanted force rebuilds', async () => {

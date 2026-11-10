@@ -434,6 +434,7 @@ def _item_permissions_payload(serializer, obj, item_type: str):
         return {
             'can_view': False,
             'can_download': False,
+            'can_print': False,
             'can_modify': False,
             'can_delete': False,
             'can_rename': False,

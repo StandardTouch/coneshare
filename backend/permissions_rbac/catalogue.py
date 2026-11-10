@@ -60,6 +60,7 @@ PERM_UPLOAD_FROM_DRIVE = 'upload_from_drive'
 # --- Dataroom: file ---
 PERM_FILE_VIEW = 'file_view'
 PERM_FILE_DOWNLOAD = 'file_download'
+PERM_FILE_PRINT = 'file_print'
 PERM_FILE_RENAME = 'file_rename'
 PERM_FILE_DELETE = 'file_delete'
 PERM_FILE_CREATE_SHARE_LINK = 'file_create_share_link'
@@ -96,6 +97,7 @@ ALL_DATAROOM_PERMISSIONS: List[str] = [
     PERM_UPLOAD_FROM_DRIVE,
     PERM_FILE_VIEW,
     PERM_FILE_DOWNLOAD,
+    PERM_FILE_PRINT,
     PERM_FILE_RENAME,
     PERM_FILE_DELETE,
     PERM_FILE_CREATE_SHARE_LINK,
@@ -229,6 +231,9 @@ PERMISSION_DEFINITIONS: Dict[str, PermissionDefinition] = {
     PERM_FILE_VIEW: PermissionDefinition(PERM_FILE_VIEW, 'View', True, 'dataroom_file', 'Datarooms — File Permission'),
     PERM_FILE_DOWNLOAD: PermissionDefinition(
         PERM_FILE_DOWNLOAD, 'Download', False, 'dataroom_file', 'Datarooms — File Permission'
+    ),
+    PERM_FILE_PRINT: PermissionDefinition(
+        PERM_FILE_PRINT, 'Print', False, 'dataroom_file', 'Datarooms — File Permission'
     ),
     PERM_FILE_RENAME: PermissionDefinition(
         PERM_FILE_RENAME, 'Rename', True, 'dataroom_file', 'Datarooms — File Permission'

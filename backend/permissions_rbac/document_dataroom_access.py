@@ -124,6 +124,7 @@ def document_dataroom_page_permissions(user, document: Document, dataroom_id: st
         'dataroom_id': str(dataroom.id),
         'can_view': item.get('can_view', False),
         'can_download': item.get('can_download', False),
+        'can_print': item.get('can_print', False),
         'can_rename': item.get('can_rename', False),
         'can_create_share_link': item.get('can_manage_share_settings', False),
         'can_see_qna_tab': has_perm(user, PERM_DATAROOM_QNA_TAB, dataroom),

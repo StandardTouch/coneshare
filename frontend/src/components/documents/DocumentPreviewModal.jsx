@@ -19,11 +19,15 @@ import { VideoViewer } from './VideoViewer';
 import { SpreadsheetViewer } from './SpreadsheetViewer';
 import { MarkdownViewer } from './MarkdownViewer';
 import { ViewerToolbar } from '../viewer/ViewerToolbar';
+import { usePrintProtection, PrintDisabledNotice } from '../../hooks/usePrintProtection';
+import { useTranslation } from 'react-i18next';
 import { printPdf, printImages } from '../../lib/print';
 
 const PREVIEW_POLL_INTERVAL_MS = 3000;
 
-export function DocumentPreviewModal({ documentId, versionId = null, isOpen, onOpenChange }) {
+export function DocumentPreviewModal({ documentId, versionId = null, isOpen, onOpenChange, allowPrint = true }) {
+  const { t } = useTranslation();
+  usePrintProtection(isOpen && !allowPrint);
   const [documentData, setDocumentData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -157,7 +161,7 @@ export function DocumentPreviewModal({ documentId, versionId = null, isOpen, onO
   };
 
   const handlePrint = () => {
-    if (!documentData) return;
+    if (!allowPrint || !documentData) return;
 
     if (documentData.preview_mode === 'client_pdf') {
       printPdf(documentData.pdf_preview_url);
@@ -179,7 +183,8 @@ export function DocumentPreviewModal({ documentId, versionId = null, isOpen, onO
             {documentData ? documentData.name : 'Document Preview'}
           </DialogTitle>
         </DialogHeader>
-        <div ref={modalViewerRef} className="relative h-[calc(90vh-80px)] py-4 overflow-hidden">
+        <div ref={modalViewerRef} className="relative h-[calc(90vh-80px)] py-4 overflow-hidden" data-viewer-content>
+          <PrintDisabledNotice message={!allowPrint ? t('viewer.printDisabledNotice') : null} />
           {isLoading && (
             <div className="space-y-4">
               <Skeleton className="h-24 w-full" />
@@ -203,6 +208,7 @@ export function DocumentPreviewModal({ documentId, versionId = null, isOpen, onO
               totalPages={totalPages}
               viewId={null}
               previewMode={documentData.preview_mode}
+              allowPrint={allowPrint}
               onPrint={handlePrint}
             />
           )}

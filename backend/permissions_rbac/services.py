@@ -26,6 +26,7 @@ from permissions_rbac.catalogue import (
     PERM_EDIT_DATAROOM_SETTINGS,
     PERM_FILE_CREATE_SHARE_LINK,
     PERM_FILE_DOWNLOAD,
+    PERM_FILE_PRINT,
     PERM_FILE_DELETE,
     PERM_FILE_RENAME,
     PERM_FILE_VIEW,
@@ -385,6 +386,7 @@ def item_permissions_for_user(user, dataroom: Dataroom, item_type: str, item) ->
         return {
             'can_view': True,
             'can_download': True,
+            'can_print': True,
             'can_modify': True,
             'can_delete': True,
             'can_rename': True,
@@ -401,6 +403,7 @@ def item_permissions_for_user(user, dataroom: Dataroom, item_type: str, item) ->
     return {
         'can_view': has_perm(user, PERM_VIEW, dataroom, item, item_type),
         'can_download': has_perm(user, PERM_DOWNLOAD, dataroom, item, item_type),
+        'can_print': has_perm(user, PERM_FILE_PRINT, dataroom, item, item_type),
         'can_modify': has_perm(user, PERM_RENAME, dataroom, item, item_type),
         'can_delete': has_perm(user, PERM_DELETE, dataroom, item, item_type),
         'can_rename': has_perm(user, PERM_RENAME, dataroom, item, item_type),

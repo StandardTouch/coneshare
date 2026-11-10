@@ -184,6 +184,9 @@ export function DocumentPage() {
   const canDownload = Boolean(
     document && (!inDataroomContext ? (isOwner || isOrgAdmin) : drPerms?.can_download),
   );
+  const canPrint = Boolean(
+    document && (!inDataroomContext ? (isOwner || isOrgAdmin) : drPerms?.can_print),
+  );
   const canCreateLink = canShowShareLinks;
   const showDataroomCollaboratorNotice = Boolean(
     inDataroomContext && !canShowShareLinks && !canShowViewSessions && !canShowQna,
@@ -615,6 +618,7 @@ export function DocumentPage() {
         onOpenChange={setIsPreviewOpen}
         documentId={documentId}
         versionId={null}
+        allowPrint={canPrint}
       />
       <ConfirmationDialog
         isOpen={isDeleteDialogOpen}
