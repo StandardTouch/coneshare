@@ -119,9 +119,31 @@ class TestDataroomFileViewWithoutSystemDocuments:
 
         resp = viewer_client.get(f'/api/v1/documents/{owner_doc.id}/preview-data/')
         assert resp.status_code == status.HTTP_200_OK
+        assert not resp.data.get('download_url')
 
         dl = viewer_client.get(f'/api/v1/documents/{owner_doc.id}/download/')
         assert dl.status_code == status.HTTP_404_NOT_FOUND
+
+    @patch('documents.renderers.base.fileserver.fileserver_client.generate_download_url')
+    def test_preview_includes_download_url_when_file_download_granted(
+        self, mock_download_url, user, organization, dataroom_viewer, viewer_client
+    ):
+        mock_download_url.return_value = 'https://files.example/owner.pdf'
+        role = _role_with_grants(
+            organization,
+            {PERM_FILE_VIEW: SCOPE_ANY, PERM_FILE_DOWNLOAD: ''},
+        )
+        dataroom_viewer.organization_role = role
+        dataroom_viewer.save(update_fields=['organization_role'])
+
+        room = Dataroom.objects.create(name='Download Room', organization=organization, created_by=user)
+        DataroomCollaborator.objects.create(dataroom=room, user=dataroom_viewer, invited_by=user)
+        owner_doc = _ready_doc('owner.pdf', user, organization)
+        DataroomDocument.objects.create(dataroom=room, document=owner_doc, name=owner_doc.name)
+
+        resp = viewer_client.get(f'/api/v1/documents/{owner_doc.id}/preview-data/')
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp.data.get('download_url') == 'https://files.example/owner.pdf'
 
     def test_own_scope_hides_other_users_files(self, user, organization, dataroom_viewer, viewer_client):
         role = _role_with_grants(organization, {PERM_FILE_VIEW: SCOPE_OWN})

@@ -41,7 +41,13 @@ vi.mock('../../components/links/LinkSheet', () => ({
   LinkSheet: () => <div>Link Sheet</div>,
 }));
 vi.mock('../../components/documents/DocumentPreviewModal', () => ({
-  DocumentPreviewModal: () => <div>Preview Modal</div>,
+  DocumentPreviewModal: ({ allowDownload, allowPrint }) => (
+    <div>
+      Preview Modal
+      <span data-testid="preview-allow-download">{String(Boolean(allowDownload))}</span>
+      <span data-testid="preview-allow-print">{String(Boolean(allowPrint))}</span>
+    </div>
+  ),
 }));
 vi.mock('../../components/qna/OwnerQnAManager', () => ({
   OwnerQnAManager: () => <div>Owner Q&A Manager</div>,
@@ -129,6 +135,33 @@ describe('DocumentPage', () => {
     });
     expect(api.getDocumentViews).not.toHaveBeenCalled();
     expect(api.getDocumentStats).not.toHaveBeenCalled();
+  });
+
+  it('passes the dataroom download permission into the preview popup', async () => {
+    mockCurrentUser = { id: 'u1', role: 'member' };
+    api.getDocumentDetails.mockResolvedValue({
+      data: {
+        ...mockDocument,
+        created_by: 'someone-else',
+        dataroom_context_permissions: {
+          can_download: false,
+          can_print: true,
+        },
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/documents/doc123?from_dataroom=dr1']}>
+        <BreadcrumbProvider>
+          <Routes>
+            <Route path="/documents/:documentId" element={<DocumentPage />} />
+          </Routes>
+        </BreadcrumbProvider>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByTestId('preview-allow-download')).toHaveTextContent('false');
+    expect(screen.getByTestId('preview-allow-print')).toHaveTextContent('true');
   });
 
   it('shows request signature for a dataroom pdf when signature access is enabled', async () => {

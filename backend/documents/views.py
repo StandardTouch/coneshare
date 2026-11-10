@@ -703,7 +703,10 @@ class DocumentPreviewDataView(APIView):
     )
     def get(self, request, document_id, *args, **kwargs):
         from featuregates.services import documents_enabled_for_user
-        from permissions_rbac.dataroom_access import assert_document_view_allowed
+        from permissions_rbac.dataroom_access import (
+            assert_document_download_allowed,
+            assert_document_view_allowed,
+        )
         from permissions_rbac.document_dataroom_access import user_can_preview_document
 
         if not documents_enabled_for_user(request.user) and not user_can_preview_document(
@@ -770,7 +773,13 @@ class DocumentPreviewDataView(APIView):
         if renderer.should_serve_pages(primary_version, render_status):
             pages_data = prepare_pages_data(document, primary_version)
 
-        download_url = renderer.get_download_url(document, primary_version, pages_data)
+        download_url = None
+        try:
+            assert_document_download_allowed(request.user, document)
+        except (NotFound, PermissionDenied):
+            download_url = None
+        else:
+            download_url = renderer.get_download_url(document, primary_version, pages_data)
 
         pdf_preview_url = None
         if preview_mode == 'client_pdf':

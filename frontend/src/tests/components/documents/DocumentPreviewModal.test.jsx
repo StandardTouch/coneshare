@@ -51,6 +51,55 @@ describe('DocumentPreviewModal', () => {
     expect(screen.queryByTitle('Print document')).not.toBeInTheDocument();
   });
 
+  it('hides download in the preview toolbar when the role does not allow it', async () => {
+    vi.spyOn(api, 'getDocumentPreviewData').mockResolvedValue({
+      data: {
+        name: 'minutes.pdf',
+        preview_status: 'ready',
+        preview_mode: 'image',
+        pages: [{ url: 'https://example.com/page.png', page_number: 1 }],
+        num_pages: 1,
+        download_url: 'https://example.com/download',
+      },
+    });
+
+    render(
+      <DocumentPreviewModal
+        documentId="doc1"
+        isOpen={true}
+        allowDownload={false}
+        onOpenChange={vi.fn()}
+      />
+    );
+
+    expect(await screen.findByText('minutes.pdf')).toBeInTheDocument();
+    expect(screen.queryByTitle('Download file')).not.toBeInTheDocument();
+  });
+
+  it('shows download in the preview toolbar when the role allows it', async () => {
+    vi.spyOn(api, 'getDocumentPreviewData').mockResolvedValue({
+      data: {
+        name: 'minutes.pdf',
+        preview_status: 'ready',
+        preview_mode: 'image',
+        pages: [{ url: 'https://example.com/page.png', page_number: 1 }],
+        num_pages: 1,
+        download_url: 'https://example.com/download',
+      },
+    });
+
+    render(
+      <DocumentPreviewModal
+        documentId="doc1"
+        isOpen={true}
+        allowDownload={true}
+        onOpenChange={vi.fn()}
+      />
+    );
+
+    expect(await screen.findByTitle('Download file')).toBeInTheDocument();
+  });
+
   it('resets rebuildTriggerCount when context changes to prevent unwanted force rebuilds', async () => {
     // 1. Mock getDocumentPreviewData and rebuildDocumentPreview
     const mockGetPreview = vi.spyOn(api, 'getDocumentPreviewData')

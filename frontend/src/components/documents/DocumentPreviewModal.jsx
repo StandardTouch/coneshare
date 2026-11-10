@@ -25,7 +25,14 @@ import { printPdf, printImages } from '../../lib/print';
 
 const PREVIEW_POLL_INTERVAL_MS = 3000;
 
-export function DocumentPreviewModal({ documentId, versionId = null, isOpen, onOpenChange, allowPrint = true }) {
+export function DocumentPreviewModal({
+  documentId,
+  versionId = null,
+  isOpen,
+  onOpenChange,
+  allowPrint = true,
+  allowDownload = true,
+}) {
   const { t } = useTranslation();
   usePrintProtection(isOpen && !allowPrint);
   const [documentData, setDocumentData] = useState(null);
@@ -160,6 +167,8 @@ export function DocumentPreviewModal({ documentId, versionId = null, isOpen, onO
     }
   };
 
+  const canDownloadFile = allowDownload && Boolean(documentData?.download_url);
+
   const handlePrint = () => {
     if (!allowPrint || !documentData) return;
 
@@ -195,8 +204,8 @@ export function DocumentPreviewModal({ documentId, versionId = null, isOpen, onO
           {error && <p className="text-center text-red-500">{error}</p>}
           {documentData && (hasRenderablePages(documentData) || documentData.preview_mode === 'client_pdf' || documentData.preview_mode === 'spreadsheet' || documentData.preview_mode === 'markdown') && !isLoading && !error && (
             <ViewerToolbar
-              allowDownload={Boolean(documentData.download_url)}
-              downloadUrl={documentData.download_url}
+              allowDownload={canDownloadFile}
+              downloadUrl={canDownloadFile ? documentData.download_url : null}
               downloadFileName={documentData.name}
               onFullScreen={handleFullScreen}
               onZoomIn={handleZoomIn}
@@ -226,7 +235,7 @@ export function DocumentPreviewModal({ documentId, versionId = null, isOpen, onO
               ref={viewerComponentRef}
               spreadsheetUrl={documentData.spreadsheet_preview_url}
               title={documentData.name}
-              allowDownload={Boolean(documentData.download_url)}
+              allowDownload={canDownloadFile}
               zoomLevel={zoomLevel}
               documentData={documentData}
             />
@@ -236,7 +245,7 @@ export function DocumentPreviewModal({ documentId, versionId = null, isOpen, onO
               ref={viewerComponentRef}
               markdownUrl={documentData.markdown_preview_url}
               title={documentData.name}
-              allowDownload={Boolean(documentData.download_url)}
+              allowDownload={canDownloadFile}
               zoomLevel={zoomLevel}
               documentData={documentData}
             />
@@ -256,15 +265,15 @@ export function DocumentPreviewModal({ documentId, versionId = null, isOpen, onO
               <VideoViewer
                 ref={viewerComponentRef}
                 videoUrl={documentData.video_preview_url}
-                allowDownload={Boolean(documentData.download_url)}
-                downloadUrl={documentData.download_url}
+                allowDownload={canDownloadFile}
+                downloadUrl={canDownloadFile ? documentData.download_url : ''}
               />
             </div>
           )}
           {documentData && !hasRenderablePages(documentData) && documentData.preview_mode !== 'client_pdf' && documentData.preview_mode !== 'video' && documentData.preview_mode !== 'markdown' && (documentData.preview_mode !== 'spreadsheet' || isPreviewPending(documentData) || isPreviewFailed(documentData)) && !error && (
             <PreviewStatePanel
               documentData={documentData}
-              allowDownload={Boolean(documentData.download_url)}
+              allowDownload={canDownloadFile}
               onRetry={handleRetry}
             />
           )}

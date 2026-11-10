@@ -619,6 +619,7 @@ export function DocumentPage() {
         documentId={documentId}
         versionId={null}
         allowPrint={canPrint}
+        allowDownload={canDownload}
       />
       <ConfirmationDialog
         isOpen={isDeleteDialogOpen}
